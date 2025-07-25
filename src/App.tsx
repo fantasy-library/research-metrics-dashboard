@@ -455,7 +455,7 @@ function App() {
                   <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
                     <div className="flex items-center space-x-2">
                       <span>Research Impact Dashboard</span>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border border-purple-200 shadow-sm">
                         BETA
                       </span>
                     </div>
