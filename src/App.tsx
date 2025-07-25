@@ -453,7 +453,12 @@ function App() {
                 </div>
                 <div className="text-center sm:text-left">
                   <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-                    Research Impact Dashboard
+                    <div className="flex items-center space-x-2">
+                      <span>Research Impact Dashboard</span>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                        BETA
+                      </span>
+                    </div>
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-600">Analyze author metrics and research impact</p>
                 </div>
