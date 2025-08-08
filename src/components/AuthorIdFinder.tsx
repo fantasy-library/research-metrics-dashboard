@@ -57,11 +57,12 @@ export const AuthorIdFinder: React.FC<AuthorIdFinderProps> = ({ onAuthorIdFound 
       
       // Make API request
       const response = await fetch(
-        `https://api.elsevier.com/analytics/scival/author/orcid/${cleanOrcid}?apiKey=${DEFAULT_API_KEY}`,
+        `https://api.elsevier.com/analytics/scival/author/orcid/${cleanOrcid}?httpAccept=application%2Fjson&apiKey=${DEFAULT_API_KEY}`,
         {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
+            'X-ELS-APIKey': DEFAULT_API_KEY,
             'User-Agent': 'SciVal-Research-Dashboard/1.0'
           }
         }
