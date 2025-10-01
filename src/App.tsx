@@ -43,7 +43,7 @@ function App() {
   const [authorIds, setAuthorIds] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [showApiKeySection, setShowApiKeySection] = useState(false);
+  const [showApiKeySection] = useState(false);
   const [showAuthorIdFinder, setShowAuthorIdFinder] = useState(false);
   const [results, setResults] = useState<AuthorResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -207,7 +207,7 @@ function App() {
         data: { 
           error: err instanceof Error ? err.message : 'Unknown error',
           metrics: {
-            hIndex: { value: 'N/A', dataSource: { name: 'N/A', url: '' } },
+            hIndex: { value: 'N/A', dataSource: { sourceName: 'N/A', lastUpdated: '', metricStartYear: 0, metricEndYear: 0 } },
             scholarlyOutput: { byYear: {}, total: 'N/A' },
             fwci: { byYear: {}, total: 'N/A' },
             topJournal: { byYear: {}, total: 'N/A' },
@@ -328,7 +328,7 @@ function App() {
     });
   };
 
-  const handleAuthorIdFound = (authorId: string, authorName: string) => {
+  const handleAuthorIdFound = (authorId: string) => {
     // Add the found author ID to the search field
     const currentIds = authorIds.trim();
     if (currentIds) {
