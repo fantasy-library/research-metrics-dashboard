@@ -554,7 +554,7 @@ export class APIService {
 
   private async getDirectAuthorMetrics(authorId: string, customApiKey?: string, yearRange: string = '5yrs', availableMetrics?: any[], includedDocs: string = 'AllPublicationTypes', includeSelfCitations: boolean = true): Promise<AuthorMetrics> {
     try {
-      console.log(`Processing author: ${authorId} with year range: ${yearRange}, document types: ${includedDocs}`);
+      // Processing author metrics
       
       // Determine which metrics to fetch based on enabled metrics
       const enabledMetrics = availableMetrics?.filter(m => m.enabled) || [];
@@ -726,7 +726,7 @@ export class APIService {
         
         for (const authorId of authorIds) {
           try {
-            console.log(`Processing author ${authorId} (${results.length + 1}/${authorIds.length}) with year range: ${yearRange}, document types: ${includedDocs}`);
+            // Processing author ${authorId} (${results.length + 1}/${authorIds.length})
             const data = await this.getDirectAuthorMetrics(authorId.trim(), customApiKey, yearRange, availableMetrics, includedDocs, includeSelfCitations);
             results.push({ id: authorId.trim(), data });
             

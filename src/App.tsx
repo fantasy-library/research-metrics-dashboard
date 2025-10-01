@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Search, BarChart3, Users, FileText, TrendingUp, Info, Key, Eye, EyeOff, Settings, User, BookOpen, ExternalLink, Calendar, Filter, FileType } from 'lucide-react';
+import { BarChart3, FileText, TrendingUp, Info, Key, Eye, EyeOff, User, BookOpen, ExternalLink, Calendar, Filter, FileType } from 'lucide-react';
 import { apiService, AuthorMetrics, APIError } from './services/api';
 import MetricsTable from './components/MetricsTable';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -452,9 +452,14 @@ function App() {
                   <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
                 <div className="text-center sm:text-left">
-                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-                    Research Impact Dashboard
-                  </h1>
+                  <div className="flex items-center justify-center sm:justify-start gap-3">
+                    <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                      Research Impact Dashboard
+                    </h1>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-sm">
+                      BETA
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-slate-600">Analyze author metrics and research impact</p>
                 </div>
               </div>
@@ -1055,26 +1060,10 @@ function App() {
 
           {/* Bottom Section */}
           <div className="border-t border-slate-700 mt-8 pt-8">
-            <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-              <p className="text-sm text-slate-300 text-center md:text-left">
+            <div className="flex justify-center items-center">
+              <p className="text-sm text-slate-300 text-center">
                 © 2025 Hong Kong University of Science and Technology Library. All rights reserved.
               </p>
-              <div className="flex space-x-6">
-                <a 
-                  href="#" 
-                  className="text-sm text-slate-300 hover:text-white transition-colors duration-200"
-                  onClick={() => analytics.trackFeatureUsage('footer_link', 'privacy_policy')}
-                >
-                  Privacy Policy
-                </a>
-                <a 
-                  href="#" 
-                  className="text-sm text-slate-300 hover:text-white transition-colors duration-200"
-                  onClick={() => analytics.trackFeatureUsage('footer_link', 'terms_of_use')}
-                >
-                  Terms of Use
-                </a>
-              </div>
             </div>
           </div>
         </div>

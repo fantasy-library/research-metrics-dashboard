@@ -104,15 +104,15 @@ const metricDefinitions: MetricDefinition[] = [
     suffix: '%'
   },
   {
-    id: 'citations',
-    label: 'Citations (Excl. Self-citation)',
-    getData: (m) => m.citations,
+    id: 'citationCount',
+    label: 'Citation Count',
+    getData: (m) => m.citationCount,
     isYearBased: true
   },
   {
-    id: 'citationsIncl',
-    label: 'Citations (Incl. Self-citation)',
-    getData: (m) => m.citationsIncl || { byYear: {}, total: 'N/A' },
+    id: 'citationsPerPublication',
+    label: 'Citations Per Publication',
+    getData: (m) => m.citationsPerPublication,
     isYearBased: true
   },
   {
@@ -164,8 +164,8 @@ const getDynamicYears = (data: ExportData): string[] => {
     data.metrics.scholarlyOutput.byYear,
     data.metrics.fwci.byYear,
     data.metrics.topJournal.byYear,
-    data.metrics.citations.byYear,
-    data.metrics.citationsIncl?.byYear || {},
+    data.metrics.citationCount.byYear,
+    data.metrics.citationsPerPublication.byYear,
     data.metrics.collaboration?.byYear || {},
     data.metrics.academicCorporateCollaboration?.byYear || {}
   ];
@@ -188,26 +188,42 @@ const getDynamicYears = (data: ExportData): string[] => {
   return ['2019', '2020', '2021', '2022', '2023', '2024'];
 };
 
-const formatExportValue = (value: number | string, suffix: string = ''): string => {
+const formatExportValue = (value: number | string, suffix: string = '', metricId?: string): string => {
   if (value === 'N/A' || value === undefined || value === null) return 'N/A';
   
-  // Special formatting for percentages - format properly
-  if (suffix === '%' && typeof value === 'number') {
-    // If it's a whole number, don't show decimals
-    return value % 1 === 0 ? `${Math.round(value)}${suffix}` : `${value.toFixed(2)}${suffix}`;
+  if (typeof value === 'number') {
+    // Only apply decimal places to specific metrics that need precision
+    const needsDecimalPlaces = metricId === 'fwci' || metricId === 'citationsPerPublication' || metricId === 'topJournal';
+    
+    if (needsDecimalPlaces) {
+      const formattedValue = value.toFixed(2);
+      return `${formattedValue}${suffix}`;
+    } else if (suffix === '%') {
+      // For collaboration percentages, use 2 decimal places fixed
+      return `${value.toFixed(2)}${suffix}`;
+    } else {
+      // For whole number metrics (Publication, H-Index, Citation Count), show as integers
+      return `${Math.round(value)}${suffix}`;
+    }
   }
   
   return `${value}${suffix}`;
 };
 
-const getFormattedCellValue = (yearData: { [year: string]: number }, year: string, isCollaboration: boolean = false): string => {
+const getFormattedCellValue = (yearData: { [year: string]: number }, year: string, isCollaboration: boolean = false, metricId?: string): string => {
   const value = yearData[year];
   if (value !== undefined) {
-    // Format collaboration values properly with %
+    // For year-by-year data, keep original formatting
     if (isCollaboration) {
+      // Collaboration percentages with 2 decimal places fixed
       return value % 1 === 0 ? `${Math.round(value)}%` : `${value.toFixed(2)}%`;
     }
-    return value.toString();
+    // Show 2 decimal places for FWCI and Citations Per Publication
+    if (metricId === 'fwci' || metricId === 'citationsPerPublication') {
+      return value.toFixed(2);
+    }
+    // Whole numbers for other metrics (Publication, Citation Count)
+    return Math.round(value).toString();
   }
   return 'N/A';
 };
@@ -274,14 +290,14 @@ export const exportToPDF = (data: ExportData[], filename: string = 'research-met
         if (metric.isYearBased) {
           return [
             metric.label,
-            ...years.map(year => getFormattedCellValue(data.byYear, year, isCollaboration)),
-            formatExportValue(data.total, metric.suffix || '')
+            ...years.map(year => getFormattedCellValue(data.byYear, year, isCollaboration, metric.id)),
+            formatExportValue(data.total, metric.suffix || '', metric.id)
           ];
         } else {
           return [
             metric.label,
             ...years.map(() => 'N/A'),
-            formatExportValue(data.total, metric.suffix || '')
+            formatExportValue(data.total, metric.suffix || '', metric.id)
           ];
         }
       });
@@ -450,7 +466,6 @@ export const exportToExcel = (data: ExportData[], filename: string = 'research-m
       // Add metrics data
       selectedMetrics.forEach(metric => {
         const data = metric.getData(authorData.metrics);
-        const isCollaboration = metric.isCollaboration;
         
         if (metric.isYearBased) {
           worksheetData.push([
@@ -458,17 +473,28 @@ export const exportToExcel = (data: ExportData[], filename: string = 'research-m
             ...years.map(year => {
               const value = data.byYear[year];
               if (value !== undefined) {
-                return isCollaboration ? (value % 1 === 0 ? Math.round(value) : parseFloat(value.toFixed(2))) : value;
+                // Show 2 decimal places for FWCI and Citations Per Publication
+                if (metric.id === 'fwci' || metric.id === 'citationsPerPublication') {
+                  return value.toFixed(2);
+                }
+                // Whole numbers for other metrics (Publication, Citation Count)
+                return Math.round(value).toString();
               }
               return 'N/A';
             }),
-            typeof data.total === 'number' && isCollaboration ? (data.total % 1 === 0 ? Math.round(data.total) : parseFloat(data.total.toFixed(2))) : data.total
+            typeof data.total === 'number' ? 
+              (metric.id === 'fwci' || metric.id === 'citationsPerPublication' || metric.id === 'topJournal' ? 
+                data.total.toFixed(2) : Math.round(data.total).toString()) : 
+              data.total.toString()
           ]);
         } else {
           worksheetData.push([
             metric.label,
             ...years.map(() => 'N/A'),
-            data.total
+            typeof data.total === 'number' ?
+              (metric.id === 'fwci' || metric.id === 'citationsPerPublication' || metric.id === 'topJournal' ? 
+                data.total.toFixed(2) : Math.round(data.total).toString()) :
+              data.total.toString()
           ]);
         }
       });
@@ -483,7 +509,7 @@ export const exportToExcel = (data: ExportData[], filename: string = 'research-m
         Object.entries(authorData.metrics.collaboration.collaborationTypes).forEach(([type, data]: [string, any]) => {
           worksheetData.push([
             type.replace(/([A-Z])/g, ' $1').trim(),
-            typeof data.total === 'number' ? (data.total % 1 === 0 ? Math.round(data.total) : parseFloat(data.total.toFixed(2))) : data.total
+            typeof data.total === 'number' ? data.total.toFixed(2) : data.total.toString()
           ]);
         });
       }
@@ -498,7 +524,7 @@ export const exportToExcel = (data: ExportData[], filename: string = 'research-m
         Object.entries(authorData.metrics.academicCorporateCollaboration.collaborationTypes).forEach(([type, data]: [string, any]) => {
           worksheetData.push([
             type.replace(/([A-Z])/g, ' $1').trim(),
-            typeof data.total === 'number' ? (data.total % 1 === 0 ? Math.round(data.total) : parseFloat(data.total.toFixed(2))) : data.total
+            typeof data.total === 'number' ? data.total.toFixed(2) : data.total.toString()
           ]);
         });
       }
@@ -506,9 +532,6 @@ export const exportToExcel = (data: ExportData[], filename: string = 'research-m
     
     // Create worksheet
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    
-    // Style the worksheet
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
     
     // Set column widths
     worksheet['!cols'] = [

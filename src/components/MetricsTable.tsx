@@ -32,6 +32,8 @@ interface MetricRow {
 }
 
 const MetricsTable: React.FC<MetricsTableProps> = ({ metrics, dataSource, availableMetrics, onSelectionChange }) => {
+  // State for decimal places control
+  const [decimalPlaces, setDecimalPlaces] = useState<number>(2);
   // Generate dynamic years based on data source or fallback to default range
   const generateYears = () => {
     if (dataSource?.metricStartYear && dataSource?.metricEndYear) {
@@ -152,26 +154,42 @@ const MetricsTable: React.FC<MetricsTableProps> = ({ metrics, dataSource, availa
     }
   }, [selectedMetrics, metricOrder, onSelectionChange]);
 
-  const formatValue = (value: number | string, suffix: string = ''): string => {
+  const formatValue = (value: number | string, suffix: string = '', metricId?: string): string => {
     if (value === 'N/A' || value === undefined || value === null) return 'N/A';
     
-    // Special formatting for percentages - format properly
-    if (suffix === '%' && typeof value === 'number') {
-      // If it's a whole number, don't show decimals
-      return value % 1 === 0 ? `${Math.round(value)}${suffix}` : `${value.toFixed(2)}${suffix}`;
+    if (typeof value === 'number') {
+      // Only apply decimal places to specific metrics that need precision
+      const needsDecimalPlaces = metricId === 'fwci' || metricId === 'citationsPerPublication' || metricId === 'topJournal';
+      
+      if (needsDecimalPlaces) {
+        const formattedValue = value.toFixed(decimalPlaces);
+        return `${formattedValue}${suffix}`;
+      } else if (suffix === '%') {
+        // For collaboration percentages, use 2 decimal places fixed
+        return `${value.toFixed(2)}${suffix}`;
+      } else {
+        // For whole number metrics (Publication, H-Index, Citation Count), show as integers
+        return `${Math.round(value)}${suffix}`;
+      }
     }
     
     return `${value}${suffix}`;
   };
 
-  const getCellValue = (yearData: { [year: string]: number }, year: number, isTopJournal: boolean = false, isCollaboration: boolean = false): string => {
+  const getCellValue = (yearData: { [year: string]: number }, year: number, isTopJournal: boolean = false, isCollaboration: boolean = false, metricId?: string): string => {
     const value = yearData[year.toString()];
     if (value !== undefined) {
-      // Format Top Journal % and Collaboration % values properly
+      // For year-by-year data, keep original formatting logic
       if (isTopJournal || isCollaboration) {
+        // Percentage values with 2 decimal places fixed
         return value % 1 === 0 ? `${Math.round(value)}%` : `${value.toFixed(2)}%`;
       }
-      return value.toString();
+      // Show 2 decimal places for FWCI and Citations Per Publication in year columns
+      if (metricId === 'fwci' || metricId === 'citationsPerPublication') {
+        return value.toFixed(2);
+      }
+      // Whole numbers for other metrics (Publication, Citation Count)
+      return Math.round(value).toString();
     }
     return 'N/A';
   };
@@ -253,6 +271,34 @@ const MetricsTable: React.FC<MetricsTableProps> = ({ metrics, dataSource, availa
         </div>
       )}
 
+      {/* Decimal Places Control */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg p-3 border border-amber-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-amber-800">Decimal Places:</span>
+            <span className="text-xs text-amber-600">Adjust precision for FWCI, Citations Per Publication, and Top 10 Journal% (TOTAL column only)</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <label htmlFor="decimal-places" className="text-xs text-amber-700 font-medium">
+              Decimal Places:
+            </label>
+            <select
+              id="decimal-places"
+              value={decimalPlaces}
+              onChange={(e) => setDecimalPlaces(parseInt(e.target.value))}
+              className="px-2 py-1 text-xs border border-amber-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            >
+              <option value={0}>0</option>
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+              <option value={4}>4</option>
+              <option value={5}>5</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Metrics Table */}
       <div className="overflow-x-auto shadow-lg rounded-lg border border-gray-200">
         <table className="w-full bg-white">
@@ -333,7 +379,7 @@ const MetricsTable: React.FC<MetricsTableProps> = ({ metrics, dataSource, availa
                       <td key={year} className={`px-4 py-4 text-sm text-center ${
                         isSelected ? 'text-gray-700' : 'text-gray-400'
                       }`}>
-                        {getCellValue(data.byYear, year, isTopJournal, isCollaboration)}
+                        {getCellValue(data.byYear, year, isTopJournal, isCollaboration, metric.id)}
                       </td>
                     ))
                   ) : (
@@ -351,8 +397,8 @@ const MetricsTable: React.FC<MetricsTableProps> = ({ metrics, dataSource, availa
                     metric.id === 'hIndex' ? 'bg-indigo-100' : 'bg-blue-50'
                   }`}>
                     {isTopJournal || isCollaboration
-                      ? formatValue(data.total, '%')
-                      : formatValue(data.total)
+                      ? formatValue(data.total, '%', metric.id)
+                      : formatValue(data.total, '', metric.id)
                     }
                   </td>
                 </tr>
