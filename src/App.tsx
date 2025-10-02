@@ -1030,11 +1030,11 @@ function App() {
                 <p>
                   <Mail className="h-4 w-4 inline mr-2" />
                   <a 
-                    href="mailto:library@ust.hk" 
+                    href="mailto:lbrs@ust.hk" 
                     className="hover:text-white transition-colors duration-200"
                     onClick={() => analytics.trackFeatureUsage('contact', 'email')}
                   >
-                    library@ust.hk
+                    lbrs@ust.hk
                   </a>
                 </p>
                 <p>
