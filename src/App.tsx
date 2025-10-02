@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { BarChart3, FileText, TrendingUp, Info, Key, Eye, EyeOff, User, BookOpen, ExternalLink, Calendar, Filter, FileType } from 'lucide-react';
+import { BarChart3, FileText, TrendingUp, Info, Key, Eye, EyeOff, User, BookOpen, ExternalLink, Calendar, Filter, FileType, Mail, Phone } from 'lucide-react';
 import { apiService, AuthorMetrics, APIError } from './services/api';
 import MetricsTable from './components/MetricsTable';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -1028,6 +1028,7 @@ function App() {
               <h3 className="text-lg font-semibold mb-4">Contact & Support</h3>
               <div className="space-y-2 text-slate-300">
                 <p>
+                  <Mail className="h-4 w-4 inline mr-2" />
                   <a 
                     href="mailto:library@ust.hk" 
                     className="hover:text-white transition-colors duration-200"
@@ -1037,6 +1038,7 @@ function App() {
                   </a>
                 </p>
                 <p>
+                  <Phone className="h-4 w-4 inline mr-2" />
                   <a 
                     href="tel:+85223586772" 
                     className="hover:text-white transition-colors duration-200"
