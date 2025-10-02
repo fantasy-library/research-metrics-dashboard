@@ -1004,13 +1004,13 @@ function App() {
       <AdminAnalytics />
 
       {/* Footer */}
-      <footer className="bg-slate-800 text-white mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <footer className="bg-slate-800 text-white mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Resources Section */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Resources</h3>
-              <ul className="space-y-2">
+              <h3 className="text-base font-semibold mb-3">Resources</h3>
+              <ul className="space-y-1">
                 <li>
                   <a 
                     href="https://library.hkust.edu.hk" 
@@ -1025,8 +1025,8 @@ function App() {
 
             {/* Contact & Support Section */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Contact & Support</h3>
-              <div className="space-y-2 text-slate-300">
+              <h3 className="text-base font-semibold mb-3">Contact & Support</h3>
+              <div className="space-y-1 text-slate-300">
                 <p>
                   <Mail className="h-4 w-4 inline mr-2" />
                   <a 
@@ -1052,7 +1052,7 @@ function App() {
 
             {/* Address Section */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">HKUST Library</h3>
+              <h3 className="text-base font-semibold mb-3">HKUST Library</h3>
               <div className="text-slate-300 space-y-1">
                 <p>Hong Kong University of Science and Technology</p>
                 <p>Clear Water Bay, Kowloon, Hong Kong</p>
@@ -1061,7 +1061,7 @@ function App() {
           </div>
 
           {/* Bottom Section */}
-          <div className="border-t border-slate-700 mt-8 pt-8">
+          <div className="border-t border-slate-700 mt-6 pt-4">
             <div className="flex justify-center items-center">
               <p className="text-sm text-slate-300 text-center">
                 © 2025 Hong Kong University of Science and Technology Library. All rights reserved.
