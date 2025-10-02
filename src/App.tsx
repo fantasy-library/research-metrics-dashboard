@@ -477,7 +477,7 @@ function App() {
                   <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-1" />
                   <div className="flex-1">
                     <p className="text-sm text-amber-800 text-justify leading-relaxed">
-                      <span className="font-semibold">Disclaimer:</span> This research metrics dashboard has been generated using data provided by Elsevier's SciVal APIs. Please be aware that metrics presented in this dashboard are subject to change over time as the underlying data is updated and refined. Contact us if you need a more customized report, see this sample report as reference.
+                      <span className="font-semibold">Disclaimer:</span> This research metrics dashboard has been generated using data provided by Elsevier's SciVal APIs. Please be aware that metrics presented in this dashboard are subject to change over time as the underlying data is updated and refined.
                     </p>
                   </div>
                   <button
