@@ -1,8 +1,5 @@
-// Check if we should use direct API or Supabase proxy
-const USE_DIRECT_API = import.meta.env.VITE_USE_DIRECT_API === 'true';
-const API_BASE_URL = USE_DIRECT_API 
-  ? 'https://api.elsevier.com/analytics/scival/author/metrics'
-  : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scival-proxy`;
+// Always use direct SciVal API
+const API_BASE_URL = 'https://api.elsevier.com/analytics/scival/author/metrics';
 
 const SCIVAL_API_KEY = '7f59af901d2d86f78a1fd60c1bf9426a';
 
@@ -213,83 +210,6 @@ async function retryWithBackoff<T>(
 }
 
 export class APIService {
-  private async makeSupabaseRequest(url: string, options: RequestInit = {}, customApiKey?: string, yearRange?: string, availableMetrics?: any[], includedDocs?: string): Promise<any> {
-    const headers = {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
-
-    // Add custom API key, year range, metrics, and document types to request body if provided
-    if (options.body) {
-      const body = JSON.parse(options.body as string);
-      if (customApiKey) {
-        body.customApiKey = customApiKey;
-      }
-      if (yearRange) {
-        body.yearRange = yearRange;
-      }
-      if (availableMetrics) {
-        body.availableMetrics = availableMetrics;
-      }
-      if (includedDocs) {
-        body.includedDocs = includedDocs;
-      }
-      options.body = JSON.stringify(body);
-    }
-
-    return retryWithBackoff(async () => {
-      await rateLimiter.waitForSlot();
-      
-      try {
-        const response = await fetch(url, {
-          ...options,
-          headers,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorMessage = `HTTP ${response.status}: ${errorText}`;
-          let isEntitlementError = false;
-          let isRateLimitError = false;
-
-          // Parse error response to check for different error types
-          try {
-            const errorData = JSON.parse(errorText);
-            if (errorData.error && errorData.error.includes('ENTITLEMENTS_ERROR')) {
-              isEntitlementError = true;
-              errorMessage = 'API Access Error: Your SciVal API key does not have the required permissions to access this resource. Please contact your administrator to verify your API key has the necessary entitlements for SciVal author metrics.';
-            } else if (errorData.error && errorData.error.includes('Not entitled to the resource')) {
-              isEntitlementError = true;
-              errorMessage = 'API Access Error: Your SciVal API key does not have the required permissions to access this resource. Please contact your administrator to verify your API key has the necessary entitlements for SciVal author metrics.';
-            } else if (response.status === 429 || errorData.error?.includes('RATE_LIMIT_EXCEEDED')) {
-              isRateLimitError = true;
-              errorMessage = 'Rate limit exceeded. The system will automatically retry your request. Please wait...';
-            } else if (errorData.error) {
-              errorMessage = errorData.error;
-            }
-          } catch (parseError) {
-            // If we can't parse the error, check if it contains keywords
-            if (errorText.toLowerCase().includes('entitlement') || 
-                errorText.toLowerCase().includes('not entitled')) {
-              isEntitlementError = true;
-              errorMessage = 'API Access Error: Your SciVal API key does not have the required permissions to access this resource. Please contact your administrator to verify your API key has the necessary entitlements for SciVal author metrics.';
-            } else if (response.status === 429 || errorText.toLowerCase().includes('rate limit')) {
-              isRateLimitError = true;
-              errorMessage = 'Rate limit exceeded. The system will automatically retry your request. Please wait...';
-            }
-          }
-
-          throw new APIError(errorMessage, response.status, isEntitlementError, isRateLimitError);
-        }
-
-        return await response.json();
-      } finally {
-        rateLimiter.releaseSlot();
-      }
-    });
-  }
-
   private async fetchDirectMetric(authorId: string, metricType: string, byYear: boolean, customApiKey?: string, yearRange: string = '5yrs', includeSelfCitations: string = 'false', includedDocs: string = 'AllPublicationTypes'): Promise<any> {
     const apiKey = customApiKey || SCIVAL_API_KEY;
     
@@ -693,23 +613,7 @@ export class APIService {
 
   async getAuthorMetrics(authorId: string, customApiKey?: string, yearRange: string = '5yrs', availableMetrics?: any[], includedDocs: string = 'AllPublicationTypes', includeSelfCitations: boolean = true): Promise<AuthorMetrics> {
     try {
-      if (USE_DIRECT_API) {
-        return await this.getDirectAuthorMetrics(authorId, customApiKey, yearRange, availableMetrics, includedDocs, includeSelfCitations);
-      } else {
-        const data = await this.makeSupabaseRequest(API_BASE_URL, {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'getAuthorMetrics',
-            authorId: authorId.trim()
-          })
-        }, customApiKey, yearRange, availableMetrics, includedDocs);
-
-        if (data.error) {
-          throw new APIError(data.error);
-        }
-
-        return data;
-      }
+      return await this.getDirectAuthorMetrics(authorId, customApiKey, yearRange, availableMetrics, includedDocs, includeSelfCitations);
     } catch (error) {
       if (error instanceof APIError) {
         throw error;
@@ -720,53 +624,41 @@ export class APIService {
 
   async processMultipleAuthors(authorIds: string[], customApiKey?: string, yearRange: string = '5yrs', availableMetrics?: any[], includedDocs: string = 'AllPublicationTypes', includeSelfCitations: boolean = true): Promise<Array<{id: string, data: AuthorMetrics}>> {
     try {
-      if (USE_DIRECT_API) {
-        // Process authors sequentially to avoid overwhelming the API
-        const results: Array<{id: string, data: AuthorMetrics}> = [];
-        
-        for (const authorId of authorIds) {
-          try {
-            // Processing author ${authorId} (${results.length + 1}/${authorIds.length})
-            const data = await this.getDirectAuthorMetrics(authorId.trim(), customApiKey, yearRange, availableMetrics, includedDocs, includeSelfCitations);
-            results.push({ id: authorId.trim(), data });
-            
-            // Add delay between authors to be extra safe
-            if (results.length < authorIds.length) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-          } catch (error) {
-            console.error(`Error processing author ${authorId}:`, error);
-            results.push({
-              id: authorId.trim(),
-              data: {
-                error: error instanceof Error ? error.message : 'Unknown error',
-                metrics: {
-                  hIndex: { value: 'N/A', dataSource: { name: 'N/A', url: '' } },
-                  scholarlyOutput: { byYear: {}, total: 'N/A' },
-                  fwci: { byYear: {}, total: 'N/A' },
-                  topJournal: { byYear: {}, total: 'N/A' },
-                  citationCount: { byYear: {}, total: 'N/A' },
-                  citationsPerPublication: { byYear: {}, total: 'N/A' },
-                  collaboration: { byYear: {}, total: 'N/A' },
-                  academicCorporateCollaboration: { byYear: {}, total: 'N/A' }
-                }
-              }
-            });
+      // Process authors sequentially to avoid overwhelming the API
+      const results: Array<{id: string, data: AuthorMetrics}> = [];
+      
+      for (const authorId of authorIds) {
+        try {
+          // Processing author ${authorId} (${results.length + 1}/${authorIds.length})
+          const data = await this.getDirectAuthorMetrics(authorId.trim(), customApiKey, yearRange, availableMetrics, includedDocs, includeSelfCitations);
+          results.push({ id: authorId.trim(), data });
+          
+          // Add delay between authors to be extra safe
+          if (results.length < authorIds.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
+        } catch (error) {
+          console.error(`Error processing author ${authorId}:`, error);
+          results.push({
+            id: authorId.trim(),
+            data: {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              metrics: {
+                hIndex: { value: 'N/A', dataSource: { name: 'N/A', url: '' } },
+                scholarlyOutput: { byYear: {}, total: 'N/A' },
+                fwci: { byYear: {}, total: 'N/A' },
+                topJournal: { byYear: {}, total: 'N/A' },
+                citationCount: { byYear: {}, total: 'N/A' },
+                citationsPerPublication: { byYear: {}, total: 'N/A' },
+                collaboration: { byYear: {}, total: 'N/A' },
+                academicCorporateCollaboration: { byYear: {}, total: 'N/A' }
+              }
+            }
+          });
         }
-        
-        return results;
-      } else {
-        const data = await this.makeSupabaseRequest(API_BASE_URL, {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'processMultipleAuthors',
-            authorIds: authorIds.map(id => id.trim())
-          })
-        }, customApiKey, yearRange, availableMetrics, includedDocs);
-
-        return data;
       }
+      
+      return results;
     } catch (error) {
       if (error instanceof APIError) {
         throw error;
