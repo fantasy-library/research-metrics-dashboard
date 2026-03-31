@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 Copy `.env.example` to `.env` and set:
 
-- `VITE_SCIVAL_API_KEY` or `SCIVAL_API_KEY` — SciVal API key (direct API and ORCID lookup)
+- SciVal / Elsevier API key (any one): `VITE_SCIVAL_API_KEY`, `SCIVAL_API_KEY`, `ELSEVIER_API_KEY`, or `ELS_API_KEY` (direct API and ORCID lookup). On Railway, add one of these in **Variables** for the service.
 - **No Supabase URL:** the app uses **direct** Elsevier SciVal API automatically (good for simple hosting).
 - **Using the Supabase proxy:** set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, and leave `VITE_USE_DIRECT_API` unset or `false` unless you want to force direct API anyway.
 - `VITE_USE_DIRECT_API` — optional override when both direct and proxy are configured

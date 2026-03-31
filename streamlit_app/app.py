@@ -24,6 +24,7 @@ from streamlit_app.api_service import (
     APIError,
     format_error_message_for_user,
     get_api_service,
+    is_missing_scival_api_key_error,
     resolve_author_ids_for_metrics_safe,
 )
 from streamlit_app.config import SCIVAL_API_KEY, USE_DIRECT_API
@@ -2354,17 +2355,20 @@ def main() -> None:
                                     st.session_state.error_msg = str(e)
                                     st.session_state.entitlement_error = e.is_entitlement_error
                                     st.session_state.rate_limit_error = e.is_rate_limit_error
-                                    st.session_state.results = [
-                                        {
-                                            "id": resolved_ids[0],
-                                            "data": {
-                                                "error": str(e),
-                                                "metrics": _placeholder_metrics(),
-                                            },
-                                            "isEntitlementError": e.is_entitlement_error,
-                                            "isRateLimitError": e.is_rate_limit_error,
-                                        }
-                                    ]
+                                    if is_missing_scival_api_key_error(str(e)):
+                                        st.session_state.results = []
+                                    else:
+                                        st.session_state.results = [
+                                            {
+                                                "id": resolved_ids[0],
+                                                "data": {
+                                                    "error": str(e),
+                                                    "metrics": _placeholder_metrics(),
+                                                },
+                                                "isEntitlementError": e.is_entitlement_error,
+                                                "isRateLimitError": e.is_rate_limit_error,
+                                            }
+                                        ]
                             else:
                                 try:
                                     batch = svc.process_multiple_authors(
@@ -2388,36 +2392,39 @@ def main() -> None:
                                     st.session_state.error_msg = str(e)
                                     st.session_state.entitlement_error = e.is_entitlement_error
                                     st.session_state.rate_limit_error = e.is_rate_limit_error
-                                    for aid in resolved_ids:
-                                        try:
-                                            d = svc.get_author_metrics(
-                                                aid,
-                                                api_key_effective,
-                                                year_key,
-                                                am_payload,
-                                                docs_key,
-                                                self_cit,
-                                            )
-                                            st.session_state.results.append(
-                                                {
-                                                    "id": aid,
-                                                    "data": d,
-                                                    "isEntitlementError": False,
-                                                    "isRateLimitError": False,
-                                                }
-                                            )
-                                        except APIError as ie:
-                                            st.session_state.results.append(
-                                                {
-                                                    "id": aid,
-                                                    "data": {
-                                                        "error": str(ie),
-                                                        "metrics": _placeholder_metrics(),
-                                                    },
-                                                    "isEntitlementError": ie.is_entitlement_error,
-                                                    "isRateLimitError": ie.is_rate_limit_error,
-                                                }
-                                            )
+                                    if is_missing_scival_api_key_error(str(e)):
+                                        st.session_state.results = []
+                                    else:
+                                        for aid in resolved_ids:
+                                            try:
+                                                d = svc.get_author_metrics(
+                                                    aid,
+                                                    api_key_effective,
+                                                    year_key,
+                                                    am_payload,
+                                                    docs_key,
+                                                    self_cit,
+                                                )
+                                                st.session_state.results.append(
+                                                    {
+                                                        "id": aid,
+                                                        "data": d,
+                                                        "isEntitlementError": False,
+                                                        "isRateLimitError": False,
+                                                    }
+                                                )
+                                            except APIError as ie:
+                                                st.session_state.results.append(
+                                                    {
+                                                        "id": aid,
+                                                        "data": {
+                                                            "error": str(ie),
+                                                            "metrics": _placeholder_metrics(),
+                                                        },
+                                                        "isEntitlementError": ie.is_entitlement_error,
+                                                        "isRateLimitError": ie.is_rate_limit_error,
+                                                    }
+                                                )
                     except APIError as e:
                         st.session_state.error_msg = str(e)
                         st.session_state.results = []

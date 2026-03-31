@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load from repo root so Streamlit/Railway still see .env when cwd is not the project root.
+_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_ROOT / ".env")
 
 
 def _truthy(val: str | None) -> bool:
@@ -33,10 +36,34 @@ SUPABASE_URL: str = _clean_supabase_url(os.getenv("VITE_SUPABASE_URL"))
 _has_supabase_url: bool = bool(SUPABASE_URL)
 USE_DIRECT_API: bool = _truthy(os.getenv("VITE_USE_DIRECT_API")) or not _has_supabase_url
 SUPABASE_ANON_KEY: str = os.getenv("VITE_SUPABASE_ANON_KEY") or ""
+
+
+def _clean_scival_api_key(raw: str | None) -> str:
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    low = s.lower()
+    if "your_scival" in low:
+        return ""
+    return s
+
+
+def _resolve_scival_api_key() -> str:
+    """First non-empty env value (shared Elsevier API keys often use other names on hosts)."""
+    for name in (
+        "VITE_SCIVAL_API_KEY",
+        "SCIVAL_API_KEY",
+        "ELSEVIER_API_KEY",
+        "ELS_API_KEY",
+    ):
+        v = _clean_scival_api_key(os.getenv(name))
+        if v:
+            return v
+    return ""
+
+
 # Prefer explicit SciVal key; do not hardcode keys in source.
-SCIVAL_API_KEY: str = (
-    os.getenv("VITE_SCIVAL_API_KEY") or os.getenv("SCIVAL_API_KEY") or ""
-)
+SCIVAL_API_KEY: str = _resolve_scival_api_key()
 # Optional institutional token (some Elsevier SciVal calls require it in the query string)
 ELSEVIER_INSTTOKEN: str = (
     os.getenv("VITE_ELSEVIER_INSTTOKEN") or os.getenv("ELSEVIER_INSTTOKEN") or ""

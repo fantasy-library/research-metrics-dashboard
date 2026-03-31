@@ -109,6 +109,16 @@ def _retry_with_backoff(operation):
     raise last_err if last_err else RuntimeError("retry failed")
 
 
+def is_missing_scival_api_key_error(message: str) -> bool:
+    """True when failure is due to no API key (avoid duplicate UI + redundant per-author retries)."""
+    low = message.lower()
+    if "no scival api key" in low and "configured" in low:
+        return True
+    if "scival api key" in low and ("not configured" in low or "required" in low):
+        return True
+    return False
+
+
 def _classify_api_error_plain(message: str, low: str) -> str | None:
     """Map common API / network / Elsevier-style messages to user-friendly text."""
     # Configuration (do not match on "vite_supabase_url" alone — that substring appears in our own hints.)
@@ -119,8 +129,8 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
         )
     if "scival api key" in low and ("not configured" in low or "required" in low):
         return (
-            "No SciVal API key is configured. Add SCIVAL_API_KEY or VITE_SCIVAL_API_KEY "
-            "(or enter a key in Settings) to fetch metrics."
+            "No SciVal API key is configured. Add SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
+            "ELSEVIER_API_KEY, or ELS_API_KEY (or enter a key in Settings) to fetch metrics."
         )
 
     # Access & subscription
@@ -384,7 +394,8 @@ class APIService:
         api_key = (custom_api_key or SCIVAL_API_KEY or "").strip()
         if not api_key:
             raise APIError(
-                "SciVal API key is not configured. Set VITE_SCIVAL_API_KEY or SCIVAL_API_KEY."
+                "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
+                "or ELSEVIER_API_KEY (or enter a key in Settings)."
             )
         params = {
             "authors": author_id,
@@ -1052,7 +1063,9 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
     """
     key = (api_key or SCIVAL_API_KEY or "").strip()
     if not key:
-        raise APIError("SciVal API key required for ORCID lookup (set VITE_SCIVAL_API_KEY).")
+        raise APIError(
+            "SciVal API key required for ORCID lookup (set SCIVAL_API_KEY or ELSEVIER_API_KEY)."
+        )
 
     extracted = _extract_orcid_from_input(orcid)
     cleaned = (extracted or orcid.strip()).replace(" ", "")
