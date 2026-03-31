@@ -397,7 +397,7 @@ class APIService:
                 "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
                 "or ELSEVIER_API_KEY (or enter a key in Settings)."
             )
-        params = {
+        params: Dict[str, str] = {
             "authors": author_id,
             "metricTypes": metric_type,
             "includedDocs": included_docs,
@@ -405,6 +405,9 @@ class APIService:
             "includeSelfCitations": include_self_citations,
             "byYear": str(by_year).lower(),
         }
+        inst = (ELSEVIER_INSTTOKEN or "").strip()
+        if inst:
+            params["insttoken"] = inst
         url = f"{DIRECT_API_BASE}?{urlencode(params)}"
         headers = {
             "Accept": "application/json",
