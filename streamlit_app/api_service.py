@@ -111,8 +111,8 @@ def _retry_with_backoff(operation):
 
 def _classify_api_error_plain(message: str, low: str) -> str | None:
     """Map common API / network / Elsevier-style messages to user-friendly text."""
-    # Configuration
-    if "supabase url not configured" in low or "vite_supabase_url" in low:
+    # Configuration (do not match on "vite_supabase_url" alone — that substring appears in our own hints.)
+    if "supabase url not configured" in low:
         return (
             "The app is not configured to use the proxy API. "
             "Set VITE_SUPABASE_URL (and keys) in your environment, or switch to direct SciVal API mode."
@@ -876,7 +876,9 @@ class APIService:
     ) -> Dict[str, Any]:
         aid = author_id.strip()
         try:
-            if USE_DIRECT_API:
+            url = supabase_proxy_url()
+            # If proxy is not actually available, always use direct Elsevier (avoids deploy misconfig).
+            if USE_DIRECT_API or not url:
                 return self.get_direct_author_metrics(
                     aid,
                     custom_api_key,
@@ -884,11 +886,6 @@ class APIService:
                     available_metrics,
                     included_docs,
                     include_self_citations,
-                )
-            url = supabase_proxy_url()
-            if not url:
-                raise APIError(
-                    "Supabase URL not configured. Set VITE_SUPABASE_URL or use direct API."
                 )
             data = self._make_supabase_request(
                 url,
@@ -919,7 +916,8 @@ class APIService:
         include_self_citations: bool = True,
     ) -> List[Dict[str, Any]]:
         ids = [i.strip() for i in author_ids if i.strip()]
-        if USE_DIRECT_API:
+        url = supabase_proxy_url()
+        if USE_DIRECT_API or not url:
             out: List[Dict[str, Any]] = []
             for i, aid in enumerate(ids):
                 try:
@@ -946,9 +944,6 @@ class APIService:
                     time.sleep(1.0)
             return out
 
-        url = supabase_proxy_url()
-        if not url:
-            raise APIError("Supabase URL not configured.")
         data = self._make_supabase_request(
             url,
             "POST",

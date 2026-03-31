@@ -15,7 +15,19 @@ def _truthy(val: str | None) -> bool:
     return val.strip().lower() in ("1", "true", "yes", "on")
 
 
-SUPABASE_URL: str = (os.getenv("VITE_SUPABASE_URL") or "").rstrip("/")
+def _clean_supabase_url(raw: str | None) -> str:
+    """Return empty if unset or if value is a common .env placeholder (treat as not configured)."""
+    s = (raw or "").strip().rstrip("/")
+    if not s:
+        return ""
+    low = s.lower()
+    # Typical copy-paste from .env.example — must not enable proxy mode.
+    if "your_supabase" in low:
+        return ""
+    return s
+
+
+SUPABASE_URL: str = _clean_supabase_url(os.getenv("VITE_SUPABASE_URL"))
 # Prefer direct Elsevier API when no Supabase proxy URL is set (common on Railway / one-key deploys).
 # If VITE_SUPABASE_URL is configured, proxy mode is used unless VITE_USE_DIRECT_API=true.
 _has_supabase_url: bool = bool(SUPABASE_URL)
