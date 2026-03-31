@@ -17,6 +17,7 @@ if str(_ROOT) not in sys.path:
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit_echarts5 import st_echarts
 from streamlit_sortables import sort_items
 
@@ -40,6 +41,85 @@ st.set_page_config(
 
 HKUST_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/profiles/ust/modules/custom/hkust_signature_affiliate/assets/images/HKUST-logo.png"
 LIB_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/core/assets/library/library_logo.png_transparent_bkgd_h300.png"
+
+# Defer #analyze-metrics-anchor scroll until the node exists (avoids “wrong view then jump”).
+_DEEP_LINK_ANALYZE_HTML = """
+<script>
+(function () {
+  var HASH = "#analyze-metrics-anchor";
+  function topWin() {
+    var w = window;
+    try {
+      while (w.parent && w.parent !== w) w = w.parent;
+    } catch (e) {}
+    return w;
+  }
+  function wantScroll() {
+    try {
+      return (topWin().location.hash || "") === HASH;
+    } catch (e) {
+      return false;
+    }
+  }
+  if (!wantScroll()) return;
+
+  function byId(doc) {
+    if (!doc) return null;
+    try {
+      return doc.getElementById("analyze-metrics-anchor");
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function findEl(doc, depth) {
+    if (depth > 14) return null;
+    var el = byId(doc);
+    if (el) return el;
+    try {
+      var ifr = doc.querySelectorAll("iframe");
+      for (var i = 0; i < ifr.length; i++) {
+        try {
+          var idoc = ifr[i].contentDocument;
+          el = findEl(idoc, depth + 1);
+          if (el) return el;
+        } catch (e) {}
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function scrollNow() {
+    var tw = topWin();
+    var el = byId(tw.document) || findEl(tw.document, 0);
+    if (!el) return false;
+    try {
+      el.scrollIntoView({ block: "start", behavior: "auto" });
+    } catch (e) {}
+    return true;
+  }
+
+  if (scrollNow()) return;
+
+  var tw = topWin();
+  var root = null;
+  try {
+    root = tw.document.body;
+  } catch (e) {}
+  if (!root) return;
+
+  var obs = new MutationObserver(function () {
+    if (scrollNow()) obs.disconnect();
+  });
+  obs.observe(root, { childList: true, subtree: true });
+  setTimeout(function () {
+    try {
+      obs.disconnect();
+    } catch (e) {}
+  }, 15000);
+})();
+</script>
+"""
 
 # Filter card header icons — line-art SVG on white circular badge
 _FILTER_ICON_CALENDAR = (
@@ -2302,6 +2382,9 @@ def main() -> None:
             '<div id="analyze-metrics-anchor"></div>',
             unsafe_allow_html=True,
         )
+        if not st.session_state.get("_deep_link_analyze_injected"):
+            st.session_state._deep_link_analyze_injected = True
+            components.html(_DEEP_LINK_ANALYZE_HTML, height=0, width=0)
         with st.container(border=False, key="analyze_zone"):
             st.markdown(
                 '<span class="skin-analyze-zone" aria-hidden="true"></span>',
