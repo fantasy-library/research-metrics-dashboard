@@ -609,11 +609,25 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   font-size: 0.95rem !important;
   line-height: 1.5 !important;
   background: #ffffff !important;
+  /* Force readable text (paste/autofill/dark-mode quirks can set light fill) */
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
   box-shadow:
     0 4px 18px rgba(15, 23, 42, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
   min-height: 132px !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+[class*="st-key-search_shell"] textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+}
+[class*="st-key-search_shell"] textarea::selection {
+  background: rgba(99, 102, 241, 0.28) !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
 }
 [class*="st-key-search_shell"] textarea:focus {
   border-color: #818cf8 !important;
@@ -1066,6 +1080,9 @@ p.metric-subtext {
   border: 2px solid #e2e8f0 !important;
   border-radius: 16px !important;
   background: #ffffff !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
 }
 
 [class*="st-key-metrics_panel_shell"] {

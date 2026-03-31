@@ -166,7 +166,8 @@ export function ResearchImpactDashboard() {
               onChange={(e) => setAuthorIds(e.target.value)}
               rows={4}
               placeholder="Enter your Scopus Author ID. Don’t know your Scopus ID? Use Find Scopus ID above."
-              className="w-full rounded-2xl border-2 border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-800 shadow-inner outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              className="w-full rounded-2xl border-2 border-slate-200 bg-white py-3 pl-12 pr-4 text-sm !text-slate-900 caret-slate-900 shadow-inner outline-none transition [color-scheme:light] placeholder:text-slate-400 placeholder:opacity-100 placeholder:[-webkit-text-fill-color:#94a3b8] focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              style={{ WebkitTextFillColor: "#0f172a" }}
             />
           </div>
           <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
