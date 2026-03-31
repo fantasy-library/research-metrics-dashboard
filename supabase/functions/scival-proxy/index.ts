@@ -4,9 +4,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-ELS-APIKey",
 };
 
-// Use environment variable for API key
-const DEFAULT_API_KEY = '7f59af901d2d86f78a1fd60c1bf9426a';
+// SciVal key: set in Supabase (Dashboard → Edge Functions → Secrets) as SCIVAL_API_KEY,
+// or pass customApiKey from the Streamlit client. Never commit real keys to git.
 const BASE_URL = 'https://api.elsevier.com/analytics/scival/author/metrics';
+
+function resolveScivalApiKey(customApiKey?: string): string {
+  const fromClient = customApiKey?.trim();
+  if (fromClient) return fromClient;
+  return (
+    Deno.env.get('SCIVAL_API_KEY')?.trim() ||
+    Deno.env.get('ELSEVIER_API_KEY')?.trim() ||
+    Deno.env.get('VITE_SCIVAL_API_KEY')?.trim() ||
+    ''
+  );
+}
 
 interface FetchParams {
   authors: string;
@@ -31,10 +42,12 @@ function formatPercentage(value: number): number {
 }
 
 async function fetchMetric(authorId: string, metricType: string, byYear: boolean, customApiKey?: string, yearRange: string = '5yrs', includeSelfCitations: string = 'false', includedDocs: string = 'AllPublicationTypes') {
-  const apiKey = customApiKey || DEFAULT_API_KEY;
-  
+  const apiKey = resolveScivalApiKey(customApiKey);
+
   if (!apiKey) {
-    throw new Error('SCIVAL_API_KEY environment variable is not set and no custom API key provided');
+    throw new Error(
+      'SciVal API key missing: set Supabase secret SCIVAL_API_KEY (or ELSEVIER_API_KEY), or send customApiKey from the client.'
+    );
   }
 
   const params: FetchParams = {

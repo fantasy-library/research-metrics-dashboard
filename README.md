@@ -31,4 +31,6 @@ streamlit run streamlit_app/app.py
 
 The `supabase/` folder holds Edge Functions (e.g. `scival-proxy`) if you deploy the proxy backend. The Streamlit app does not require Node.js.
 
+For the **`scival-proxy`** function, set the Elsevier key as a Supabase secret (Dashboard → **Edge Functions** → **Manage secrets**), e.g. `SCIVAL_API_KEY` (or `ELSEVIER_API_KEY`). From the CLI: `supabase secrets set SCIVAL_API_KEY=your_key`. Do not commit keys in the repo.
+
 If you still see a `node_modules` folder from the old React/Vite app, delete it manually after closing any process that locks files inside it (terminals, dev servers, antivirus scans).
