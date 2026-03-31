@@ -25,6 +25,7 @@ from streamlit_app.api_service import (
     format_error_message_for_user,
     get_api_service,
     is_missing_scival_api_key_error,
+    is_scival_authentication_error,
     resolve_author_ids_for_metrics_safe,
 )
 from streamlit_app.config import SCIVAL_API_KEY, USE_DIRECT_API
@@ -2355,7 +2356,9 @@ def main() -> None:
                                     st.session_state.error_msg = str(e)
                                     st.session_state.entitlement_error = e.is_entitlement_error
                                     st.session_state.rate_limit_error = e.is_rate_limit_error
-                                    if is_missing_scival_api_key_error(str(e)):
+                                    if is_missing_scival_api_key_error(str(e)) or is_scival_authentication_error(
+                                        str(e)
+                                    ):
                                         st.session_state.results = []
                                     else:
                                         st.session_state.results = [
@@ -2392,7 +2395,9 @@ def main() -> None:
                                     st.session_state.error_msg = str(e)
                                     st.session_state.entitlement_error = e.is_entitlement_error
                                     st.session_state.rate_limit_error = e.is_rate_limit_error
-                                    if is_missing_scival_api_key_error(str(e)):
+                                    if is_missing_scival_api_key_error(str(e)) or is_scival_authentication_error(
+                                        str(e)
+                                    ):
                                         st.session_state.results = []
                                     else:
                                         for aid in resolved_ids:

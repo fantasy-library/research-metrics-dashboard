@@ -119,6 +119,18 @@ def is_missing_scival_api_key_error(message: str) -> bool:
     return False
 
 
+def is_scival_authentication_error(message: str) -> bool:
+    """HTTP 401 / invalid key — same message for every author; show once, skip per-author retries."""
+    low = message.lower()
+    if "api error (401)" in low:
+        return True
+    if "authentication failed" in low and (
+        "scival" in low or "settings" in low or "environment" in low or "railway" in low
+    ):
+        return True
+    return False
+
+
 def _classify_api_error_plain(message: str, low: str) -> str | None:
     """Map common API / network / Elsevier-style messages to user-friendly text."""
     # Configuration (do not match on "vite_supabase_url" alone — that substring appears in our own hints.)
@@ -166,8 +178,9 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
         or "api key" in low and "invalid" in low
     ):
         return (
-            "Authentication failed. Check that your SciVal API key is correct and active "
-            "in Settings or in your environment file."
+            "Authentication failed (HTTP 401). Verify your Elsevier API key: use Settings, "
+            "or set SCIVAL_API_KEY in Railway (or .env). If your institution requires it, "
+            "check ELSEVIER_INSTTOKEN too—wrong or missing tokens also return 401."
         )
 
     # Forbidden (non-entitlement)
