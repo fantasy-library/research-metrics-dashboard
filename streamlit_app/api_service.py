@@ -125,7 +125,11 @@ def is_scival_authentication_error(message: str) -> bool:
     if "api error (401)" in low:
         return True
     if "authentication failed" in low and (
-        "scival" in low or "settings" in low or "environment" in low or "railway" in low
+        "scival" in low
+        or "settings" in low
+        or "environment" in low
+        or "railway" in low
+        or "api key" in low
     ):
         return True
     return False
@@ -410,7 +414,11 @@ class APIService:
                 "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
                 "or ELSEVIER_API_KEY (or enter a key in Settings)."
             )
+        # Elsevier allows apiKey / insttoken on the query string (same pattern as author XML URLs).
+        # Institutional access often requires both; we also send X-ELS-* headers below.
+        inst = (ELSEVIER_INSTTOKEN or "").strip()
         params: Dict[str, str] = {
+            "apiKey": api_key,
             "authors": author_id,
             "metricTypes": metric_type,
             "includedDocs": included_docs,
@@ -418,7 +426,6 @@ class APIService:
             "includeSelfCitations": include_self_citations,
             "byYear": str(by_year).lower(),
         }
-        inst = (ELSEVIER_INSTTOKEN or "").strip()
         if inst:
             params["insttoken"] = inst
         url = f"{DIRECT_API_BASE}?{urlencode(params)}"
@@ -427,6 +434,8 @@ class APIService:
             "X-ELS-APIKey": api_key,
             "User-Agent": "SciVal-Research-Dashboard/1.0",
         }
+        if inst:
+            headers["X-ELS-Insttoken"] = inst
 
         def op():
             _rate_limiter.acquire()
@@ -1108,6 +1117,8 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
         "X-ELS-APIKey": key,
         "User-Agent": "SciVal-Research-Dashboard/1.0",
     }
+    if inst:
+        headers["X-ELS-Insttoken"] = inst
 
     client = httpx.Client(timeout=60.0)
     try:

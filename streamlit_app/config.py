@@ -64,10 +64,23 @@ def _resolve_scival_api_key() -> str:
 
 # Prefer explicit SciVal key; do not hardcode keys in source.
 SCIVAL_API_KEY: str = _resolve_scival_api_key()
-# Optional institutional token (some Elsevier SciVal calls require it in the query string)
-ELSEVIER_INSTTOKEN: str = (
-    os.getenv("VITE_ELSEVIER_INSTTOKEN") or os.getenv("ELSEVIER_INSTTOKEN") or ""
-)
+
+
+def _resolve_insttoken() -> str:
+    """Institutional token; accept common Railway typos (e.g. ELSVIER vs ELSEVIER)."""
+    for name in (
+        "VITE_ELSEVIER_INSTTOKEN",
+        "ELSEVIER_INSTTOKEN",
+        "ELSVIER_INSTTOKEN",  # typo: missing E (Elsevier)
+    ):
+        v = (os.getenv(name) or "").strip()
+        if v:
+            return v
+    return ""
+
+
+# Optional institutional token (Elsevier query param insttoken and/or header X-ELS-Insttoken)
+ELSEVIER_INSTTOKEN: str = _resolve_insttoken()
 
 DIRECT_API_BASE: str = (
     "https://api.elsevier.com/analytics/scival/author/metrics"
