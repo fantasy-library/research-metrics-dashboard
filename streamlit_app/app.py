@@ -174,38 +174,73 @@ def _inject_export_download_styles() -> None:
     st.markdown(
         f"""
 <style>
+/* Compact export row: hug content, minimal space between PDF + Excel */
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  column-gap: 0.35rem !important;
+  justify-content: flex-start !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
+  flex: 0 0 auto !important;
+  flex-grow: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: fit-content !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin: 0 !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {{
+  gap: 0 !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] .block-container {{
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] [data-testid="stDownloadButton"],
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] .stDownloadButton {{
+  width: auto !important;
+  min-width: 0 !important;
+}}
+
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button,
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) .stDownloadButton > button,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) .stDownloadButton > button {{
-  width: 100% !important;
-  min-height: 3.15rem !important;
-  padding: 0.7rem 0.85rem !important;
-  border-radius: 14px !important;
+  width: auto !important;
+  min-height: 2.25rem !important;
+  height: auto !important;
+  padding: 0.4rem 0.7rem !important;
+  border-radius: 10px !important;
   border: none !important;
   display: inline-flex !important;
   flex-direction: row !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.5rem !important;
+  gap: 0.35rem !important;
   font-weight: 700 !important;
-  font-size: 0.95rem !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 18px rgba(251, 113, 133, 0.35) !important;
-  background: linear-gradient(145deg, #fecdd3 0%, #fda4af 42%, #fb7185 100%) !important;
-  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.32) !important;
+  background: linear-gradient(145deg, #fca5a5 0%, #f87171 40%, #ef4444 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.12) !important;
 }}
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button:hover,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button:hover {{
   filter: brightness(1.05) saturate(1.05);
-  box-shadow: 0 6px 22px rgba(251, 113, 133, 0.42) !important;
+  box-shadow: 0 3px 16px rgba(239, 68, 68, 0.4) !important;
 }}
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button::before,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::before {{
   content: "" !important;
   display: block !important;
-  width: 1.38rem !important;
-  height: 1.38rem !important;
+  width: 1.05rem !important;
+  height: 1.05rem !important;
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_pdf}") center / contain no-repeat !important;
 }}
@@ -213,8 +248,8 @@ def _inject_export_download_styles() -> None:
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::after {{
   content: "" !important;
   display: block !important;
-  width: 1.12rem !important;
-  height: 1.12rem !important;
+  width: 0.9rem !important;
+  height: 0.9rem !important;
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
 }}
@@ -223,34 +258,36 @@ def _inject_export_download_styles() -> None:
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) .stDownloadButton > button,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) .stDownloadButton > button {{
-  width: 100% !important;
-  min-height: 3.15rem !important;
-  padding: 0.7rem 0.85rem !important;
-  border-radius: 14px !important;
+  width: auto !important;
+  min-height: 2.25rem !important;
+  height: auto !important;
+  padding: 0.4rem 0.7rem !important;
+  border-radius: 10px !important;
   border: none !important;
   display: inline-flex !important;
   flex-direction: row !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.5rem !important;
+  gap: 0.35rem !important;
   font-weight: 700 !important;
-  font-size: 0.95rem !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 18px rgba(74, 222, 128, 0.35) !important;
-  background: linear-gradient(145deg, #d1fae5 0%, #86efac 45%, #4ade80 100%) !important;
-  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.06) !important;
+  box-shadow: 0 2px 12px rgba(34, 197, 94, 0.32) !important;
+  background: linear-gradient(145deg, #6ee7b7 0%, #34d399 42%, #16a34a 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
 }}
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button:hover,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button:hover {{
   filter: brightness(1.05) saturate(1.05);
-  box-shadow: 0 6px 22px rgba(74, 222, 128, 0.42) !important;
+  box-shadow: 0 3px 16px rgba(22, 163, 74, 0.38) !important;
 }}
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::before,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::before {{
   content: "" !important;
   display: block !important;
-  width: 1.38rem !important;
-  height: 1.38rem !important;
+  width: 1.05rem !important;
+  height: 1.05rem !important;
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_xls}") center / contain no-repeat !important;
 }}
@@ -258,8 +295,8 @@ def _inject_export_download_styles() -> None:
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::after {{
   content: "" !important;
   display: block !important;
-  width: 1.12rem !important;
-  height: 1.12rem !important;
+  width: 0.9rem !important;
+  height: 0.9rem !important;
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
 }}
@@ -2878,6 +2915,14 @@ def main() -> None:
                         + " -> ".join(label_map.get(i, i) for i in order_pick)
                     )
 
+                author_export_payload = {
+                    "authorId": aid,
+                    "authorName": d.get("authorName"),
+                    "metrics": d.get("metrics"),
+                    "dataSource": d.get("dataSource"),
+                    "selectedMetrics": picked,
+                    "metricOrder": order_pick,
+                }
                 col_names, table_rows = _build_metrics_table_rows(
                     d.get("metrics") or {},
                     ds,
@@ -2887,6 +2932,21 @@ def main() -> None:
                 if table_rows:
                     df = pd.DataFrame(table_rows, columns=col_names)
                     st.dataframe(df, use_container_width=True, hide_index=True)
+                    try:
+                        xl_author_b, xl_author_n = export_excel_bytes(
+                            [author_export_payload],
+                            f"research-metrics-{aid}",
+                        )
+                        st.download_button(
+                            "Download this table (Excel)",
+                            xl_author_b,
+                            file_name=xl_author_n,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"export_xl_author_{aid}_{card_idx}",
+                            use_container_width=False,
+                        )
+                    except Exception:
+                        st.caption("Could not build Excel file for this author.")
 
                     years = []
                     for c in col_names[1:-1]:
@@ -3007,16 +3067,7 @@ def main() -> None:
                                     "Use the chart toolbar (top-right) -> camera icon to download image."
                                 )
 
-                export_rows.append(
-                    {
-                        "authorId": aid,
-                        "authorName": d.get("authorName"),
-                        "metrics": d.get("metrics"),
-                        "dataSource": d.get("dataSource"),
-                        "selectedMetrics": picked,
-                        "metricOrder": order_pick,
-                    }
-                )
+                export_rows.append(author_export_payload)
 
             st.markdown(
                 '<div id="export-downloads-anchor"></div>',
@@ -3042,7 +3093,7 @@ def main() -> None:
                 fn = st.text_input(
                     "Export filename (without extension)", value="research-metrics"
                 )
-                b1, b2 = st.columns(2)
+                b1, b2 = st.columns(2, gap="xxsmall")
                 with b1:
                     pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
                     st.download_button(
@@ -3050,7 +3101,7 @@ def main() -> None:
                         pdf_b,
                         file_name=pdf_n,
                         mime="application/pdf",
-                        use_container_width=True,
+                        use_container_width=False,
                     )
                 with b2:
                     xl_b, xl_n = export_excel_bytes(export_rows, fn)
@@ -3059,7 +3110,7 @@ def main() -> None:
                         xl_b,
                         file_name=xl_n,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
+                        use_container_width=False,
                     )
 
     elif results:
