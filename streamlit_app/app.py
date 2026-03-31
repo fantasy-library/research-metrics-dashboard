@@ -8,6 +8,7 @@ from __future__ import annotations
 import html
 import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -140,6 +141,132 @@ _FILTER_ICON_FUNNEL = (
     'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
     '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>'
 )
+
+
+def _inject_export_download_styles() -> None:
+    """Lighter PDF/Excel export buttons with file + download icons (data-URI SVGs)."""
+    from urllib.parse import quote
+
+    svg_pdf = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff">'
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 1.4L18.6 9H14V3.4zM8 12.5h8v1.25H8v-1.25zm0 3h6v1.25H8v-1.25z"/>'
+        "</svg>"
+    )
+    svg_xls = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
+        'stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>'
+        '<path d="M14 2v6h6"/><path d="M8 11h8M8 14.5h8M8 18h5"/>'
+        '<path d="m16.5 16 2.5 2.5m0-2.5L16.5 19"/>'
+        "</svg>"
+    )
+    svg_dl = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
+        'stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M5 21h14"/>'
+        "</svg>"
+    )
+    u_pdf, u_xls, u_dl = (
+        quote(svg_pdf, safe=""),
+        quote(svg_xls, safe=""),
+        quote(svg_dl, safe=""),
+    )
+    st.markdown(
+        f"""
+<style>
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) .stDownloadButton > button,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) .stDownloadButton > button {{
+  width: 100% !important;
+  min-height: 3.15rem !important;
+  padding: 0.7rem 0.85rem !important;
+  border-radius: 14px !important;
+  border: none !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 18px rgba(251, 113, 133, 0.35) !important;
+  background: linear-gradient(145deg, #fecdd3 0%, #fda4af 42%, #fb7185 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button:hover,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button:hover {{
+  filter: brightness(1.05) saturate(1.05);
+  box-shadow: 0 6px 22px rgba(251, 113, 133, 0.42) !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button::before,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::before {{
+  content: "" !important;
+  display: block !important;
+  width: 1.38rem !important;
+  height: 1.38rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_pdf}") center / contain no-repeat !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button::after,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::after {{
+  content: "" !important;
+  display: block !important;
+  width: 1.12rem !important;
+  height: 1.12rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
+}}
+
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) .stDownloadButton > button,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) .stDownloadButton > button {{
+  width: 100% !important;
+  min-height: 3.15rem !important;
+  padding: 0.7rem 0.85rem !important;
+  border-radius: 14px !important;
+  border: none !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 18px rgba(74, 222, 128, 0.35) !important;
+  background: linear-gradient(145deg, #d1fae5 0%, #86efac 45%, #4ade80 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.06) !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button:hover,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button:hover {{
+  filter: brightness(1.05) saturate(1.05);
+  box-shadow: 0 6px 22px rgba(74, 222, 128, 0.42) !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::before,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::before {{
+  content: "" !important;
+  display: block !important;
+  width: 1.38rem !important;
+  height: 1.38rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_xls}") center / contain no-repeat !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::after,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::after {{
+  content: "" !important;
+  display: block !important;
+  width: 1.12rem !important;
+  height: 1.12rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
+}}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _inject_theme_css() -> None:
@@ -895,6 +1022,10 @@ p.metric-subtext {
 #analyze-metrics-anchor {
   scroll-margin-top: 1rem;
 }
+/* Anchor for “Download all” jump (PDF / Excel at end of results) */
+#export-downloads-anchor {
+  scroll-margin-top: 1rem;
+}
 /* Toggle / switch accent (metrics panel only) */
 [class*="st-key-metrics_panel_shell"]:not(:has(span.skin-unified-form-shell)) [data-baseweb="switch"] {
   color: #7c3aed !important;
@@ -1282,10 +1413,55 @@ p.metric-subtext {
   box-shadow: none !important;
   padding-bottom: 0 !important;
 }
+
+/* Export results: header row (badge + copy) */
+.export-results-head {
+  margin: 0 0 1rem 0;
+  padding: 0;
+}
+.export-results-head-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+.export-results-badge {
+  flex-shrink: 0;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #6ee7b7 0%, #34d399 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 12px rgba(52, 211, 153, 0.4);
+}
+.export-results-badge svg {
+  width: 1.22rem;
+  height: 1.22rem;
+}
+.export-results-title {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.14rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+.export-results-sub {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.45;
+  max-width: 46rem;
+}
+[class*="st-key-export_results_shell"] [data-testid="stTextInput"] {
+  margin-bottom: 0.65rem !important;
+}
 </style>
         """,
         unsafe_allow_html=True,
     )
+    _inject_export_download_styles()
 
 
 def _render_footer_html() -> None:
@@ -1724,6 +1900,59 @@ def _compare_toolbox() -> dict:
     }
 
 
+def _fetch_multi_author_metrics_with_progress(
+    svc,
+    resolved_ids: list[str],
+    api_key_effective,
+    year_key: str,
+    am_payload: list,
+    docs_key: str,
+    self_cit: bool,
+) -> list[dict]:
+    """Load each author sequentially so the UI can show real progress (and respect direct-API pacing)."""
+    n = len(resolved_ids)
+    progress = st.progress(0, text=f"Loading {n} author(s)…")
+    out: list[dict] = []
+    for i, aid in enumerate(resolved_ids):
+        progress.progress(
+            i / max(n, 1),
+            text=f"Fetching author {i + 1} of {n} ({aid})…",
+        )
+        try:
+            d = svc.get_author_metrics(
+                aid,
+                api_key_effective,
+                year_key,
+                am_payload,
+                docs_key,
+                self_cit,
+            )
+            out.append(
+                {
+                    "id": aid,
+                    "data": d,
+                    "isEntitlementError": False,
+                    "isRateLimitError": False,
+                }
+            )
+        except APIError as ie:
+            out.append(
+                {
+                    "id": aid,
+                    "data": {
+                        "error": str(ie),
+                        "metrics": _placeholder_metrics(),
+                    },
+                    "isEntitlementError": ie.is_entitlement_error,
+                    "isRateLimitError": ie.is_rate_limit_error,
+                }
+            )
+        if USE_DIRECT_API and i < n - 1:
+            time.sleep(1.0)
+    progress.progress(1.0, text=f"Finished loading {n} author(s).")
+    return out
+
+
 def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     """Multi-author line (years × metric) and bubble (X × Y × size totals) for len(valid) >= 2."""
     en = _enabled_metric_ids(st.session_state.available_metrics)
@@ -1806,16 +2035,23 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     vals.append(None)
                 else:
                     vals.append(v)
-            line_series.append(
-                {
-                    "name": author_name,
-                    "type": line_chart_type.lower(),
-                    "data": vals,
-                    "symbol": symbols[idx % len(symbols)],
-                    "symbolSize": 8,
-                    "smooth": line_chart_type == "Line",
+            ser: dict = {
+                "name": author_name,
+                "type": line_chart_type.lower(),
+                "data": vals,
+                "symbol": symbols[idx % len(symbols)],
+                "symbolSize": 8,
+                "smooth": line_chart_type == "Line",
+            }
+            if line_chart_type == "Bar":
+                ser["label"] = {
+                    "show": True,
+                    "position": "top",
+                    "formatter": "{c}",
+                    "fontSize": 11,
+                    "color": "#334155",
                 }
-            )
+            line_series.append(ser)
         if line_series:
             toolbox_line = _compare_toolbox()
             toolbox_line["right"] = 10
@@ -2473,8 +2709,9 @@ def main() -> None:
                                             }
                                         ]
                             else:
-                                try:
-                                    batch = svc.process_multiple_authors(
+                                st.session_state.results = (
+                                    _fetch_multi_author_metrics_with_progress(
+                                        svc,
                                         resolved_ids,
                                         api_key_effective,
                                         year_key,
@@ -2482,54 +2719,7 @@ def main() -> None:
                                         docs_key,
                                         self_cit,
                                     )
-                                    st.session_state.results = [
-                                        {
-                                            "id": item["id"],
-                                            "data": item["data"],
-                                            "isEntitlementError": False,
-                                            "isRateLimitError": False,
-                                        }
-                                        for item in batch
-                                    ]
-                                except APIError as e:
-                                    st.session_state.error_msg = str(e)
-                                    st.session_state.entitlement_error = e.is_entitlement_error
-                                    st.session_state.rate_limit_error = e.is_rate_limit_error
-                                    if is_missing_scival_api_key_error(str(e)) or is_scival_authentication_error(
-                                        str(e)
-                                    ):
-                                        st.session_state.results = []
-                                    else:
-                                        for aid in resolved_ids:
-                                            try:
-                                                d = svc.get_author_metrics(
-                                                    aid,
-                                                    api_key_effective,
-                                                    year_key,
-                                                    am_payload,
-                                                    docs_key,
-                                                    self_cit,
-                                                )
-                                                st.session_state.results.append(
-                                                    {
-                                                        "id": aid,
-                                                        "data": d,
-                                                        "isEntitlementError": False,
-                                                        "isRateLimitError": False,
-                                                    }
-                                                )
-                                            except APIError as ie:
-                                                st.session_state.results.append(
-                                                    {
-                                                        "id": aid,
-                                                        "data": {
-                                                            "error": str(ie),
-                                                            "metrics": _placeholder_metrics(),
-                                                        },
-                                                        "isEntitlementError": ie.is_entitlement_error,
-                                                        "isRateLimitError": ie.is_rate_limit_error,
-                                                    }
-                                                )
+                                )
                     except APIError as e:
                         st.session_state.error_msg = str(e)
                         st.session_state.results = []
@@ -2556,6 +2746,19 @@ def main() -> None:
             )
             label_map_global = {x["id"]: x["label"] for x in DEFAULT_METRICS}
             _render_compare_authors_charts(valid, label_map_global)
+            if len(valid) >= 2:
+                st.markdown(
+                    '<div class="analyze-hint" style="margin: 0.35rem 0 1.1rem 0;">'
+                    '<div class="analyze-hint-inner">'
+                    '<p class="analyze-hint-text">'
+                    "PDF and Excel export are at the bottom of this results section."
+                    "</p>"
+                    '<a class="analyze-hint-cta" href="#export-downloads-anchor">'
+                    "Download all — jump to export <span aria-hidden=\"true\">↓</span>"
+                    "</a>"
+                    "</div></div>",
+                    unsafe_allow_html=True,
+                )
             export_rows = []
             for card_idx, r in enumerate(valid):
                 aid = r["id"]
@@ -2815,24 +3018,49 @@ def main() -> None:
                     }
                 )
 
-            st.divider()
-            fn = st.text_input(
-                "Export filename (without extension)", value="research-metrics"
+            st.markdown(
+                '<div id="export-downloads-anchor"></div>',
+                unsafe_allow_html=True,
             )
-            b1, b2 = st.columns(2)
-            with b1:
-                pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
-                st.download_button(
-                    "Download PDF", pdf_b, file_name=pdf_n, mime="application/pdf"
+            st.divider()
+            with st.container(border=True, key="export_results_shell"):
+                st.markdown(
+                    '<div class="export-results-head">'
+                    '<div class="export-results-head-row">'
+                    '<div class="export-results-badge" aria-hidden="true">'
+                    f"{_FILTER_ICON_DOCUMENT}"
+                    "</div>"
+                    '<div class="export-results-head-text">'
+                    '<p class="export-results-title">Export Results</p>'
+                    "<p class=\"export-results-sub\">"
+                    "Download your research metrics in PDF or Excel. "
+                    "Set the filename below; the file includes all authors in this run."
+                    "</p>"
+                    "</div></div></div>",
+                    unsafe_allow_html=True,
                 )
-            with b2:
-                xl_b, xl_n = export_excel_bytes(export_rows, fn)
-                st.download_button(
-                    "Download Excel",
-                    xl_b,
-                    file_name=xl_n,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fn = st.text_input(
+                    "Export filename (without extension)", value="research-metrics"
                 )
+                b1, b2 = st.columns(2)
+                with b1:
+                    pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
+                    st.download_button(
+                        "Export as PDF",
+                        pdf_b,
+                        file_name=pdf_n,
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                with b2:
+                    xl_b, xl_n = export_excel_bytes(export_rows, fn)
+                    st.download_button(
+                        "Export as Excel",
+                        xl_b,
+                        file_name=xl_n,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
 
     elif results:
         for r in results:
