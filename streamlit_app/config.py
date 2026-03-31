@@ -15,8 +15,11 @@ def _truthy(val: str | None) -> bool:
     return val.strip().lower() in ("1", "true", "yes", "on")
 
 
-USE_DIRECT_API: bool = _truthy(os.getenv("VITE_USE_DIRECT_API"))
 SUPABASE_URL: str = (os.getenv("VITE_SUPABASE_URL") or "").rstrip("/")
+# Prefer direct Elsevier API when no Supabase proxy URL is set (common on Railway / one-key deploys).
+# If VITE_SUPABASE_URL is configured, proxy mode is used unless VITE_USE_DIRECT_API=true.
+_has_supabase_url: bool = bool(SUPABASE_URL)
+USE_DIRECT_API: bool = _truthy(os.getenv("VITE_USE_DIRECT_API")) or not _has_supabase_url
 SUPABASE_ANON_KEY: str = os.getenv("VITE_SUPABASE_ANON_KEY") or ""
 # Prefer explicit SciVal key; do not hardcode keys in source.
 SCIVAL_API_KEY: str = (

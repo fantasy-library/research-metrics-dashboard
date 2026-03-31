@@ -14,9 +14,10 @@ pip install -r requirements.txt
 
 Copy `.env.example` to `.env` and set:
 
-- `VITE_USE_DIRECT_API` — `true` for direct Elsevier API, `false` to use the Supabase edge function proxy
-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — required when using the proxy
 - `VITE_SCIVAL_API_KEY` or `SCIVAL_API_KEY` — SciVal API key (direct API and ORCID lookup)
+- **No Supabase URL:** the app uses **direct** Elsevier SciVal API automatically (good for simple hosting).
+- **Using the Supabase proxy:** set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, and leave `VITE_USE_DIRECT_API` unset or `false` unless you want to force direct API anyway.
+- `VITE_USE_DIRECT_API` — optional override when both direct and proxy are configured
 
 ## Run
 
