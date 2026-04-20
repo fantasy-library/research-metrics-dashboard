@@ -199,6 +199,22 @@ def _pdf_safe(s: str) -> str:
     return "".join(c if 32 <= ord(c) < 127 or c in "\n\t" else "?" for c in (s or ""))
 
 
+def _pdf_wrap_width(pdf: FPDF) -> float:
+    """Usable width for ``multi_cell`` — never pass ``w=0`` (remaining width can be 0 if ``x`` is wrong)."""
+    try:
+        epw = getattr(pdf, "epw", None)
+        if epw is not None and float(epw) > 0:
+            return max(float(epw), 20.0)
+    except (TypeError, ValueError):
+        pass
+    w = float(pdf.w) - float(pdf.l_margin) - float(pdf.r_margin)
+    return max(w, 20.0)
+
+
+def _pdf_reset_x_margin(pdf: FPDF) -> None:
+    pdf.set_x(pdf.l_margin)
+
+
 def export_pdf_bytes(data: List[Dict[str, Any]], filename_base: str = "research-metrics") -> Tuple[bytes, str]:
     validated = _validate_export_data(data)
     name = _sanitize_filename(filename_base)
@@ -213,39 +229,50 @@ def export_pdf_bytes(data: List[Dict[str, Any]], filename_base: str = "research-
     pdf.ln(6)
 
     for idx, author_data in enumerate(validated):
+        _pdf_reset_x_margin(pdf)
         if pdf.get_y() > 250:
             pdf.add_page()
+            _pdf_reset_x_margin(pdf)
 
         title = (
             f"{author_data.get('authorName') or ''} (ID: {author_data['authorId']})"
             if author_data.get("authorName")
             else f"Author ID: {author_data['authorId']}"
         )
+        wrap_w = _pdf_wrap_width(pdf)
         pdf.set_font("Helvetica", "B", 12)
-        pdf.multi_cell(0, 8, _pdf_safe(title))
+        _pdf_reset_x_margin(pdf)
+        pdf.multi_cell(wrap_w, 8, _pdf_safe(title))
+        _pdf_reset_x_margin(pdf)
         ds = author_data.get("dataSource")
         if ds:
+            wrap_w = _pdf_wrap_width(pdf)
             # Use multi_cell so long sourceName / labels wrap; plain cell() truncates at page edge.
             pdf.set_font("Helvetica", "B", 9)
-            pdf.multi_cell(0, 5, _pdf_safe("Source"))
+            _pdf_reset_x_margin(pdf)
+            pdf.multi_cell(wrap_w, 5, _pdf_safe("Source"))
+            _pdf_reset_x_margin(pdf)
             pdf.set_font("Helvetica", "", 9)
             pdf.multi_cell(
-                0,
+                wrap_w,
                 5,
                 _pdf_safe(str(ds.get("sourceName", "") or "—")),
             )
+            _pdf_reset_x_margin(pdf)
             pdf.multi_cell(
-                0,
+                wrap_w,
                 5,
                 _pdf_safe(f"Last updated: {ds.get('lastUpdated', '')}"),
             )
+            _pdf_reset_x_margin(pdf)
             ms, me = ds.get("metricStartYear", ""), ds.get("metricEndYear", "")
             if ms or me:
                 pdf.multi_cell(
-                    0,
+                    wrap_w,
                     5,
                     _pdf_safe(f"Metric period: {ms} - {me}"),
                 )
+                _pdf_reset_x_margin(pdf)
             pdf.ln(2)
 
         selected = _get_selected_metrics(author_data)

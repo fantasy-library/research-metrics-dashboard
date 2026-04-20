@@ -858,10 +858,11 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  margin: 0 0 0.28rem 0 !important;
-  font-size: 0.875rem !important;
-  font-weight: 500 !important;
-  color: #6B7280 !important;
+  margin: 0 0 0.48rem 0 !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #374151 !important;
+  letter-spacing: 0.01em;
 }
 /* Circular “FAB” badge: white disc, hairline border, soft shadow (filter row icons) */
 .minimal-filter-icon-badge {
@@ -893,7 +894,8 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   color: #9c4121 !important;
 }
 [class*="st-key-search_shell"] [data-testid="stSelectbox"] {
-  margin-bottom: 0.2rem !important;
+  margin-top: 0.05rem !important;
+  margin-bottom: 0.22rem !important;
 }
 [class*="st-key-search_shell"] [data-baseweb="select"] > div {
   border: 1px solid #E5E7EB !important;
@@ -947,27 +949,28 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   border: 1px solid #e5e7eb !important;
   border-radius: 8px !important;
   background: #f3f4f6 !important;
-  padding: 2px !important;
-  gap: 2px !important;
+  padding: 3px !important;
+  gap: 3px !important;
+  margin-top: 0.05rem !important;
 }
 [class*="st-key-search_shell"] [data-testid="stRadio"] label {
   margin: 0 !important;
   flex: 0 0 auto !important;
   border-radius: 6px !important;
   border: 1px solid transparent !important;
-  padding: 0.15rem 0.42rem !important;
-  color: #4b5563 !important;
+  padding: 0.22rem 0.55rem !important;
+  color: #374151 !important;
   background: transparent !important;
-  font-weight: 500 !important;
-  gap: 0.3rem !important;
+  font-weight: 600 !important;
+  gap: 0.35rem !important;
 }
 [class*="st-key-search_shell"] [data-testid="stRadio"] label p {
-  font-size: 0.8125rem !important;
-  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
   color: inherit !important;
   -webkit-text-fill-color: inherit !important;
   margin: 0 !important;
-  line-height: 1.2 !important;
+  line-height: 1.25 !important;
 }
 [class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked),
 [class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] {
@@ -991,8 +994,8 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   -webkit-text-fill-color: #5b21b6 !important;
 }
 [class*="st-key-search_shell"] .stRadio input[type="radio"] {
-  width: 0.95rem !important;
-  height: 0.95rem !important;
+  width: 1.05rem !important;
+  height: 1.05rem !important;
   flex-shrink: 0;
 }
 [class*="st-key-search_shell"] .stRadio input {
@@ -2435,41 +2438,42 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     line_series.append(ser)
                 if line_series:
                     toolbox_line = _compare_toolbox()
-                    # Keep toolbox clear of the vertical legend column on the right.
-                    toolbox_line["right"] = 220
-                    toolbox_line["top"] = 6
+                    toolbox_line["right"] = 12
+                    toolbox_line["top"] = 8
                     line_opts = {
                         "animation": True,
                         "title": {
                             "text": "Trends by years",
+                            "subtext": line_short,
                             "left": "center",
-                            "top": 6,
+                            "top": 8,
                             "textStyle": {
                                 "fontSize": 15,
                                 "fontWeight": 600,
                                 "color": "#1e293b",
                             },
+                            "subtextStyle": {"fontSize": 11, "color": "#64748b"},
                         },
                         "tooltip": {"trigger": "axis"},
                         "legend": {
                             "type": "scroll",
-                            "orient": "vertical",
-                            "right": 4,
-                            "top": 44,
-                            "bottom": 86,
-                            "width": 220,
+                            "orient": "horizontal",
+                            "top": 56,
+                            "left": "center",
+                            "width": "90%",
                             "data": [s["name"] for s in line_series],
-                            "itemWidth": 10,
-                            "itemHeight": 10,
-                            "itemGap": 8,
-                            "textStyle": {"fontSize": 10, "lineHeight": 14},
+                            "itemWidth": 12,
+                            "itemHeight": 12,
+                            "itemGap": 16,
+                            "padding": [4, 8, 2, 8],
+                            "textStyle": {"fontSize": 10, "lineHeight": 15},
                         },
                         "toolbox": toolbox_line,
                         "grid": {
-                            "left": "11%",
-                            "right": "26%",
-                            "top": 44,
-                            "bottom": 76,
+                            "left": "10%",
+                            "right": "8%",
+                            "top": 128,
+                            "bottom": 78,
                             "containLabel": True,
                         },
                         "xAxis": {
@@ -2496,7 +2500,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     }
                     st_echarts(
                         options=line_opts,
-                        height="560px",
+                        height="600px",
                         key=f"compare_line_v2_{line_metric}_{line_chart_type}",
                     )
                     st.caption(
@@ -2651,10 +2655,10 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                             "subtextStyle": {"fontSize": 11, "color": "#64748b"},
                         },
                         "grid": {
-                            "left": "4%",
-                            "right": "3%",
-                            "top": 124,
-                            "bottom": "12%",
+                            "left": "6%",
+                            "right": "4%",
+                            "top": 128,
+                            "bottom": 118,
                             "containLabel": True,
                         },
                         "tooltip": {
@@ -2678,7 +2682,13 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                             "type": "value",
                             "name": x_name,
                             "nameLocation": "middle",
-                            "nameGap": 32,
+                            "nameGap": 40,
+                            "nameTextStyle": {
+                                "fontSize": 11,
+                                "color": "#475569",
+                                "padding": [0, 0, 4, 0],
+                            },
+                            "axisLabel": {"margin": 10},
                             "scale": True,
                         },
                         "yAxis": {
@@ -2691,12 +2701,17 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         "series": bubble_series,
                         "dataZoom": [
                             {"type": "inside"},
-                            {"type": "slider", "height": 16},
+                            {
+                                "type": "slider",
+                                "xAxisIndex": 0,
+                                "height": 22,
+                                "bottom": 8,
+                            },
                         ],
                     }
                     st_echarts(
                         options=bubble_opts,
-                        height="520px",
+                        height="580px",
                         key=f"bubble_{x_metric}_{y_metric}_{size_metric}_totals",
                     )
 
