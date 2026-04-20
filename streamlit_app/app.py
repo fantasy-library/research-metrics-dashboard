@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import hashlib
 import html
-from io import BytesIO
 import re
 import sys
 import time
@@ -937,6 +936,34 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   color: #9CA3AF !important;
   opacity: 1 !important;
   -webkit-text-fill-color: #9CA3AF !important;
+}
+[class*="st-key-search_shell"] .author-limit-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.52rem;
+  margin: 0.35rem 0 0.1rem 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+[class*="st-key-search_shell"] .author-limit-hint--ok {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+}
+[class*="st-key-search_shell"] .author-limit-hint--warn {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+[class*="st-key-search_shell"] .author-limit-icon {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+[class*="st-key-search_shell"] .author-limit-count {
+  font-weight: 700;
+  margin-left: 0.25rem;
 }
 [class*="st-key-search_shell"] textarea:focus {
   border-color: #5D5CDE !important;
@@ -2698,6 +2725,8 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     toolbox_line = _compare_toolbox()
                     toolbox_line["right"] = 12
                     toolbox_line["top"] = 8
+                    line_legend_rows = max(1, (len(line_series) + 4) // 5)
+                    line_grid_top = 128 + max(0, line_legend_rows - 1) * 22
                     line_opts = {
                         "animation": True,
                         "title": {
@@ -2714,15 +2743,15 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         },
                         "tooltip": {"trigger": "axis"},
                         "legend": {
-                            "type": "scroll",
+                            "type": "plain",
                             "orient": "horizontal",
                             "top": 56,
-                            "left": "center",
-                            "width": "90%",
+                            "left": 20,
+                            "right": 118,
                             "data": [s["name"] for s in line_series],
                             "itemWidth": 12,
                             "itemHeight": 12,
-                            "itemGap": 16,
+                            "itemGap": 14,
                             "padding": [4, 8, 2, 8],
                             "textStyle": {"fontSize": 10, "lineHeight": 15},
                         },
@@ -2730,7 +2759,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         "grid": {
                             "left": "10%",
                             "right": "8%",
-                            "top": 128,
+                            "top": line_grid_top,
                             "bottom": 78,
                             "containLabel": True,
                         },
@@ -2761,6 +2790,29 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         height="600px",
                         key=f"compare_line_v2_{line_metric}_{line_chart_type}",
                     )
+                    def _fmt_line_val(v) -> str:
+                        if v is None or (isinstance(v, (int, float)) and pd.isna(v)):
+                            return "N/A"
+                        if isinstance(v, (int, float)):
+                            return f"{v:.4f}".rstrip("0").rstrip(".")
+                        return str(v)
+
+                    trends_tbl = pd.DataFrame(
+                        [
+                            {
+                                "Author": s["name"],
+                                **{
+                                    x_years[i]: _fmt_line_val(s["data"][i])
+                                    for i in range(len(x_years))
+                                },
+                            }
+                            for s in line_series
+                        ]
+                    )
+                    st.caption(
+                        f"Values used in trends chart ({label_map.get(line_metric, line_metric)} by year):"
+                    )
+                    st.dataframe(trends_tbl, use_container_width=True, hide_index=True)
                 else:
                     st.caption(
                         "No series to plot for this metric (missing year data for all authors)."
@@ -2997,30 +3049,15 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         f"bubble-totals-{x_metric}-{y_metric}-{size_metric}".lower(),
                     ).strip("-")
                     csv_bytes = tbl_df.to_csv(index=False).encode("utf-8-sig")
-                    xlsm_buf = BytesIO()
-                    with pd.ExcelWriter(xlsm_buf, engine="openpyxl") as writer:
-                        tbl_df.to_excel(writer, index=False, sheet_name="BubbleTotals")
-                    xlsm_bytes = xlsm_buf.getvalue()
 
-                    d1, d2 = st.columns(2, gap="small")
-                    with d1:
-                        st.download_button(
-                            "Download bubble totals (.csv)",
-                            data=csv_bytes,
-                            file_name=f"{export_stub}.csv",
-                            mime="text/csv",
-                            key=f"dl_bubble_totals_csv_{x_metric}_{y_metric}_{size_metric}",
-                            use_container_width=True,
-                        )
-                    with d2:
-                        st.download_button(
-                            "Download bubble totals (.xlsm)",
-                            data=xlsm_bytes,
-                            file_name=f"{export_stub}.xlsm",
-                            mime="application/vnd.ms-excel.sheet.macroEnabled.12",
-                            key=f"dl_bubble_totals_xlsm_{x_metric}_{y_metric}_{size_metric}",
-                            use_container_width=True,
-                        )
+                    st.download_button(
+                        "Download bubble totals (.csv)",
+                        data=csv_bytes,
+                        file_name=f"{export_stub}.csv",
+                        mime="text/csv",
+                        key=f"dl_bubble_totals_csv_{x_metric}_{y_metric}_{size_metric}",
+                        use_container_width=True,
+                    )
 
 
 def main() -> None:
@@ -3139,6 +3176,25 @@ def main() -> None:
                 key="scopus_author_ids",
                 height=96,
             )
+            parsed_author_ids = [
+                x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
+            ]
+            _limit_cls = (
+                "author-limit-hint--warn"
+                if len(parsed_author_ids) > MAX_AUTHORS_PER_RUN
+                else "author-limit-hint--ok"
+            )
+            st.markdown(
+                '<div class="author-limit-hint '
+                f'{_limit_cls}"><span class="author-limit-icon" aria-hidden="true">👥</span>'
+                "<span><strong>Search up to "
+                f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
+                "Use commas, semicolons, or new lines to separate entries."
+                '<span class="author-limit-count">'
+                f"{len(parsed_author_ids)}/{MAX_AUTHORS_PER_RUN} entered"
+                "</span></span></div>",
+                unsafe_allow_html=True,
+            )
             st.markdown(
                 '<div class="minimal-go-analyze-wrap">'
                 '<a class="minimal-go-analyze-btn" href="#analyze-metrics-anchor">Go to Analyze</a>'
@@ -3249,8 +3305,8 @@ def main() -> None:
                 st.session_state.entitlement_error = False
                 st.session_state.rate_limit_error = False
                 st.session_state.results = []
-                # Accept common separators: commas, semicolons, and new lines.
-                ids = [x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()]
+                # Parsed with same separators shown in the author input hint.
+                ids = parsed_author_ids
                 selected_metric_count = sum(
                     1 for m in st.session_state.available_metrics if m.get("enabled")
                 )
