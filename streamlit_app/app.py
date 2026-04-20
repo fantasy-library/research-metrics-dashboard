@@ -1026,6 +1026,47 @@ a.minimal-go-analyze-btn:hover,
   text-decoration: none !important;
 }
 
+/* Compare — trends & bubble: narrow control column, chart uses remaining width */
+:is([class*="st-key-compare_trends_row"], [class*="st-key-compare_bubble_row"]) [data-testid="stHorizontalBlock"] {
+  align-items: flex-start !important;
+  gap: 0.5rem !important;
+}
+:is([class*="st-key-compare_trends_row"], [class*="st-key-compare_bubble_row"]) [data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
+  flex: 0 0 clamp(168px, 22vw, 240px) !important;
+  max-width: 260px !important;
+}
+:is([class*="st-key-compare_trends_row"], [class*="st-key-compare_bubble_row"]) .compare-filter-mini {
+  margin: 0 0 0.2rem 0 !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+:is([class*="st-key-compare_trends_row"], [class*="st-key-compare_bubble_row"]) [data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-baseweb="select"] > div {
+  min-height: 40px !important;
+}
+:is([class*="st-key-compare_trends_row"], [class*="st-key-compare_bubble_row"]) [data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stRadio"] {
+  margin-top: 0.15rem !important;
+}
+:is([class*="st-key-compare_trends_row"], [class*="st-key-compare_bubble_row"]) [data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stRadio"] label p {
+  font-size: 0.85rem !important;
+}
+
+/* Export bundle: one checkbox per scholar, full names wrap on one logical line each */
+[class*="st-key-export_scholar_shell"] [data-testid="stCheckbox"] {
+  margin-bottom: 0.35rem !important;
+}
+[class*="st-key-export_scholar_shell"] [data-testid="stCheckbox"] label {
+  white-space: normal !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
+}
+[class*="st-key-export_scholar_shell"] [data-testid="stCheckbox"] label p {
+  font-size: 0.92rem !important;
+  line-height: 1.35 !important;
+}
+
 /* Metrics container: white elevated card (same chrome as header/footer band) */
 [class*="st-key-metrics_panel_shell"]:not(:has(span.skin-unified-form-shell)) {
   background: #f5f3ff !important;
@@ -1782,9 +1823,14 @@ DEFAULT_METRICS = [
     },
 ]
 
+# Default on/off per metric id (used when creating ``met_*`` session keys).
+DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {
+    m["id"]: bool(m.get("enabled", True)) for m in DEFAULT_METRICS
+}
+
 # Bump when default metric toggles change so Streamlit widget keys (met_*) resync.
-# v4: clear stale met_* widget state so toggles match "all on" defaults.
-_METRICS_SESSION_DEFAULT_VERSION = 4
+# v5: reset stuck "all off" sessions; ensure defaults come from DEFAULT_METRICS, not stale dict copies.
+_METRICS_SESSION_DEFAULT_VERSION = 5
 
 YEAR_OPTIONS = {
     "3yrs": "Last 3 complete years — compact recent window",
@@ -1856,9 +1902,16 @@ def _init_session() -> None:
                 except KeyError:
                     pass
         for m in DEFAULT_METRICS:
-            st.session_state[f"met_{m['id']}"] = bool(m.get("enabled"))
+            mid = m["id"]
+            st.session_state[f"met_{mid}"] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
+                mid, True
+            )
     elif "available_metrics" not in st.session_state:
         st.session_state.available_metrics = [dict(m) for m in DEFAULT_METRICS]
+        for m in DEFAULT_METRICS:
+            mk = f"met_{m['id']}"
+            if mk not in st.session_state:
+                st.session_state[mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(m["id"], True)
     if "results" not in st.session_state:
         st.session_state.results = []
     if "loading" not in st.session_state:
@@ -2272,11 +2325,6 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     ]
     inter_years = _intersection_years(year_lists)
 
-    st.markdown(
-        '<p class="section-title" style="margin-bottom:0.35rem;">Compare</p>',
-        unsafe_allow_html=True,
-    )
-
     def _pick_metric_idx(metric_id: str, default: str) -> int:
         try:
             return compare_opts.index(metric_id)
@@ -2286,118 +2334,139 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
             except ValueError:
                 return 0
 
-    # --- Line chart (SciVal-style multi-series) ---
+    # --- Line chart (multi-author): metric + chart type left, chart right ---
     st.markdown("##### Trends by years")
-    line_metric = st.selectbox(
-        "Metric",
-        options=compare_opts,
-        index=_pick_metric_idx("publication", "fwci"),
-        format_func=lambda i: label_map.get(i, i),
-        key="compare_line_metric",
-    )
-    line_chart_type = st.radio(
-        "Chart type",
-        options=["Line", "Bar"],
-        horizontal=True,
-        index=0,
-        key="compare_line_type",
-    )
-    line_short = _metric_short_label(label_map, line_metric)
+    with st.container(border=False, key="compare_trends_row"):
+        col_filt, col_chart = st.columns([1, 3.5], gap="small", vertical_alignment="top")
+        with col_filt:
+            st.markdown(
+                '<p class="compare-filter-mini">Metric</p>',
+                unsafe_allow_html=True,
+            )
+            line_metric = st.selectbox(
+                "Metric",
+                options=compare_opts,
+                index=_pick_metric_idx("publication", "fwci"),
+                format_func=lambda i: label_map.get(i, i),
+                key="compare_line_metric",
+                label_visibility="collapsed",
+            )
+            st.markdown(
+                '<p class="compare-filter-mini" style="margin-top:0.45rem;">Chart type</p>',
+                unsafe_allow_html=True,
+            )
+            line_chart_type = st.radio(
+                "Chart type",
+                options=["Line", "Bar"],
+                horizontal=True,
+                index=0,
+                key="compare_line_type",
+                label_visibility="collapsed",
+            )
+        line_short = _metric_short_label(label_map, line_metric)
 
-    if not inter_years:
-        st.caption(
-            "No overlapping years across authors. "
-            "Adjust search or year range so authors share a common window."
-        )
-    else:
-        x_years = [str(y) for y in inter_years]
-        line_series = []
-        symbols = ["circle", "rect", "triangle", "diamond", "roundRect", "pin"]
-        for idx, r in enumerate(valid):
-            mp = r["data"].get("metrics") or {}
-            by_y = _extract_metric_by_year(mp, line_metric)
-            if not by_y:
-                continue
-            author_name = r["data"].get("authorName") or f"Author {r['id']}"
-            vals = []
-            for y in inter_years:
-                v = by_y.get(str(y))
-                if v is None or (isinstance(v, (int, float)) and pd.isna(v)):
-                    vals.append(None)
+        with col_chart:
+            if not inter_years:
+                st.caption(
+                    "No overlapping years across authors. "
+                    "Adjust search or year range so authors share a common window."
+                )
+            else:
+                x_years = [str(y) for y in inter_years]
+                line_series = []
+                symbols = ["circle", "rect", "triangle", "diamond", "roundRect", "pin"]
+                for idx, r in enumerate(valid):
+                    mp = r["data"].get("metrics") or {}
+                    by_y = _extract_metric_by_year(mp, line_metric)
+                    if not by_y:
+                        continue
+                    author_name = r["data"].get("authorName") or f"Author {r['id']}"
+                    vals = []
+                    for y in inter_years:
+                        v = by_y.get(str(y))
+                        if v is None or (isinstance(v, (int, float)) and pd.isna(v)):
+                            vals.append(None)
+                        else:
+                            vals.append(v)
+                    ser: dict = {
+                        "name": author_name,
+                        "type": line_chart_type.lower(),
+                        "data": vals,
+                        "symbol": symbols[idx % len(symbols)],
+                        "symbolSize": 8,
+                        "smooth": line_chart_type == "Line",
+                    }
+                    if line_chart_type == "Bar":
+                        ser["label"] = {
+                            "show": True,
+                            "position": "top",
+                            "formatter": "{c}",
+                            "fontSize": 11,
+                            "color": "#334155",
+                        }
+                    line_series.append(ser)
+                if line_series:
+                    toolbox_line = _compare_toolbox()
+                    toolbox_line["right"] = 10
+                    toolbox_line["top"] = 8
+                    line_opts = {
+                        "animation": True,
+                        "title": {
+                            "text": "Trends by years",
+                            "subtext": line_short,
+                            "left": "center",
+                            "top": 2,
+                            "textStyle": {
+                                "fontSize": 15,
+                                "fontWeight": 600,
+                                "color": "#1e293b",
+                            },
+                            "subtextStyle": {"fontSize": 12, "color": "#64748b"},
+                        },
+                        "tooltip": {"trigger": "axis"},
+                        "legend": {
+                            "type": "plain",
+                            "data": [s["name"] for s in line_series],
+                            "top": 34,
+                            "left": "center",
+                            "itemWidth": 10,
+                            "itemHeight": 10,
+                            "itemGap": 8,
+                            "textStyle": {"fontSize": 10},
+                        },
+                        "toolbox": toolbox_line,
+                        "grid": {
+                            "left": "4%",
+                            "right": "3%",
+                            "top": 108,
+                            "bottom": 72,
+                            "containLabel": True,
+                        },
+                        "xAxis": {"type": "category", "name": "Year", "data": x_years},
+                        "yAxis": {
+                            "type": "value",
+                            "name": line_short,
+                            "nameLocation": "middle",
+                            "nameGap": 48,
+                        },
+                        "series": line_series,
+                        "dataZoom": [
+                            {"type": "inside"},
+                            {"type": "slider", "height": 16, "bottom": 12},
+                        ],
+                    }
+                    st_echarts(
+                        options=line_opts,
+                        height="520px",
+                        key=f"compare_line_v2_{line_metric}_{line_chart_type}",
+                    )
+                    st.caption(
+                        "Toolbar (top-right): camera icon to download image."
+                    )
                 else:
-                    vals.append(v)
-            ser: dict = {
-                "name": author_name,
-                "type": line_chart_type.lower(),
-                "data": vals,
-                "symbol": symbols[idx % len(symbols)],
-                "symbolSize": 8,
-                "smooth": line_chart_type == "Line",
-            }
-            if line_chart_type == "Bar":
-                ser["label"] = {
-                    "show": True,
-                    "position": "top",
-                    "formatter": "{c}",
-                    "fontSize": 11,
-                    "color": "#334155",
-                }
-            line_series.append(ser)
-        if line_series:
-            toolbox_line = _compare_toolbox()
-            toolbox_line["right"] = 10
-            toolbox_line["top"] = 8
-            line_opts = {
-                "animation": True,
-                "title": {
-                    "text": f"{line_short} over years (all authors)",
-                    "left": "center",
-                    "top": 4,
-                    "textStyle": {"fontSize": 15},
-                },
-                "tooltip": {"trigger": "axis"},
-                "legend": {
-                    "type": "plain",
-                    "data": [s["name"] for s in line_series],
-                    "top": 30,
-                    "left": "center",
-                    "right": 60,
-                    "itemWidth": 10,
-                    "itemHeight": 10,
-                    "itemGap": 10,
-                    "textStyle": {"fontSize": 11},
-                },
-                "toolbox": toolbox_line,
-                "grid": {
-                    "left": "6%",
-                    "right": "5%",
-                    "top": 116,
-                    "bottom": 78,
-                    "containLabel": True,
-                },
-                "xAxis": {"type": "category", "name": "Year", "data": x_years},
-                "yAxis": {
-                    "type": "value",
-                    "name": line_short,
-                    "nameLocation": "middle",
-                    "nameGap": 55,
-                },
-                "series": line_series,
-                "dataZoom": [
-                    {"type": "inside"},
-                    {"type": "slider", "height": 18, "bottom": 14},
-                ],
-            }
-            st_echarts(
-                options=line_opts,
-                height="560px",
-                key=f"compare_line_v2_{line_metric}_{line_chart_type}",
-            )
-            st.caption("Toolbar (top-right): camera icon to download image.")
-        else:
-            st.caption(
-                "No series to plot for this metric (missing year data for all authors)."
-            )
+                    st.caption(
+                        "No series to plot for this metric (missing year data for all authors)."
+                    )
 
     st.divider()
 
@@ -2424,172 +2493,194 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
         )
         return
 
-    bx1, bx2, bx3 = st.columns(3)
-    with bx1:
-        y_metric = st.selectbox(
-            "Y-axis",
-            options=bubble_metric_opts,
-            index=_bubble_pick_idx("topJournal", "fwci"),
-            format_func=lambda i: label_map.get(i, i),
-            key="compare_bubble_y_v2",
+    with st.container(border=False, key="compare_bubble_row"):
+        col_bfilt, col_bchart = st.columns(
+            [1, 3.5], gap="small", vertical_alignment="top"
         )
-    with bx2:
-        x_metric = st.selectbox(
-            "X-axis",
-            options=bubble_metric_opts,
-            index=_bubble_pick_idx("fwci", "publication"),
-            format_func=lambda i: label_map.get(i, i),
-            key="compare_bubble_x_v2",
-        )
-    with bx3:
-        size_metric = st.selectbox(
-            "Bubble size",
-            options=bubble_metric_opts,
-            index=_bubble_pick_idx("publication", "citationCount"),
-            format_func=lambda i: label_map.get(i, i),
-            key="compare_bubble_size_v2",
-        )
+        with col_bfilt:
+            st.markdown(
+                '<p class="compare-filter-mini">X-axis</p>',
+                unsafe_allow_html=True,
+            )
+            x_metric = st.selectbox(
+                "X-axis",
+                options=bubble_metric_opts,
+                index=_bubble_pick_idx("fwci", "publication"),
+                format_func=lambda i: label_map.get(i, i),
+                key="compare_bubble_x_v2",
+                label_visibility="collapsed",
+            )
+            st.markdown(
+                '<p class="compare-filter-mini" style="margin-top:0.45rem;">Y-axis</p>',
+                unsafe_allow_html=True,
+            )
+            y_metric = st.selectbox(
+                "Y-axis",
+                options=bubble_metric_opts,
+                index=_bubble_pick_idx("topJournal", "fwci"),
+                format_func=lambda i: label_map.get(i, i),
+                key="compare_bubble_y_v2",
+                label_visibility="collapsed",
+            )
+            st.markdown(
+                '<p class="compare-filter-mini" style="margin-top:0.45rem;">Bubble size</p>',
+                unsafe_allow_html=True,
+            )
+            size_metric = st.selectbox(
+                "Bubble size",
+                options=bubble_metric_opts,
+                index=_bubble_pick_idx("publication", "citationCount"),
+                format_func=lambda i: label_map.get(i, i),
+                key="compare_bubble_size_v2",
+                label_visibility="collapsed",
+            )
 
-    if len({x_metric, y_metric, size_metric}) < 3:
-        st.warning("Choose three different metrics for X, Y, and bubble size.")
-        return
+        with col_bchart:
+            if len({x_metric, y_metric, size_metric}) < 3:
+                st.warning(
+                    "Choose three different metrics for X, Y, and bubble size."
+                )
+            else:
+                y_lbl = _metric_short_label(label_map, y_metric)
+                x_lbl = _metric_short_label(label_map, x_metric)
+                sz_lbl = _metric_short_label(label_map, size_metric)
+                x_name = label_map.get(x_metric, x_metric)
+                y_name = label_map.get(y_metric, y_metric)
+                z_name = label_map.get(size_metric, size_metric)
 
-    y_lbl = _metric_short_label(label_map, y_metric)
-    x_lbl = _metric_short_label(label_map, x_metric)
-    sz_lbl = _metric_short_label(label_map, size_metric)
-    x_name = label_map.get(x_metric, x_metric)
-    y_name = label_map.get(y_metric, y_metric)
-    z_name = label_map.get(size_metric, size_metric)
+                plotted: list[tuple[str, float, float, float]] = []
+                for r in valid:
+                    mp = r["data"].get("metrics") or {}
+                    xv = _scalar_metric_total(mp, x_metric)
+                    yv = _scalar_metric_total(mp, y_metric)
+                    sv = _scalar_metric_total(mp, size_metric)
+                    if xv is None or yv is None or sv is None:
+                        continue
+                    author_name = r["data"].get("authorName") or f"Author {r['id']}"
+                    plotted.append((author_name, xv, yv, sv))
 
-    plotted: list[tuple[str, float, float, float]] = []
-    for r in valid:
-        mp = r["data"].get("metrics") or {}
-        xv = _scalar_metric_total(mp, x_metric)
-        yv = _scalar_metric_total(mp, y_metric)
-        sv = _scalar_metric_total(mp, size_metric)
-        if xv is None or yv is None or sv is None:
-            continue
-        author_name = r["data"].get("authorName") or f"Author {r['id']}"
-        plotted.append((author_name, xv, yv, sv))
+                if not plotted:
+                    st.caption(
+                        "No complete Total values for all three metrics. "
+                        "Try other metrics or confirm the API returned totals."
+                    )
+                else:
 
-    if not plotted:
-        st.caption(
-            "No complete Total values for all three metrics. "
-            "Try other metrics or confirm the API returned totals."
-        )
-        return
+                    def _fmt_val(v: float) -> str:
+                        if float(v).is_integer():
+                            return str(int(v))
+                        return f"{v:.4f}".rstrip("0").rstrip(".")
 
-    size_px = _bubble_symbol_sizes([p[3] for p in plotted])
+                    size_px = _bubble_symbol_sizes([p[3] for p in plotted])
 
-    def _fmt_val(v: float) -> str:
-        if float(v).is_integer():
-            return str(int(v))
-        return f"{v:.4f}".rstrip("0").rstrip(".")
+                    bubble_series = []
+                    for i, (author_name, xv, yv, sv) in enumerate(plotted):
+                        tooltip_text = (
+                            f"{author_name}\n"
+                            f"{y_name}: {_fmt_val(yv)}\n"
+                            f"{x_name}: {_fmt_val(xv)}\n"
+                            f"{z_name}: {_fmt_val(sv)}"
+                        )
+                        bubble_series.append(
+                            {
+                                "name": author_name,
+                                "type": "scatter",
+                                "data": [{"name": tooltip_text, "value": [xv, yv, sv]}],
+                                "symbolSize": size_px[i],
+                                "itemStyle": {"opacity": 0.78},
+                                "label": {
+                                    "show": True,
+                                    "position": "top",
+                                    "formatter": author_name,
+                                    "fontSize": 11,
+                                },
+                            }
+                        )
 
-    bubble_series = []
-    for i, (author_name, xv, yv, sv) in enumerate(plotted):
-        tooltip_text = (
-            f"{author_name}\n"
-            f"{y_name}: {_fmt_val(yv)}\n"
-            f"{x_name}: {_fmt_val(xv)}\n"
-            f"{z_name}: {_fmt_val(sv)}"
-        )
-        bubble_series.append(
-            {
-                "name": author_name,
-                "type": "scatter",
-                "data": [{"name": tooltip_text, "value": [xv, yv, sv]}],
-                "symbolSize": size_px[i],
-                "itemStyle": {"opacity": 0.78},
-                "label": {
-                    "show": True,
-                    "position": "top",
-                    "formatter": author_name,
-                    "fontSize": 11,
-                },
-            }
-        )
+                    toolbox_bubble = _compare_toolbox()
+                    toolbox_bubble["right"] = 10
+                    toolbox_bubble["top"] = 8
 
-    toolbox_bubble = _compare_toolbox()
-    toolbox_bubble["right"] = 10
-    toolbox_bubble["top"] = 8
+                    bubble_opts = {
+                        "animation": True,
+                        "title": {
+                            "text": f"{y_lbl} vs {x_lbl}",
+                            "subtext": f"Bubble size: {sz_lbl} (period totals)",
+                            "left": "center",
+                            "top": 6,
+                            "textStyle": {"fontSize": 15, "color": "#1e293b"},
+                            "subtextStyle": {"fontSize": 11, "color": "#64748b"},
+                        },
+                        "grid": {
+                            "left": "4%",
+                            "right": "3%",
+                            "top": 124,
+                            "bottom": "12%",
+                            "containLabel": True,
+                        },
+                        "tooltip": {
+                            "trigger": "item",
+                            "renderMode": "richText",
+                            "textStyle": {"lineHeight": 20},
+                            "formatter": "{b}",
+                        },
+                        "legend": {
+                            "type": "plain",
+                            "data": [s["name"] for s in bubble_series],
+                            "top": 52,
+                            "left": "center",
+                            "itemWidth": 10,
+                            "itemHeight": 10,
+                            "itemGap": 8,
+                            "textStyle": {"fontSize": 10},
+                        },
+                        "toolbox": toolbox_bubble,
+                        "xAxis": {
+                            "type": "value",
+                            "name": x_name,
+                            "nameLocation": "middle",
+                            "nameGap": 32,
+                            "scale": True,
+                        },
+                        "yAxis": {
+                            "type": "value",
+                            "name": y_name,
+                            "nameLocation": "middle",
+                            "nameGap": 46,
+                            "scale": True,
+                        },
+                        "series": bubble_series,
+                        "dataZoom": [
+                            {"type": "inside"},
+                            {"type": "slider", "height": 16},
+                        ],
+                    }
+                    st_echarts(
+                        options=bubble_opts,
+                        height="520px",
+                        key=f"bubble_{x_metric}_{y_metric}_{size_metric}_totals",
+                    )
 
-    bubble_opts = {
-        "animation": True,
-        "title": {
-            "text": f"{y_lbl} vs {x_lbl}",
-            "subtext": f"Bubble size: {sz_lbl} (period totals)",
-            "left": "center",
-            "top": 8,
-            "textStyle": {"fontSize": 15},
-            "subtextStyle": {"fontSize": 12, "color": "#555"},
-        },
-        "grid": {
-            "left": "6%",
-            "right": "5%",
-            "top": 138,
-            "bottom": "14%",
-            "containLabel": True,
-        },
-        "tooltip": {
-            "trigger": "item",
-            "renderMode": "richText",
-            "textStyle": {"lineHeight": 20},
-            "formatter": "{b}",
-        },
-        "legend": {
-            "type": "plain",
-            "data": [s["name"] for s in bubble_series],
-            "top": 58,
-            "left": "center",
-            "itemWidth": 10,
-            "itemHeight": 10,
-            "itemGap": 10,
-            "textStyle": {"fontSize": 11},
-        },
-        "toolbox": toolbox_bubble,
-        "xAxis": {
-            "type": "value",
-            "name": x_name,
-            "nameLocation": "middle",
-            "nameGap": 36,
-            "scale": True,
-        },
-        "yAxis": {
-            "type": "value",
-            "name": y_name,
-            "nameLocation": "middle",
-            "nameGap": 50,
-            "scale": True,
-        },
-        "series": bubble_series,
-        "dataZoom": [
-            {"type": "inside"},
-            {"type": "slider", "height": 18},
-        ],
-    }
-    st_echarts(
-        options=bubble_opts,
-        height="520px",
-        key=f"bubble_{x_metric}_{y_metric}_{size_metric}_totals",
-    )
-
-    tbl_df = pd.DataFrame(
-        [
-            {
-                "Author": p[0],
-                x_lbl: p[1],
-                y_lbl: p[2],
-                sz_lbl: p[3],
-            }
-            for p in plotted
-        ]
-    )
-    # Streamlit right-aligns numeric dtypes; cast metric columns to text for left alignment.
-    for col in (x_lbl, y_lbl, sz_lbl):
-        tbl_df[col] = tbl_df[col].map(_fmt_val)
-    st.caption("Totals used for position and bubble size (same period as your search):")
-    st.dataframe(tbl_df, use_container_width=True, hide_index=True)
+                    tbl_df = pd.DataFrame(
+                        [
+                            {
+                                "Author": p[0],
+                                x_lbl: p[1],
+                                y_lbl: p[2],
+                                sz_lbl: p[3],
+                            }
+                            for p in plotted
+                        ]
+                    )
+                    for col in (x_lbl, y_lbl, sz_lbl):
+                        tbl_df[col] = tbl_df[col].map(_fmt_val)
+                    st.caption(
+                        "Totals used for position and bubble size "
+                        "(same period as your search):"
+                    )
+                    st.dataframe(
+                        tbl_df, use_container_width=True, hide_index=True
+                    )
 
 
 def main() -> None:
@@ -2733,7 +2824,9 @@ def main() -> None:
             for m in am:
                 mk = f"met_{m['id']}"
                 if mk not in st.session_state:
-                    st.session_state[mk] = bool(m.get("enabled"))
+                    st.session_state[mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
+                        m["id"], True
+                    )
                 m["enabled"] = bool(st.session_state[mk])
             n_on = sum(1 for m in am if m.get("enabled"))
             with st.container(border=False, key="metrics_toolbar_shell"):
@@ -2783,8 +2876,14 @@ def main() -> None:
                                         )
                                     with csw:
                                         _mk = f"met_{metric['id']}"
+                                        _def_on = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
+                                            metric["id"], True
+                                        )
                                         metric["enabled"] = st.toggle(
                                             metric["label"],
+                                            value=bool(
+                                                st.session_state.get(_mk, _def_on)
+                                            ),
                                             key=_mk,
                                             label_visibility="collapsed",
                                         )
@@ -2915,10 +3014,6 @@ def main() -> None:
 
     if valid:
         with st.container(border=True):
-            st.markdown(
-                '<p class="section-title">Results</p>',
-                unsafe_allow_html=True,
-            )
             label_map_global = {x["id"]: x["label"] for x in DEFAULT_METRICS}
             _render_compare_authors_charts(valid, label_map_global)
             if len(valid) >= 2:
@@ -2968,18 +3063,28 @@ def main() -> None:
                     sortable_key="export_bundle_metrics_sort",
                     fallback_key="export_bundle_metrics_fallback",
                 )
-                scholar_ids_m = [r["id"] for r in valid]
-                scholar_labels_m = {
-                    r["id"]: r["data"].get("authorName") or f"Author {r['id']}"
-                    for r in valid
-                }
-                export_scholar_pick = st.multiselect(
-                    "Scholar(s) to export",
-                    options=scholar_ids_m,
-                    default=scholar_ids_m,
-                    format_func=lambda sid: str(scholar_labels_m.get(sid, sid)),
-                    key="export_bundle_scholar_pick",
+                st.markdown(
+                    '<p class="compare-filter-mini" style="margin-top:0.65rem;">'
+                    "Scholar(s) to export</p>",
+                    unsafe_allow_html=True,
                 )
+                _prev_bundle_pick = st.session_state.get("export_bundle_scholar_pick")
+                with st.container(border=False, key="export_scholar_shell"):
+                    for r in valid:
+                        aid = r["id"]
+                        chk_key = f"export_scholar_inc_{aid}"
+                        if chk_key not in st.session_state:
+                            if isinstance(_prev_bundle_pick, list):
+                                st.session_state[chk_key] = aid in _prev_bundle_pick
+                            else:
+                                st.session_state[chk_key] = True
+                        _nm = str(r["data"].get("authorName") or f"Author {aid}")
+                        st.checkbox(_nm, key=chk_key)
+                export_scholar_pick = [
+                    r["id"]
+                    for r in valid
+                    if st.session_state.get(f"export_scholar_inc_{r['id']}", True)
+                ]
                 if not picked_m or not export_scholar_pick:
                     st.info("Select at least one metric and one scholar to build the export file.")
                 for r in valid:
