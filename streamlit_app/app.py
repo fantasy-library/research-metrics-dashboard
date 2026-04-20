@@ -142,6 +142,13 @@ _FILTER_ICON_FUNNEL = (
     'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>'
 )
+# Export workspace strip — “outputs” glyph (separate from analysis / charts)
+_EXPORT_WORKSPACE_ICON = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
+    '<polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+)
 
 
 def _inject_export_download_styles() -> None:
@@ -1434,7 +1441,7 @@ p.metric-subtext {
   color: #1e293b;
   margin: 0 0 0.85rem 0;
 }
-/* Between multi-author charts and Prepare export */
+/* Between multi-author charts and Export Option */
 hr.charts-export-divider {
   border: none;
   border-top: 3px solid #8b5cf6;
@@ -1451,6 +1458,149 @@ p.prepare-export-heading {
   letter-spacing: -0.02em;
   margin: 0.35rem 0 0.45rem 0 !important;
   line-height: 1.25 !important;
+}
+/* Export bundle: three steps — same label size + numbered badges */
+p.export-step-label {
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  margin: 0 0 0.4rem 0 !important;
+  line-height: 1.4 !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0.35rem 0.5rem !important;
+}
+p.export-step-label .export-step-label-text {
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  color: inherit !important;
+}
+span.export-step-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 2.1rem !important;
+  padding: 0.2rem 0.45rem !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%) !important;
+  border: 1px solid #c4b5fd !important;
+  color: #5b21b6 !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums !important;
+  line-height: 1.2 !important;
+  flex-shrink: 0 !important;
+}
+
+/* Export workspace — self-contained lane (analysis/charts live above) */
+[class*="st-key-export_workspace_stack"] {
+  margin-top: 0.85rem !important;
+  margin-bottom: 0.35rem !important;
+  padding: 1.35rem 1.45rem 1.55rem 1.55rem !important;
+  border-radius: 18px !important;
+  background: linear-gradient(
+    165deg,
+    #f8fafc 0%,
+    #f0fdf4 28%,
+    #ecfdf5 55%,
+    #f8fafc 100%
+  ) !important;
+  border: 1px solid rgba(16, 185, 129, 0.42) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 10px 36px rgba(16, 185, 129, 0.12),
+    0 4px 14px rgba(15, 23, 42, 0.06) !important;
+  position: relative !important;
+}
+[class*="st-key-export_workspace_stack"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 5px;
+  border-radius: 0 6px 6px 0;
+  background: linear-gradient(180deg, #34d399 0%, #10b981 48%, #059669 100%);
+  box-shadow: 2px 0 10px rgba(16, 185, 129, 0.35);
+  pointer-events: none;
+}
+header.export-workspace-module-head {
+  margin: 0 0 1.15rem 0 !important;
+  padding: 0 0 0 0.35rem !important;
+}
+.export-workspace-module-head-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 1rem !important;
+}
+.export-workspace-module-copy {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+.export-workspace-module-icon {
+  flex-shrink: 0 !important;
+  width: 3.1rem !important;
+  height: 3.1rem !important;
+  border-radius: 14px !important;
+  background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 100%) !important;
+  border: 1px solid rgba(52, 211, 153, 0.65) !important;
+  color: #047857 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.22) !important;
+}
+.export-workspace-module-icon svg {
+  display: block !important;
+}
+.export-workspace-module-title {
+  margin: 0 0 0.35rem 0 !important;
+  font-size: 1.2rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.2 !important;
+}
+.export-workspace-module-desc {
+  margin: 0 !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  color: #475569 !important;
+  line-height: 1.45 !important;
+  max-width: 40rem !important;
+}
+.export-workspace-module-kicker {
+  display: inline-block !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: #059669 !important;
+  margin-bottom: 0.4rem !important;
+}
+[class*="st-key-export_prep_inner"] {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-radius: 14px !important;
+  padding: 1rem 1.2rem 1.15rem !important;
+  margin-bottom: 1.05rem !important;
+  border: 1px solid rgba(148, 163, 184, 0.35) !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
+}
+[class*="st-key-export_prep_inner"] p.prepare-export-heading {
+  margin-top: 0.15rem !important;
+}
+hr.export-workspace-split {
+  border: none !important;
+  height: 0 !important;
+  margin: 0.2rem 0 1.15rem 0 !important;
+  border-top: 2px dashed rgba(16, 185, 129, 0.45) !important;
+  opacity: 1 !important;
+}
+[class*="st-key-export_workspace_stack"] [class*="st-key-export_results_shell"] {
+  background: rgba(255, 255, 255, 0.97) !important;
+  border-color: rgba(16, 185, 129, 0.28) !important;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05) !important;
 }
 .metrics-grid-hint {
   font-size: 0.85rem;
@@ -2240,6 +2390,97 @@ def _fetch_multi_author_metrics_with_progress(
     return out
 
 
+def _export_step_heading_html(step: int, text: str) -> str:
+    """HTML for a numbered export step label; ``text`` is plain (escaped)."""
+    badge = html.escape(f"({step})")
+    text_esc = html.escape(text)
+    return (
+        f'<p class="export-step-label">'
+        f'<span class="export-step-badge" aria-hidden="true">{badge}</span>'
+        f'<span class="export-step-label-text">{text_esc}</span></p>'
+    )
+
+
+def _export_workspace_module_head_html(*, bundle_prep: bool) -> str:
+    """Banner for the export lane (separate from charts / analysis above)."""
+    title = "Export workspace"
+    if bundle_prep:
+        desc = (
+            "This area is independent of the comparison charts: PDF and Excel follow only "
+            "the three steps below—not chart filters or zoom state."
+        )
+    else:
+        desc = (
+            "Separate from the tables and charts above: combined PDF/Excel use the metric "
+            "rows and scholars from this run."
+        )
+    return (
+        '<header class="export-workspace-module-head" role="presentation">'
+        '<p class="export-workspace-module-kicker">Standalone outputs</p>'
+        '<div class="export-workspace-module-head-row">'
+        '<div class="export-workspace-module-icon" aria-hidden="true">'
+        f"{_EXPORT_WORKSPACE_ICON}</div>"
+        '<div class="export-workspace-module-copy">'
+        f'<p class="export-workspace-module-title">{html.escape(title)}</p>'
+        f'<p class="export-workspace-module-desc">{html.escape(desc)}</p>'
+        "</div></div></header>"
+    )
+
+
+def _render_export_results_block(export_rows: list, n_valid: int) -> None:
+    """Anchor, copy, filename, and PDF/Excel downloads (used inside export workspace)."""
+    st.markdown(
+        '<div id="export-downloads-anchor"></div>',
+        unsafe_allow_html=True,
+    )
+    export_body_sub = (
+        "Download your research metrics in PDF or Excel. "
+        "Set the filename below; the file includes only the scholar(s) and metrics you selected above."
+        if n_valid > 1
+        else (
+            "Download your research metrics in PDF or Excel. "
+            "Set the filename below; the file includes all authors in this run."
+        )
+    )
+    with st.container(border=True, key="export_results_shell"):
+        st.markdown(
+            '<div class="export-results-head">'
+            '<div class="export-results-head-row">'
+            '<div class="export-results-badge" aria-hidden="true">'
+            f"{_FILTER_ICON_DOCUMENT}"
+            "</div>"
+            '<div class="export-results-head-text">'
+            '<p class="export-results-title">Export Results</p>'
+            '<p class="export-results-sub">'
+            f"{html.escape(export_body_sub)}"
+            "</p>"
+            "</div></div></div>",
+            unsafe_allow_html=True,
+        )
+        fn = st.text_input(
+            "Export filename (without extension)", value="research-metrics"
+        )
+        b1, b2 = st.columns(2, gap="xxsmall")
+        with b1:
+            pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
+            st.download_button(
+                "Export as PDF",
+                pdf_b,
+                file_name=pdf_n,
+                mime="application/pdf",
+                use_container_width=False,
+            )
+        with b2:
+            xl_b, xl_n = export_excel_bytes(export_rows, fn)
+            st.download_button(
+                "Export as Excel",
+                xl_b,
+                file_name=xl_n,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=False,
+            )
+
+
 def _metrics_multiselect_and_order_ui(
     opt_list: list[str],
     label_map: dict[str, str],
@@ -2249,14 +2490,22 @@ def _metrics_multiselect_and_order_ui(
     order_state_key: str,
     sortable_key: str,
     fallback_key: str,
+    step_multiselect: int | None = None,
+    step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
     """Pick metrics and drag-to-order rows. Returns ``(picked, order_pick)``."""
+    if step_multiselect is not None:
+        st.markdown(
+            _export_step_heading_html(step_multiselect, multiselect_label),
+            unsafe_allow_html=True,
+        )
     picked = st.multiselect(
         multiselect_label,
         options=opt_list,
         default=opt_list,
         format_func=lambda i: label_map.get(i, i),
         key=multiselect_key,
+        label_visibility="collapsed" if step_multiselect is not None else "visible",
     )
     if not picked:
         st.caption("Select at least one metric row to display.")
@@ -2274,7 +2523,13 @@ def _metrics_multiselect_and_order_ui(
     # from the list (streamlit-sortables can otherwise keep stale items).
     _pick_sig = hashlib.md5(",".join(sorted(picked)).encode()).hexdigest()[:12]
 
-    st.markdown("Display order (top to bottom)")
+    if step_order is not None:
+        st.markdown(
+            _export_step_heading_html(step_order, "Display order (top to bottom)"),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown("Display order (top to bottom)")
     display_to_metric = {label_map.get(m, m): m for m in order_pick}
     sortable_style = """
                     .sortable-component {
@@ -3075,91 +3330,107 @@ def main() -> None:
                     '<hr class="charts-export-divider" aria-hidden="true" />',
                     unsafe_allow_html=True,
                 )
-            if len(valid) >= 2:
-                st.markdown(
-                    '<div class="analyze-hint" style="margin: 0.35rem 0 1.1rem 0;">'
-                    '<div class="analyze-hint-inner">'
-                    '<p class="analyze-hint-text">'
-                    "Select metrics, their order, and which scholar(s) to export, "
-                    "then use Export Results below."
-                    "</p>"
-                    '<a class="analyze-hint-cta" href="#export-downloads-anchor">'
-                    "Jump to export <span aria-hidden=\"true\">↓</span>"
-                    "</a>"
-                    "</div></div>",
-                    unsafe_allow_html=True,
-                )
             export_rows = []
             if len(valid) > 1:
-                en_m = _enabled_metric_ids(st.session_state.available_metrics)
-                order_opts_m = [
-                    "publication",
-                    "citationCount",
-                    "citationsPerPublication",
-                    "fwci",
-                    "topJournal",
-                    "hIndex",
-                    "collaboration",
-                    "academicCorporateCollaboration",
-                ]
-                label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
-                opt_list_m = [i for i in order_opts_m if i in en_m]
-                st.markdown(
-                    '<p class="prepare-export-heading">Prepare export</p>',
-                    unsafe_allow_html=True,
-                )
-                st.caption(
-                    "Choose metrics to include, drag to set row order, then pick one or more "
-                    "scholars. PDF/Excel in Export Results use only these choices."
-                )
-                picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
-                    opt_list_m,
-                    label_map_m,
-                    multiselect_label="Metrics to export",
-                    multiselect_key="export_bundle_metrics_ms",
-                    order_state_key="export_bundle_metrics_ord_state",
-                    sortable_key="export_bundle_metrics_sort",
-                    fallback_key="export_bundle_metrics_fallback",
-                )
-                st.markdown(
-                    '<p class="compare-filter-mini" style="margin-top:0.65rem;">'
-                    "Scholar(s) to export</p>",
-                    unsafe_allow_html=True,
-                )
-                _prev_bundle_pick = st.session_state.get("export_bundle_scholar_pick")
-                with st.container(border=False, key="export_scholar_shell"):
-                    for r in valid:
-                        aid = r["id"]
-                        chk_key = f"export_scholar_inc_{aid}"
-                        if chk_key not in st.session_state:
-                            if isinstance(_prev_bundle_pick, list):
-                                st.session_state[chk_key] = aid in _prev_bundle_pick
-                            else:
-                                st.session_state[chk_key] = True
-                        _nm = str(r["data"].get("authorName") or f"Author {aid}")
-                        st.checkbox(_nm, key=chk_key)
-                export_scholar_pick = [
-                    r["id"]
-                    for r in valid
-                    if st.session_state.get(f"export_scholar_inc_{r['id']}", True)
-                ]
-                if not picked_m or not export_scholar_pick:
-                    st.info("Select at least one metric and one scholar to build the export file.")
-                for r in valid:
-                    if r["id"] not in export_scholar_pick:
-                        continue
-                    d = r["data"]
-                    aid = r["id"]
-                    export_rows.append(
-                        {
-                            "authorId": aid,
-                            "authorName": d.get("authorName"),
-                            "metrics": d.get("metrics"),
-                            "dataSource": d.get("dataSource"),
-                            "selectedMetrics": picked_m,
-                            "metricOrder": order_pick_m,
-                        }
+                with st.container(border=False, key="export_workspace_stack"):
+                    st.markdown(
+                        _export_workspace_module_head_html(bundle_prep=True),
+                        unsafe_allow_html=True,
                     )
+                    if len(valid) >= 2:
+                        st.markdown(
+                            '<div class="analyze-hint" style="margin: 0 0 1rem 0;">'
+                            '<div class="analyze-hint-inner">'
+                            '<p class="analyze-hint-text">'
+                            "Select metrics, their order, and which scholar(s) to export, "
+                            "then use Export Results below."
+                            "</p>"
+                            '<a class="analyze-hint-cta" href="#export-downloads-anchor">'
+                            "Jump to export <span aria-hidden=\"true\">↓</span>"
+                            "</a>"
+                            "</div></div>",
+                            unsafe_allow_html=True,
+                        )
+                    with st.container(border=False, key="export_prep_inner"):
+                        en_m = _enabled_metric_ids(st.session_state.available_metrics)
+                        order_opts_m = [
+                            "publication",
+                            "citationCount",
+                            "citationsPerPublication",
+                            "fwci",
+                            "topJournal",
+                            "hIndex",
+                            "collaboration",
+                            "academicCorporateCollaboration",
+                        ]
+                        label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
+                        opt_list_m = [i for i in order_opts_m if i in en_m]
+                        st.markdown(
+                            '<p class="prepare-export-heading">Export Option</p>',
+                            unsafe_allow_html=True,
+                        )
+                        st.caption(
+                            "Choose metrics to include, drag to set row order, then pick one or more "
+                            "scholars. PDF/Excel in Export Results use only these choices."
+                        )
+                        picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
+                            opt_list_m,
+                            label_map_m,
+                            multiselect_label="Metrics to export",
+                            multiselect_key="export_bundle_metrics_ms",
+                            order_state_key="export_bundle_metrics_ord_state",
+                            sortable_key="export_bundle_metrics_sort",
+                            fallback_key="export_bundle_metrics_fallback",
+                            step_multiselect=1,
+                            step_order=2,
+                        )
+                        st.markdown(
+                            '<p class="export-step-label" style="margin-top:0.65rem;">'
+                            '<span class="export-step-badge" aria-hidden="true">(3)</span>'
+                            '<span class="export-step-label-text">Scholar(s) to export</span></p>',
+                            unsafe_allow_html=True,
+                        )
+                        _prev_bundle_pick = st.session_state.get("export_bundle_scholar_pick")
+                        with st.container(border=False, key="export_scholar_shell"):
+                            for r in valid:
+                                aid = r["id"]
+                                chk_key = f"export_scholar_inc_{aid}"
+                                if chk_key not in st.session_state:
+                                    if isinstance(_prev_bundle_pick, list):
+                                        st.session_state[chk_key] = aid in _prev_bundle_pick
+                                    else:
+                                        st.session_state[chk_key] = True
+                                _nm = str(r["data"].get("authorName") or f"Author {aid}")
+                                st.checkbox(_nm, key=chk_key)
+                        export_scholar_pick = [
+                            r["id"]
+                            for r in valid
+                            if st.session_state.get(f"export_scholar_inc_{r['id']}", True)
+                        ]
+                        if not picked_m or not export_scholar_pick:
+                            st.info(
+                                "Select at least one metric and one scholar to build the export file."
+                            )
+                        for r in valid:
+                            if r["id"] not in export_scholar_pick:
+                                continue
+                            d = r["data"]
+                            aid = r["id"]
+                            export_rows.append(
+                                {
+                                    "authorId": aid,
+                                    "authorName": d.get("authorName"),
+                                    "metrics": d.get("metrics"),
+                                    "dataSource": d.get("dataSource"),
+                                    "selectedMetrics": picked_m,
+                                    "metricOrder": order_pick_m,
+                                }
+                            )
+                    st.markdown(
+                        '<hr class="export-workspace-split" aria-hidden="true" />',
+                        unsafe_allow_html=True,
+                    )
+                    _render_export_results_block(export_rows, len(valid))
             else:
                 for card_idx, r in enumerate(valid):
                     aid = r["id"]
@@ -3360,57 +3631,13 @@ def main() -> None:
     
                     export_rows.append(author_export_payload)
 
-            st.markdown(
-                '<div id="export-downloads-anchor"></div>',
-                unsafe_allow_html=True,
-            )
-            st.divider()
-            export_body_sub = (
-                "Download your research metrics in PDF or Excel. "
-                "Set the filename below; the file includes only the scholar(s) and metrics you selected above."
-                if len(valid) > 1
-                else (
-                    "Download your research metrics in PDF or Excel. "
-                    "Set the filename below; the file includes all authors in this run."
-                )
-            )
-            with st.container(border=True, key="export_results_shell"):
-                st.markdown(
-                    '<div class="export-results-head">'
-                    '<div class="export-results-head-row">'
-                    '<div class="export-results-badge" aria-hidden="true">'
-                    f"{_FILTER_ICON_DOCUMENT}"
-                    "</div>"
-                    '<div class="export-results-head-text">'
-                    '<p class="export-results-title">Export Results</p>'
-                    '<p class="export-results-sub">'
-                    f"{html.escape(export_body_sub)}"
-                    "</p>"
-                    "</div></div></div>",
-                    unsafe_allow_html=True,
-                )
-                fn = st.text_input(
-                    "Export filename (without extension)", value="research-metrics"
-                )
-                b1, b2 = st.columns(2, gap="xxsmall")
-                with b1:
-                    pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
-                    st.download_button(
-                        "Export as PDF",
-                        pdf_b,
-                        file_name=pdf_n,
-                        mime="application/pdf",
-                        use_container_width=False,
+            if len(valid) == 1:
+                with st.container(border=False, key="export_workspace_stack"):
+                    st.markdown(
+                        _export_workspace_module_head_html(bundle_prep=False),
+                        unsafe_allow_html=True,
                     )
-                with b2:
-                    xl_b, xl_n = export_excel_bytes(export_rows, fn)
-                    st.download_button(
-                        "Export as Excel",
-                        xl_b,
-                        file_name=xl_n,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=False,
-                    )
+                    _render_export_results_block(export_rows, len(valid))
 
     elif results:
         for r in results:
