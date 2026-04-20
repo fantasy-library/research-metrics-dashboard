@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+from io import BytesIO
 import re
 import sys
 import time
@@ -2989,6 +2990,37 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     st.dataframe(
                         tbl_df, use_container_width=True, hide_index=True
                     )
+                    # Bubble totals quick export (same data shown in table).
+                    export_stub = re.sub(
+                        r"[^a-z0-9]+",
+                        "-",
+                        f"bubble-totals-{x_metric}-{y_metric}-{size_metric}".lower(),
+                    ).strip("-")
+                    csv_bytes = tbl_df.to_csv(index=False).encode("utf-8-sig")
+                    xlsm_buf = BytesIO()
+                    with pd.ExcelWriter(xlsm_buf, engine="openpyxl") as writer:
+                        tbl_df.to_excel(writer, index=False, sheet_name="BubbleTotals")
+                    xlsm_bytes = xlsm_buf.getvalue()
+
+                    d1, d2 = st.columns(2, gap="small")
+                    with d1:
+                        st.download_button(
+                            "Download bubble totals (.csv)",
+                            data=csv_bytes,
+                            file_name=f"{export_stub}.csv",
+                            mime="text/csv",
+                            key=f"dl_bubble_totals_csv_{x_metric}_{y_metric}_{size_metric}",
+                            use_container_width=True,
+                        )
+                    with d2:
+                        st.download_button(
+                            "Download bubble totals (.xlsm)",
+                            data=xlsm_bytes,
+                            file_name=f"{export_stub}.xlsm",
+                            mime="application/vnd.ms-excel.sheet.macroEnabled.12",
+                            key=f"dl_bubble_totals_xlsm_{x_metric}_{y_metric}_{size_metric}",
+                            use_container_width=True,
+                        )
 
 
 def main() -> None:
