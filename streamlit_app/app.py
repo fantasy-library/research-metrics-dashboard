@@ -125,20 +125,20 @@ _DEEP_LINK_ANALYZE_HTML = """
 # Filter card header icons — line-art SVG on white circular badge
 _FILTER_ICON_CALENDAR = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>'
     '<line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
 )
 _FILTER_ICON_DOCUMENT = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
     '<polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>'
     '<line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>'
 )
 _FILTER_ICON_FUNNEL = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>'
 )
 
@@ -512,7 +512,11 @@ footer[data-testid="stFooter"] {
 [class*="st-key-metric_card_"]:has(input:checked),
 [class*="st-key-metric_card_"]:has(input:checked),
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="true"]),
-[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="true"]) {
+[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="true"]),
+[class*="st-key-dense_metric_"]:has(input:checked),
+[class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="true"]),
+[class*="st-key-metric_cell_"]:has(input:checked),
+[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="true"]) {
   border-color: #a78bfa !important;
   background: linear-gradient(165deg, #faf5ff 0%, #ffffff 55%) !important;
   box-shadow:
@@ -522,20 +526,28 @@ footer[data-testid="stFooter"] {
 [class*="st-key-metric_card_"]:has(input:not(:checked)),
 [class*="st-key-metric_card_"]:has(input:not(:checked)),
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]),
-[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) {
+[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]),
+[class*="st-key-dense_metric_"]:has(input:not(:checked)),
+[class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="false"]),
+[class*="st-key-metric_cell_"]:has(input:not(:checked)),
+[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="false"]) {
   border-color: #e5e7eb !important;
   background: #fafafa !important;
 }
 [class*="st-key-metric_card_"]:has(input:not(:checked)) label,
 [class*="st-key-metric_card_"]:has(input:not(:checked)) label,
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) label,
-[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) label {
+[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) label,
+[class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="false"]) label,
+[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="false"]) label {
   color: #64748b !important;
 }
 [class*="st-key-metric_card_"]:has(input:not(:checked)) p.metric-subtext,
 [class*="st-key-metric_card_"]:has(input:not(:checked)) p.metric-subtext,
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext,
-[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext {
+[class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext,
+[class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext,
+[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext {
   color: #94a3b8 !important;
 }
 
@@ -822,122 +834,196 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   box-shadow: 0 3px 14px rgba(124, 58, 237, 0.15), inset 0 1px 0 #fff;
 }
 
-/* —— Search card (Netlify-style: bold title, lifted inputs) —— */
-[class*="st-key-search_shell"] p.section-kicker {
-  color: #4f46e5 !important;
-  letter-spacing: 0.11em !important;
-  font-weight: 800 !important;
-}
-[class*="st-key-search_shell"] p.section-title {
-  font-size: 1.2rem !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.03em !important;
-  color: #0f172a !important;
-  padding-bottom: 0 !important;
-  margin-bottom: 1.25rem !important;
-  border-bottom: none !important;
-  box-shadow: none !important;
-}
-[class*="st-key-search_shell"] [data-testid="stTextArea"] label p {
-  font-weight: 800 !important;
-  font-size: 1.02rem !important;
-  color: #1e293b !important;
-}
-[class*="st-key-search_shell"] [data-testid="stTextArea"] {
-  margin-top: 0.65rem !important;
-}
-[class*="st-key-search_shell"] textarea {
-  border: 2px solid #e2e8f0 !important;
-  border-radius: 16px !important;
-  padding: 1rem 1.1rem !important;
-  font-size: 0.95rem !important;
-  line-height: 1.5 !important;
+/* —— Search configuration (minimal, compact, single-column flow) —— */
+[class*="st-key-search_shell"] {
+  padding: 1rem 1.05rem 0.9rem !important;
+  border: 1px solid #E5E7EB !important;
+  border-left: 1px solid #E5E7EB !important;
+  border-radius: 12px !important;
   background: #ffffff !important;
-  /* Force readable text (paste/autofill/dark-mode quirks can set light fill) */
-  color: #0f172a !important;
-  -webkit-text-fill-color: #0f172a !important;
-  caret-color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+  margin-bottom: 0.95rem !important;
+}
+.search-config-title {
+  margin: 0 0 0.65rem 0 !important;
+  font-family: 'Inter', 'Segoe UI', sans-serif !important;
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  color: #111827 !important;
+}
+.minimal-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.28rem 0 !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: #6B7280 !important;
+}
+/* Circular “FAB” badge: white disc, hairline border, soft shadow (filter row icons) */
+.minimal-filter-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   box-shadow:
-    0 4px 18px rgba(15, 23, 42, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-  min-height: 132px !important;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+    0 4px 14px rgba(15, 23, 42, 0.1),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+  flex-shrink: 0;
 }
-[class*="st-key-search_shell"] textarea::placeholder {
-  color: #94a3b8 !important;
-  opacity: 1 !important;
-  -webkit-text-fill-color: #94a3b8 !important;
+.minimal-filter-icon-badge svg {
+  width: 1.28rem;
+  height: 1.28rem;
+  flex-shrink: 0;
 }
-[class*="st-key-search_shell"] textarea::selection {
-  background: rgba(99, 102, 241, 0.28) !important;
-  color: #0f172a !important;
-  -webkit-text-fill-color: #0f172a !important;
+.minimal-filter-icon-badge--calendar svg {
+  color: #2563eb !important;
 }
-[class*="st-key-search_shell"] textarea:focus {
-  border-color: #818cf8 !important;
-  outline: none !important;
-  box-shadow:
-    0 0 0 4px rgba(129, 140, 248, 0.22),
-    0 8px 28px rgba(79, 70, 229, 0.12) !important;
+.minimal-filter-icon-badge--document svg {
+  color: #0d9488 !important;
 }
-
-[class*="st-key-search_shell"] [data-testid="stCaption"] {
-  font-size: 0.85rem !important;
-  color: #4b5563 !important;
-  margin-top: 0.35rem !important;
+.minimal-filter-icon-badge--funnel svg {
+  color: #9c4121 !important;
+}
+[class*="st-key-search_shell"] [data-testid="stSelectbox"] {
   margin-bottom: 0.2rem !important;
 }
-
-/* Search card: subtle left accent like the premium Netlify UI */
-[class*="st-key-search_shell"] {
-  border-left: 4px solid #e8eef7 !important;
-}
-
-/* Config panels: dropdown trigger — flat on panel tint */
-[class*="st-key-filter_panel_blue"] [data-baseweb="select"] > div,
-[class*="st-key-filter_panel_mint"] [data-baseweb="select"] > div {
-  border-radius: 8px !important;
-  border: 1px solid #dbe2ea !important;
+[class*="st-key-search_shell"] [data-baseweb="select"] > div {
+  border: 1px solid #E5E7EB !important;
+  border-radius: 10px !important;
   background: #ffffff !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
-  min-height: 44px !important;
+  min-height: 42px !important;
 }
-[class*="st-key-filter_panel_blue"] [data-testid="stSelectbox"],
-[class*="st-key-filter_panel_mint"] [data-testid="stSelectbox"] {
-  background: transparent !important;
-  border-radius: 8px !important;
+[class*="st-key-search_shell"] [data-testid="stTextArea"] {
+  margin-top: 0.25rem !important;
 }
-[class*="st-key-filter_panel_blue"] [data-baseweb="select"] > div > div,
-[class*="st-key-filter_panel_mint"] [data-baseweb="select"] > div > div {
+[class*="st-key-search_shell"] [data-testid="stTextArea"] label p {
+  margin-bottom: 0.3rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: #4B5563 !important;
+}
+[class*="st-key-search_shell"] textarea {
+  border: 1px solid #E5E7EB !important;
+  border-radius: 10px !important;
+  padding: 0.75rem 0.85rem !important;
   background: #ffffff !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+  min-height: 96px !important;
 }
-[class*="st-key-filter_panel_blue"] [data-testid="stSelectbox"] label p,
-[class*="st-key-filter_panel_mint"] [data-testid="stSelectbox"] label p {
-  font-weight: 800 !important;
-  font-size: 0.72rem !important;
-  letter-spacing: 0.06em !important;
-  text-transform: uppercase !important;
-  color: #475569 !important;
+[class*="st-key-search_shell"] textarea::placeholder {
+  color: #9CA3AF !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #9CA3AF !important;
 }
-/* Peach panel: radios directly on panel — no inner boxed well */
-[class*="st-key-filter_panel_peach"] [data-testid="stRadio"] {
-  margin-top: 0.15rem !important;
-  padding: 0 !important;
+[class*="st-key-search_shell"] textarea:focus {
+  border-color: #5D5CDE !important;
+  box-shadow: 0 0 0 3px rgba(93, 92, 222, 0.14) !important;
+}
+.minimal-section-divider {
+  border-top: 1px solid #E5E7EB;
+  margin: 0.28rem 0 0.5rem 0;
+}
+/* Self-citation: hug content (avoid stretching across the whole column) */
+[class*="st-key-search_shell"] [data-testid="stRadio"] {
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+[class*="st-key-search_shell"] [data-testid="stRadio"] [role="radiogroup"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: fit-content !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  background: #f3f4f6 !important;
+  padding: 2px !important;
+  gap: 2px !important;
+}
+[class*="st-key-search_shell"] [data-testid="stRadio"] label {
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+  border-radius: 6px !important;
+  border: 1px solid transparent !important;
+  padding: 0.15rem 0.42rem !important;
+  color: #4b5563 !important;
   background: transparent !important;
-  border-radius: 0 !important;
-  border: none !important;
+  font-weight: 500 !important;
+  gap: 0.3rem !important;
 }
-[class*="st-key-filter_panel_peach"] [data-testid="stRadio"] label {
+[class*="st-key-search_shell"] [data-testid="stRadio"] label p {
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
+}
+[class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked),
+[class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] {
+  background: #ede9fe !important;
+  border-color: #ddd6fe !important;
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+  box-shadow: none !important;
+}
+/* Nested Streamlit text must match light chip (dark violet, not white) */
+[class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked) p,
+[class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked) span,
+[class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] p,
+[class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] span {
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+}
+[class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked) div,
+[class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] div {
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+}
+[class*="st-key-search_shell"] .stRadio input[type="radio"] {
+  width: 0.95rem !important;
+  height: 0.95rem !important;
+  flex-shrink: 0;
+}
+[class*="st-key-search_shell"] .stRadio input {
+  accent-color: #7c3aed !important;
+}
+.minimal-go-analyze-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.55rem;
+}
+a.minimal-go-analyze-btn,
+.minimal-go-analyze-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 250px;
+  padding: 0.56rem 1.2rem !important;
+  border-radius: 10px !important;
+  border: 1px solid #5D5CDE !important;
+  background: #5D5CDE !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
+  font-size: 0.98rem !important;
   font-weight: 600 !important;
-  font-size: 0.78rem !important;
-  line-height: 1.38 !important;
-  color: #7c2d12 !important;
+  box-shadow: 0 6px 18px rgba(93, 92, 222, 0.25) !important;
 }
-[class*="st-key-filter_panel_peach"] [data-testid="stRadio"] label p {
-  font-weight: 600 !important;
-}
-[class*="st-key-filter_panel_peach"] .stRadio input {
-  accent-color: #ea580c !important;
+a.minimal-go-analyze-btn:hover,
+.minimal-go-analyze-btn:hover {
+  background: #4f4ec8 !important;
+  border-color: #4f4ec8 !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
 }
 
 /* Metrics container: white elevated card (same chrome as header/footer band) */
@@ -1003,33 +1089,11 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   background: rgba(147, 51, 234, 0.08) !important;
   border-color: #7c3aed !important;
 }
-/* Core research metrics: faint purple/gray well (toggles sit as white mini-cards on top) */
-[class*="st-key-core_metrics_shell"]:not(:has(span.skin-unified-form-shell)) {
-  background: transparent !important;
-  border: none !important;
-  border-radius: 12px !important;
-  padding: 0 !important;
-  margin-top: 0 !important;
-  margin-bottom: 1rem !important;
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-}
-
-/* Collaboration metrics group shell */
+/* Collaboration metrics group shell (legacy; grid no longer uses it) */
 [class*="st-key-collab_metrics_shell"] {
   background: transparent !important;
 }
-/* Each toggle + subtext: premium grouped cell (marker span inside st.container) */
-[class*="st-key-metric_card_"] {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 10px !important;
-  padding: 0.85rem 0.95rem 0.65rem !important;
-  margin-bottom: 0.8rem !important;
-  min-height: 160px !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
-}
+/* Legacy metric_card / dense_metric (unused by current grid; keep for :has() joint rules above) */
 [class*="st-key-metric_card_"] label {
   display: flex !important;
   align-items: flex-start !important;
@@ -1046,6 +1110,101 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   line-height: 1.35 !important;
   min-height: 2.7em !important;
   margin-top: 0.05rem !important;
+}
+/* Minimal 2×4 metrics grid (Select Metrics to Include) */
+[class*="st-key-metrics_toolbar_shell"] {
+  margin-bottom: 0.5rem !important;
+  padding-bottom: 0 !important;
+}
+[class*="st-key-metrics_grid_shell"] {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+[class*="st-key-metrics_grid_row0"] {
+  margin-bottom: 0.75rem !important;
+}
+[class*="st-key-metrics_grid_shell"] [data-testid="stHorizontalBlock"] {
+  gap: 0.75rem !important;
+  align-items: stretch !important;
+}
+[class*="st-key-metrics_grid_shell"] [data-testid="column"] {
+  display: flex !important;
+  flex-direction: column !important;
+}
+[class*="st-key-metrics_grid_shell"] [data-testid="column"] > div {
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+[class*="st-key-metric_cell_"] {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.5rem !important;
+  padding: 0.45rem 0.55rem !important;
+  margin: 0 !important;
+  min-height: 5.5rem !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+  overflow: hidden !important;
+}
+[class*="st-key-metric_cell_"] > div[data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+}
+[class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] {
+  gap: 0.35rem !important;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+  margin-bottom: 0 !important;
+  min-height: 3.35rem !important;
+}
+[class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:first-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+}
+[class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+}
+[class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child [data-testid="stVerticalBlock"] {
+  align-items: flex-end !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+}
+[class*="st-key-metric_cell_"] h3 {
+  display: none !important;
+}
+[class*="st-key-metric_cell_"] label {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+[class*="st-key-metric_cell_"] [data-baseweb="switch"] {
+  margin: 0 !important;
+  transform: scale(0.92);
+  transform-origin: top right !important;
+}
+p.metric-compact-title {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  color: #1f2937 !important;
+  line-height: 1.25 !important;
+  min-height: 2.5em !important;
+  display: block !important;
+}
+[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="true"]) {
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.12) !important;
 }
 p.metric-subtext {
   color: #4b5563 !important;
@@ -1241,12 +1400,12 @@ p.metric-subtext {
   margin-top: 3rem;
   margin-bottom: 2.25rem;
   padding: 2rem 1.75rem 1.5rem;
-  background: linear-gradient(165deg, #f8fbff 0%, #eef3fa 55%, #e7edf6 100%);
-  border: 1px solid rgba(123, 146, 177, 0.30) !important;
+  background: linear-gradient(165deg, #ffffff 0%, #f9fbfd 45%, #f4f7fb 100%);
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
   border-radius: 12px;
   box-shadow:
-    0 8px 20px rgba(15, 23, 42, 0.05),
-    0 18px 40px rgba(123, 146, 177, 0.10);
+    0 4px 14px rgba(15, 23, 42, 0.04),
+    0 12px 28px rgba(148, 163, 184, 0.06);
   scroll-margin-bottom: 3rem;
 }
 .site-footer-grid {
@@ -1307,7 +1466,7 @@ p.metric-subtext {
   text-align: center;
   margin: 2rem 0 0;
   padding-top: 1.5rem;
-  border-top: 1px solid rgba(123, 146, 177, 0.28);
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
   font-size: 0.78rem;
   color: #4a5568;
   line-height: 1.5;
@@ -1340,7 +1499,7 @@ p.metric-subtext {
   border-radius: 12px !important;
   padding: 2rem 1.75rem 1.5rem !important;
 }
-[class*="st-key-core_metrics_shell"],
+[class*="st-key-metrics_grid_shell"],
 [class*="st-key-collab_metrics_shell"] {
   background: transparent !important;
   border: none !important;
@@ -1531,7 +1690,7 @@ def _render_footer_html() -> None:
     <div>
       <h4>HKUST Library</h4>
       <p class="sf-body">Hong Kong University of Science and Technology</p>
-      <p class="sf-body">Clear Water Bay, Kowloon, Hong Kong</p>
+      <p class="sf-body">Clear Water Bay, Hong Kong</p>
     </div>
   </div>
   <p class="site-footer-copy">
@@ -1613,15 +1772,19 @@ DEFAULT_METRICS = [
         "id": "collaboration",
         "label": "Collaboration",
         "description": "Collaboration patterns by type (institutional, international, national, single authorship)",
-        "enabled": False,
+        "enabled": True,
     },
     {
         "id": "academicCorporateCollaboration",
         "label": "Academic Corporate Collaboration",
         "description": "Academic–corporate collaboration breakdown",
-        "enabled": False,
+        "enabled": True,
     },
 ]
+
+# Bump when default metric toggles change so Streamlit widget keys (met_*) resync.
+# v4: clear stale met_* widget state so toggles match "all on" defaults.
+_METRICS_SESSION_DEFAULT_VERSION = 4
 
 YEAR_OPTIONS = {
     "3yrs": "Last 3 complete years — compact recent window",
@@ -1682,7 +1845,19 @@ DOCS_SELECTION_CAPTION = "Include all types matching your selection above."
 def _init_session() -> None:
     if "disclaimer_ok" not in st.session_state:
         st.session_state.disclaimer_ok = False
-    if "available_metrics" not in st.session_state:
+    if st.session_state.get("_metrics_session_default_version") != _METRICS_SESSION_DEFAULT_VERSION:
+        st.session_state._metrics_session_default_version = _METRICS_SESSION_DEFAULT_VERSION
+        st.session_state.available_metrics = [dict(m) for m in DEFAULT_METRICS]
+        # Drop old widget keys so st.toggle does not keep a mismatched internal state.
+        for _k in list(st.session_state.keys()):
+            if isinstance(_k, str) and _k.startswith("met_"):
+                try:
+                    del st.session_state[_k]
+                except KeyError:
+                    pass
+        for m in DEFAULT_METRICS:
+            st.session_state[f"met_{m['id']}"] = bool(m.get("enabled"))
+    elif "available_metrics" not in st.session_state:
         st.session_state.available_metrics = [dict(m) for m in DEFAULT_METRICS]
     if "results" not in st.session_state:
         st.session_state.results = []
@@ -1990,6 +2165,90 @@ def _fetch_multi_author_metrics_with_progress(
     return out
 
 
+def _metrics_multiselect_and_order_ui(
+    opt_list: list[str],
+    label_map: dict[str, str],
+    *,
+    multiselect_label: str,
+    multiselect_key: str,
+    order_state_key: str,
+    sortable_key: str,
+    fallback_key: str,
+) -> tuple[list[str], list[str]]:
+    """Pick metrics and drag-to-order rows. Returns ``(picked, order_pick)``."""
+    picked = st.multiselect(
+        multiselect_label,
+        options=opt_list,
+        default=opt_list,
+        format_func=lambda i: label_map.get(i, i),
+        key=multiselect_key,
+    )
+    if not picked:
+        st.caption("Select at least one metric row to display.")
+        return [], []
+
+    existing_order = st.session_state.get(order_state_key, picked.copy())
+    existing_order = [m for m in existing_order if m in picked]
+    for m in picked:
+        if m not in existing_order:
+            existing_order.append(m)
+    st.session_state[order_state_key] = existing_order
+    order_pick = existing_order
+
+    st.markdown("Display order (top to bottom)")
+    display_to_metric = {label_map.get(m, m): m for m in order_pick}
+    sortable_style = """
+                    .sortable-component {
+                        border: 1px solid #e5e7eb;
+                        border-radius: 10px;
+                        padding: 8px;
+                        background: #f8fafc;
+                    }
+                    .sortable-container-header {
+                        display: none;
+                    }
+                    .sortable-item, .sortable-item:hover {
+                        background: #e0ecff;
+                        border: 1px solid #bfd3ff;
+                        color: #1f2937;
+                        font-weight: 600;
+                        border-radius: 8px;
+                    }
+                    """
+    sorted_display = sort_items(
+        list(display_to_metric.keys()),
+        direction="vertical",
+        custom_style=sortable_style,
+        key=sortable_key,
+    )
+    if (
+        isinstance(sorted_display, list)
+        and sorted_display
+        and all(isinstance(s, str) for s in sorted_display)
+    ):
+        order_pick = [
+            display_to_metric[s] for s in sorted_display if s in display_to_metric
+        ]
+    else:
+        st.caption("Drag area unavailable for this card. Use fallback selector below.")
+        fallback_display = st.multiselect(
+            "Fallback order",
+            options=list(display_to_metric.keys()),
+            default=list(display_to_metric.keys()),
+            key=fallback_key,
+            label_visibility="collapsed",
+        )
+        if fallback_display:
+            order_pick = [
+                display_to_metric[s] for s in fallback_display if s in display_to_metric
+            ]
+        else:
+            order_pick = existing_order
+    st.session_state[order_state_key] = order_pick
+    st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
+    return picked, order_pick
+
+
 def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     """Multi-author line (years × metric) and bubble (X × Y × size totals) for len(valid) >= 2."""
     en = _enabled_metric_ids(st.session_state.available_metrics)
@@ -2014,13 +2273,8 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     inter_years = _intersection_years(year_lists)
 
     st.markdown(
-        '<p class="section-kicker" style="margin-bottom:0.25rem;">Compare</p>'
-        '<p class="section-title">Authors across the same year range</p>',
+        '<p class="section-title" style="margin-bottom:0.35rem;">Compare</p>',
         unsafe_allow_html=True,
-    )
-    st.caption(
-        "Uses the overlap of publication years from each author’s data. "
-        "Charts are not included in PDF/Excel export."
     )
 
     def _pick_metric_idx(metric_id: str, default: str) -> int:
@@ -2033,7 +2287,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                 return 0
 
     # --- Line chart (SciVal-style multi-series) ---
-    st.markdown("##### Metric over years (all authors)")
+    st.markdown("##### Trends by years")
     line_metric = st.selectbox(
         "Metric",
         options=compare_opts,
@@ -2390,161 +2644,76 @@ def main() -> None:
             st.rerun()
         st.stop()
 
-    # --- Search + filters + metrics (distinct white cards on slate page bg) ---
+    # --- Search + filters + metrics (compact search/filter shell) ---
     with st.container():
-        # Card 1: Search configuration
         with st.container(border=True, key="search_shell"):
             st.markdown(
-                '<span class="skin-search-shell" aria-hidden="true"></span>',
+                '<p class="search-config-title">SEARCH CONFIGURATION</p>',
                 unsafe_allow_html=True,
             )
-            st.markdown(
-                '<p class="section-title" style="margin:0;">Search Configuration</p>',
-                unsafe_allow_html=True,
-            )
+
+            fy, fd, fs = st.columns(3, gap="small")
+            with fy:
+                st.markdown(
+                    '<div class="minimal-filter-label">'
+                    f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--calendar" '
+                    f'aria-hidden="true">{_FILTER_ICON_CALENDAR}</span><span>Year</span></div>',
+                    unsafe_allow_html=True,
+                )
+                year_key = st.selectbox(
+                    "Year",
+                    options=list(YEAR_OPTIONS.keys()),
+                    format_func=lambda k: YEAR_OPTIONS_DISPLAY[k],
+                    index=list(YEAR_OPTIONS.keys()).index("5yrs"),
+                    label_visibility="collapsed",
+                    key="year_filter_select",
+                )
+            with fd:
+                st.markdown(
+                    '<div class="minimal-filter-label">'
+                    f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--document" '
+                    f'aria-hidden="true">{_FILTER_ICON_DOCUMENT}</span><span>Document Type</span></div>',
+                    unsafe_allow_html=True,
+                )
+                docs_key = st.selectbox(
+                    "Document Type",
+                    options=list(DOCS_OPTIONS.keys()),
+                    format_func=lambda k: DOCS_OPTIONS_DISPLAY[k],
+                    label_visibility="collapsed",
+                    key="docs_filter_select",
+                )
+            with fs:
+                st.markdown(
+                    '<div class="minimal-filter-label">'
+                    f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--funnel" '
+                    f'aria-hidden="true">{_FILTER_ICON_FUNNEL}</span><span>Self-Citation</span></div>',
+                    unsafe_allow_html=True,
+                )
+                st.radio(
+                    "Self-citation mode",
+                    options=["include", "exclude"],
+                    format_func=lambda k: SELF_CIT_RADIO_LABELS[k],
+                    horizontal=True,
+                    key="self_cit_radio",
+                    label_visibility="collapsed",
+                )
+                self_cit = st.session_state.self_cit_radio == "include"
+
+            st.markdown('<div class="minimal-section-divider"></div>', unsafe_allow_html=True)
 
             author_ids = st.text_area(
                 "Scopus Author ID (preferred) or ORCID ID",
-                placeholder=(
-                    "Scopus Author ID(s) or ORCID(s). ORCIDs are resolved automatically before metrics. "
-                    "Separate multiple values with commas, semicolons, or new lines."
-                ),
-                help=(
-                    f"Scopus Author ID and/or ORCID (max {MAX_AUTHORS_PER_RUN} per run). "
-                    "ORCIDs are looked up via SciVal first, then metrics use the Scopus Author ID."
-                ),
+                placeholder="Enter Scopus Author ID(s) or ORCID(s)...",
                 label_visibility="visible",
                 key="scopus_author_ids",
-            )
-            st.caption(
-                "Need help with profiles? [Researcher Profile and Visibility](https://libguides.hkust.edu.hk/research-impact/research-visibility)"
-            )
-            parsed_ids_preview = [
-                x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
-            ]
-            st.caption(
-                f"Parsed author IDs: {len(parsed_ids_preview)} / {MAX_AUTHORS_PER_RUN}."
-            )
-            if len(parsed_ids_preview) > MAX_AUTHORS_PER_RUN:
-                st.warning(
-                    f"You entered {len(parsed_ids_preview)} IDs. "
-                    f"Please keep it to {MAX_AUTHORS_PER_RUN} or fewer per run."
-                )
-
-            st.markdown(
-                '<div class="analyze-hint">'
-                '<div class="analyze-hint-inner">'
-                '<p class="analyze-hint-text">'
-                "Select the metrics below and press <strong>Analyze Metrics</strong>."
-                "</p>"
-                '<a class="analyze-hint-cta" href="#analyze-metrics-anchor">'
-                "Go to Analyze <span aria-hidden=\"true\">↗</span>"
-                "</a>"
-                "</div></div>",
-                unsafe_allow_html=True,
-            )
-
-        # Card 2: Filter panels (3-column grid on white surface)
-        with st.container(border=True, key="filter_deck_shell"):
-            st.markdown(
-                '<span class="skin-filter-deck-shell" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
+                height=96,
             )
             st.markdown(
-                '<div class="filters-row-intro">'
-                '<p class="filters-row-kicker">Analysis scope</p>'
-                "<p class=\"filters-row-title\">Filters</p>"
-                "<p class=\"filters-row-sub\">Set the time window, document types, and self-citation rules. "
-                "Each panel applies before metrics are fetched.</p>"
+                '<div class="minimal-go-analyze-wrap">'
+                '<a class="minimal-go-analyze-btn" href="#analyze-metrics-anchor">Go to Analyze</a>'
                 "</div>",
                 unsafe_allow_html=True,
             )
-            fy, fd, fs = st.columns(3)
-            with fy:
-                with st.container(border=True, key="filter_panel_blue"):
-                    st.markdown(
-                        '<span class="skin-filter-panel" data-theme="blue" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
-                        '<div class="filter-panel-head filter-panel-head--blue">'
-                        '<div class="filter-panel-icon-wrap" aria-hidden="true">'
-                        f"{_FILTER_ICON_CALENDAR}"
-                        "</div>"
-                        "<div>"
-                        '<p class="filter-panel-kicker">Year range</p>'
-                        '<p class="filter-panel-title">Filter by Year Range</p>'
-                        "<p class=\"filter-panel-sub\">Which publication years feed into SciVal metrics.</p>"
-                        "</div></div>",
-                        unsafe_allow_html=True,
-                    )
-                    year_key = st.selectbox(
-                        "Time window",
-                        options=list(YEAR_OPTIONS.keys()),
-                        format_func=lambda k: YEAR_OPTIONS_DISPLAY[k],
-                        index=list(YEAR_OPTIONS.keys()).index("5yrs"),
-                        help=(
-                            "SciVal applies this window consistently across scholarly output, "
-                            "citations, FWCI, and related fields."
-                        ),
-                    )
-                    st.caption(YEAR_FOOTNOTES.get(year_key, ""))
-            with fd:
-                with st.container(border=True, key="filter_panel_mint"):
-                    st.markdown(
-                        '<span class="skin-filter-panel" data-theme="mint" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
-                        '<div class="filter-panel-head filter-panel-head--mint">'
-                        '<div class="filter-panel-icon-wrap" aria-hidden="true">'
-                        f"{_FILTER_ICON_DOCUMENT}"
-                        "</div>"
-                        "<div>"
-                        '<p class="filter-panel-kicker">Document types</p>'
-                        '<p class="filter-panel-title">Filter by Document Types</p>'
-                        "<p class=\"filter-panel-sub\">Limit which document categories are counted.</p>"
-                        "</div></div>",
-                        unsafe_allow_html=True,
-                    )
-                    docs_key = st.selectbox(
-                        "Document types",
-                        options=list(DOCS_OPTIONS.keys()),
-                        format_func=lambda k: DOCS_OPTIONS_DISPLAY[k],
-                        help=(
-                            "Filters the document set before metrics are computed. "
-                            "Default includes all publication types."
-                        ),
-                    )
-                    st.caption(DOCS_SELECTION_CAPTION)
-            with fs:
-                with st.container(border=True, key="filter_panel_peach"):
-                    st.markdown(
-                        '<span class="skin-filter-panel" data-theme="peach" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
-                        '<div class="filter-panel-head filter-panel-head--peach">'
-                        '<div class="filter-panel-icon-wrap" aria-hidden="true">'
-                        f"{_FILTER_ICON_FUNNEL}"
-                        "</div>"
-                        "<div>"
-                        '<p class="filter-panel-kicker">Self-citations</p>'
-                        '<p class="filter-panel-title">Self-Citations Filter</p>'
-                        "<p class=\"filter-panel-sub\">Include or exclude an author’s citations to their own work.</p>"
-                        "</div></div>",
-                        unsafe_allow_html=True,
-                    )
-                    st.radio(
-                        "Self-citation mode",
-                        options=["include", "exclude"],
-                        format_func=lambda k: SELF_CIT_RADIO_LABELS[k],
-                        horizontal=True,
-                        key="self_cit_radio",
-                        label_visibility="collapsed",
-                    )
-                    self_cit = st.session_state.self_cit_radio == "include"
-                    st.caption(SELF_CIT_HELP)
 
         # --- Metrics: own bordered panel (layered inside main card) ---
         with st.container(border=True, key="metrics_panel_shell"):
@@ -2567,89 +2736,58 @@ def main() -> None:
                     st.session_state[mk] = bool(m.get("enabled"))
                 m["enabled"] = bool(st.session_state[mk])
             n_on = sum(1 for m in am if m.get("enabled"))
-            tb1, tb2, tb3 = st.columns([2, 1, 1])
-            with tb1:
-                st.markdown(
-                    f'<span class="metrics-count-bar">{n_on} of {len(am)} metrics selected</span>',
-                    unsafe_allow_html=True,
-                )
-            with tb2:
-                if st.button(
-                    "Select All",
-                    key="metrics_select_all",
-                    type="secondary",
-                    use_container_width=True,
-                ):
-                    for m in am:
-                        m["enabled"] = True
-                        st.session_state[f"met_{m['id']}"] = True
-            with tb3:
-                if st.button(
-                    "Clear All",
-                    key="metrics_clear_all",
-                    type="secondary",
-                    use_container_width=True,
-                ):
-                    for m in am:
-                        m["enabled"] = False
-                        st.session_state[f"met_{m['id']}"] = False
+            with st.container(border=False, key="metrics_toolbar_shell"):
+                tb1, tb2, tb3 = st.columns([2, 1, 1])
+                with tb1:
+                    st.markdown(
+                        f'<span class="metrics-count-bar">{n_on} of {len(am)} metrics selected</span>',
+                        unsafe_allow_html=True,
+                    )
+                with tb2:
+                    if st.button(
+                        "Select All",
+                        key="metrics_select_all",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        for m in am:
+                            m["enabled"] = True
+                            st.session_state[f"met_{m['id']}"] = True
+                with tb3:
+                    if st.button(
+                        "Clear All",
+                        key="metrics_clear_all",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        for m in am:
+                            m["enabled"] = False
+                            st.session_state[f"met_{m['id']}"] = False
 
-            core = am[:6]
-            with st.container(border=True, key="core_metrics_shell"):
-                st.markdown(
-                    '<span class="skin-core-metrics-shell" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    '<p class="metrics-subhead" style="margin: 0 0 1rem 0;">Core research metrics</p>',
-                    unsafe_allow_html=True,
-                )
-                st.caption(
-                    "Need additional metrics? [SciVal](https://lbdiscover.hkust.edu.hk/bib/991012525864503412)"
-                )
-                cols_c = st.columns(3)
-                for i, metric in enumerate(core):
-                    with cols_c[i % 3]:
-                        with st.container(key=f"metric_card_{metric['id']}"):
-                            st.markdown(
-                                '<span class="toggle-metric-pair" aria-hidden="true"></span>',
-                                unsafe_allow_html=True,
-                            )
-                            metric["enabled"] = st.toggle(
-                                metric["label"],
-                                key=f"met_{metric['id']}",
-                            )
-                            st.markdown(
-                                f'<p class="metric-subtext">{html.escape(metric.get("description", ""))}</p>',
-                                unsafe_allow_html=True,
-                            )
-
-            st.markdown(
-                '<p class="metrics-subhead">Collaboration metrics</p>',
-                unsafe_allow_html=True,
-            )
-            collab = am[6:]
-            with st.container(border=True, key="collab_metrics_shell"):
-                st.markdown(
-                    '<span class="skin-collab-metrics-shell" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                cols_b = st.columns(2)
-                for i, metric in enumerate(collab):
-                    with cols_b[i % 2]:
-                        with st.container(key=f"metric_card_{metric['id']}"):
-                            st.markdown(
-                                '<span class="toggle-metric-pair" aria-hidden="true"></span>',
-                                unsafe_allow_html=True,
-                            )
-                            metric["enabled"] = st.toggle(
-                                metric["label"],
-                                key=f"met_{metric['id']}",
-                            )
-                            st.markdown(
-                                f'<p class="metric-subtext">{html.escape(metric.get("description", ""))}</p>',
-                                unsafe_allow_html=True,
-                            )
+            with st.container(border=False, key="metrics_grid_shell"):
+                for row_key, row_start in (
+                    ("metrics_grid_row0", 0),
+                    ("metrics_grid_row1", 4),
+                ):
+                    row = am[row_start : row_start + 4]
+                    with st.container(border=False, key=row_key):
+                        cols = st.columns(4, gap="small")
+                        for i, metric in enumerate(row):
+                            with cols[i]:
+                                with st.container(key=f"metric_cell_{metric['id']}"):
+                                    ct, csw = st.columns([1, 0.28], gap="small")
+                                    with ct:
+                                        st.markdown(
+                                            f'<p class="metric-compact-title">{html.escape(metric["label"])}</p>',
+                                            unsafe_allow_html=True,
+                                        )
+                                    with csw:
+                                        _mk = f"met_{metric['id']}"
+                                        metric["enabled"] = st.toggle(
+                                            metric["label"],
+                                            key=_mk,
+                                            label_visibility="collapsed",
+                                        )
 
         st.markdown(
             '<div id="analyze-metrics-anchor"></div>',
@@ -2778,7 +2916,7 @@ def main() -> None:
     if valid:
         with st.container(border=True):
             st.markdown(
-                '<p class="section-kicker">Output</p><p class="section-title">Results & export</p>',
+                '<p class="section-title">Results</p>',
                 unsafe_allow_html=True,
             )
             label_map_global = {x["id"]: x["label"] for x in DEFAULT_METRICS}
@@ -2788,38 +2926,19 @@ def main() -> None:
                     '<div class="analyze-hint" style="margin: 0.35rem 0 1.1rem 0;">'
                     '<div class="analyze-hint-inner">'
                     '<p class="analyze-hint-text">'
-                    "PDF and Excel export are at the bottom of this results section."
+                    "Select metrics, their order, and which scholar(s) to export, "
+                    "then use Export Results below."
                     "</p>"
                     '<a class="analyze-hint-cta" href="#export-downloads-anchor">'
-                    "Download all — jump to export <span aria-hidden=\"true\">↓</span>"
+                    "Jump to export <span aria-hidden=\"true\">↓</span>"
                     "</a>"
                     "</div></div>",
                     unsafe_allow_html=True,
                 )
             export_rows = []
-            for card_idx, r in enumerate(valid):
-                aid = r["id"]
-                d = r["data"]
-                en = _enabled_metric_ids(st.session_state.available_metrics)
-
-                st.divider()
-                title = d.get("authorName") or f"Author {aid}"
-                title_safe = html.escape(str(title))
-                aid_safe = html.escape(str(aid))
-                st.markdown(
-                    f'<p class="section-title" style="margin-bottom:0.25rem;">{title_safe}</p>'
-                    f'<p class="metrics-grid-hint" style="margin-top:0;">Scopus Author ID: <code>{aid_safe}</code></p>',
-                    unsafe_allow_html=True,
-                )
-                ds = d.get("dataSource")
-                if ds:
-                    st.caption(
-                        f"Source: {ds.get('sourceName', '')} · "
-                        f"Updated: {ds.get('lastUpdated', '')} · "
-                        f"Years: {ds.get('metricStartYear', '')}–{ds.get('metricEndYear', '')}"
-                    )
-
-                order_opts = [
+            if len(valid) > 1:
+                en_m = _enabled_metric_ids(st.session_state.available_metrics)
+                order_opts_m = [
                     "publication",
                     "citationCount",
                     "citationsPerPublication",
@@ -2829,251 +2948,269 @@ def main() -> None:
                     "collaboration",
                     "academicCorporateCollaboration",
                 ]
-                label_map = {x["id"]: x["label"] for x in DEFAULT_METRICS}
-                opt_list = [i for i in order_opts if i in en]
-
-                picked = st.multiselect(
-                    "Rows to show in table",
-                    options=opt_list,
-                    default=opt_list,
-                    format_func=lambda i: label_map.get(i, i),
-                    key=f"multisel_{aid}",
+                label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
+                opt_list_m = [i for i in order_opts_m if i in en_m]
+                st.markdown(
+                    '<p class="section-title" style="margin:0.85rem 0 0.35rem 0;">'
+                    "Prepare export</p>",
+                    unsafe_allow_html=True,
                 )
-                if not picked:
-                    st.caption("Select at least one metric row to display.")
-                    order_pick = []
-                else:
-                    # Drag-and-drop reorder control for dynamic arrangement.
-                    order_state_key = f"multiord_state_{aid}_{card_idx}"
-                    existing_order = st.session_state.get(order_state_key, picked.copy())
-                    existing_order = [m for m in existing_order if m in picked]
-                    for m in picked:
-                        if m not in existing_order:
-                            existing_order.append(m)
-                    st.session_state[order_state_key] = existing_order
-                    order_pick = existing_order
-
-                    st.markdown("Display order (top to bottom)")
-                    display_to_metric = {label_map.get(m, m): m for m in order_pick}
-                    sortable_style = """
-                    .sortable-component {
-                        border: 1px solid #e5e7eb;
-                        border-radius: 10px;
-                        padding: 8px;
-                        background: #f8fafc;
-                    }
-                    .sortable-container-header {
-                        display: none;
-                    }
-                    .sortable-item, .sortable-item:hover {
-                        background: #e0ecff;
-                        border: 1px solid #bfd3ff;
-                        color: #1f2937;
-                        font-weight: 600;
-                        border-radius: 8px;
-                    }
-                    """
-                    sorted_display = sort_items(
-                        list(display_to_metric.keys()),
-                        direction="vertical",
-                        custom_style=sortable_style,
-                        key=f"multiord_sort_{aid}_{card_idx}",
-                    )
-                    # Defensive fallback: if component returns empty/invalid, keep previous order.
-                    if (
-                        isinstance(sorted_display, list)
-                        and sorted_display
-                        and all(isinstance(s, str) for s in sorted_display)
-                    ):
-                        order_pick = [
-                            display_to_metric[s]
-                            for s in sorted_display
-                            if s in display_to_metric
-                        ]
-                    else:
-                        st.caption(
-                            "Drag area unavailable for this card. Use fallback selector below."
-                        )
-                        fallback_display = st.multiselect(
-                            "Fallback order",
-                            options=list(display_to_metric.keys()),
-                            default=list(display_to_metric.keys()),
-                            key=f"multiord_fallback_{aid}_{card_idx}",
-                            label_visibility="collapsed",
-                        )
-                        if fallback_display:
-                            order_pick = [
-                                display_to_metric[s]
-                                for s in fallback_display
-                                if s in display_to_metric
-                            ]
-                        else:
-                            order_pick = existing_order
-                    st.session_state[order_state_key] = order_pick
-                    st.caption(
-                        "Current order: "
-                        + " -> ".join(label_map.get(i, i) for i in order_pick)
-                    )
-
-                author_export_payload = {
-                    "authorId": aid,
-                    "authorName": d.get("authorName"),
-                    "metrics": d.get("metrics"),
-                    "dataSource": d.get("dataSource"),
-                    "selectedMetrics": picked,
-                    "metricOrder": order_pick,
+                st.caption(
+                    "Choose metrics to include, drag to set row order, then pick one or more "
+                    "scholars. PDF/Excel in Export Results use only these choices."
+                )
+                picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
+                    opt_list_m,
+                    label_map_m,
+                    multiselect_label="Metrics to export",
+                    multiselect_key="export_bundle_metrics_ms",
+                    order_state_key="export_bundle_metrics_ord_state",
+                    sortable_key="export_bundle_metrics_sort",
+                    fallback_key="export_bundle_metrics_fallback",
+                )
+                scholar_ids_m = [r["id"] for r in valid]
+                scholar_labels_m = {
+                    r["id"]: r["data"].get("authorName") or f"Author {r['id']}"
+                    for r in valid
                 }
-                col_names, table_rows = _build_metrics_table_rows(
-                    d.get("metrics") or {},
-                    ds,
-                    picked,
-                    order_pick,
+                export_scholar_pick = st.multiselect(
+                    "Scholar(s) to export",
+                    options=scholar_ids_m,
+                    default=scholar_ids_m,
+                    format_func=lambda sid: str(scholar_labels_m.get(sid, sid)),
+                    key="export_bundle_scholar_pick",
                 )
-                if table_rows:
-                    df = pd.DataFrame(table_rows, columns=col_names)
-                    st.dataframe(df, use_container_width=True, hide_index=True)
-                    try:
-                        xl_author_b, xl_author_n = export_excel_bytes(
-                            [author_export_payload],
-                            f"research-metrics-{aid}",
-                        )
-                        st.download_button(
-                            "Download this table (Excel)",
-                            xl_author_b,
-                            file_name=xl_author_n,
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"export_xl_author_{aid}_{card_idx}",
-                            use_container_width=False,
-                        )
-                    except Exception:
-                        st.caption("Could not build Excel file for this author.")
+                if not picked_m or not export_scholar_pick:
+                    st.info("Select at least one metric and one scholar to build the export file.")
+                for r in valid:
+                    if r["id"] not in export_scholar_pick:
+                        continue
+                    d = r["data"]
+                    aid = r["id"]
+                    export_rows.append(
+                        {
+                            "authorId": aid,
+                            "authorName": d.get("authorName"),
+                            "metrics": d.get("metrics"),
+                            "dataSource": d.get("dataSource"),
+                            "selectedMetrics": picked_m,
+                            "metricOrder": order_pick_m,
+                        }
+                    )
+            else:
+                for card_idx, r in enumerate(valid):
+                    aid = r["id"]
+                    d = r["data"]
+                    en = _enabled_metric_ids(st.session_state.available_metrics)
 
-                    years = []
-                    for c in col_names[1:-1]:
+                    st.divider()
+                    title = d.get("authorName") or f"Author {aid}"
+                    title_safe = html.escape(str(title))
+                    aid_safe = html.escape(str(aid))
+                    st.markdown(
+                        f'<p class="section-title" style="margin-bottom:0.25rem;">{title_safe}</p>'
+                        f'<p class="metrics-grid-hint" style="margin-top:0;">Scopus Author ID: <code>{aid_safe}</code></p>',
+                        unsafe_allow_html=True,
+                    )
+                    ds = d.get("dataSource")
+                    if ds:
+                        st.caption(
+                            f"Source: {ds.get('sourceName', '')} · "
+                            f"Updated: {ds.get('lastUpdated', '')} · "
+                            f"Years: {ds.get('metricStartYear', '')}–{ds.get('metricEndYear', '')}"
+                        )
+
+                    order_opts = [
+                        "publication",
+                        "citationCount",
+                        "citationsPerPublication",
+                        "fwci",
+                        "topJournal",
+                        "hIndex",
+                        "collaboration",
+                        "academicCorporateCollaboration",
+                    ]
+                    label_map = {x["id"]: x["label"] for x in DEFAULT_METRICS}
+                    opt_list = [i for i in order_opts if i in en]
+
+                    picked, order_pick = _metrics_multiselect_and_order_ui(
+                        opt_list,
+                        label_map,
+                        multiselect_label="Rows to show in table",
+                        multiselect_key=f"multisel_{aid}",
+                        order_state_key=f"multiord_state_{aid}_{card_idx}",
+                        sortable_key=f"multiord_sort_{aid}_{card_idx}",
+                        fallback_key=f"multiord_fallback_{aid}_{card_idx}",
+                    )
+
+                    author_export_payload = {
+                        "authorId": aid,
+                        "authorName": d.get("authorName"),
+                        "metrics": d.get("metrics"),
+                        "dataSource": d.get("dataSource"),
+                        "selectedMetrics": picked,
+                        "metricOrder": order_pick,
+                    }
+                    col_names, table_rows = _build_metrics_table_rows(
+                        d.get("metrics") or {},
+                        ds,
+                        picked,
+                        order_pick,
+                    )
+                    if table_rows:
+                        df = pd.DataFrame(table_rows, columns=col_names)
+                        st.dataframe(df, use_container_width=True, hide_index=True)
                         try:
-                            years.append(int(float(c)))
+                            xl_author_b, xl_author_n = export_excel_bytes(
+                                [author_export_payload],
+                                f"research-metrics-{aid}",
+                            )
+                            st.download_button(
+                                "Download this table (Excel)",
+                                xl_author_b,
+                                file_name=xl_author_n,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"export_xl_author_{aid}_{card_idx}",
+                                use_container_width=False,
+                            )
                         except Exception:
-                            continue
-                    if years:
-                        c_filters, c_chart = st.columns([1, 3], vertical_alignment="top")
-                        with c_filters:
-                            st.markdown("#### Chart filters")
-                            default_plot_metric = (
-                                "publication" if "publication" in picked else picked[0]
-                            )
-                            plot_metric = st.selectbox(
-                                "Metric",
-                                options=picked,
-                                index=picked.index(default_plot_metric),
-                                format_func=lambda i: label_map.get(i, i),
-                                key=f"chart_metric_{aid}",
-                            )
-                            chart_type = st.radio(
-                                "Type",
-                                options=["Bar", "Line"],
-                                horizontal=False,
-                                index=0,
-                                key=f"chart_type_{aid}",
-                            )
-                            st.caption("Axis is fixed: Year on X, Metric value on Y.")
-
-                        with c_chart:
-                            series_name_full = label_map.get(plot_metric, plot_metric)
-                            # ECharts doesn't always handle long metric names well; use acronym
-                            # (e.g. "Field-Weighted Citation Impact (FWCI)" -> "FWCI") for labels.
-                            paren_match = re.search(r"\(([^)]+)\)", str(series_name_full))
-                            series_name_short = (
-                                paren_match.group(1).strip()
-                                if paren_match
-                                else str(series_name_full)
-                            )
-                            metrics_payload = d.get("metrics") or {}
-                            by_year = _extract_metric_by_year(metrics_payload, plot_metric)
-                            if not by_year:
-                                st.caption(
-                                    "Chart is not available for this metric row (for example, H-Index)."
+                            st.caption("Could not build Excel file for this author.")
+    
+                        years = []
+                        for c in col_names[1:-1]:
+                            try:
+                                years.append(int(float(c)))
+                            except Exception:
+                                continue
+                        if years:
+                            c_filters, c_chart = st.columns([1, 3], vertical_alignment="top")
+                            with c_filters:
+                                st.markdown("#### Chart filters")
+                                default_plot_metric = (
+                                    "publication" if "publication" in picked else picked[0]
                                 )
-                            else:
-                                values = [by_year.get(str(y)) for y in years]
-                                values = [
-                                    None
-                                    if (
-                                        v is None
-                                        or (isinstance(v, (int, float)) and pd.isna(v))
+                                plot_metric = st.selectbox(
+                                    "Metric",
+                                    options=picked,
+                                    index=picked.index(default_plot_metric),
+                                    format_func=lambda i: label_map.get(i, i),
+                                    key=f"chart_metric_{aid}",
+                                )
+                                chart_type = st.radio(
+                                    "Type",
+                                    options=["Bar", "Line"],
+                                    horizontal=False,
+                                    index=0,
+                                    key=f"chart_type_{aid}",
+                                )
+                                st.caption("Axis is fixed: Year on X, Metric value on Y.")
+    
+                            with c_chart:
+                                series_name_full = label_map.get(plot_metric, plot_metric)
+                                # ECharts doesn't always handle long metric names well; use acronym
+                                # (e.g. "Field-Weighted Citation Impact (FWCI)" -> "FWCI") for labels.
+                                paren_match = re.search(r"\(([^)]+)\)", str(series_name_full))
+                                series_name_short = (
+                                    paren_match.group(1).strip()
+                                    if paren_match
+                                    else str(series_name_full)
+                                )
+                                metrics_payload = d.get("metrics") or {}
+                                by_year = _extract_metric_by_year(metrics_payload, plot_metric)
+                                if not by_year:
+                                    st.caption(
+                                        "Chart is not available for this metric row (for example, H-Index)."
                                     )
-                                    else v
-                                    for v in values
-                                ]
-                                x_years = [str(y) for y in years]
-                                echarts_options = {
-                                    "animation": True,
-                                    "title": {
-                                        "text": f"{series_name_short} over Years",
-                                        "left": "center",
-                                        "top": 8,
-                                        "textStyle": {"fontSize": 15},
-                                    },
-                                    "tooltip": {"trigger": "axis"},
-                                    # Single-series chart: hide legend to prevent duplicate
-                                    # label text colliding with the title area.
-                                    "legend": {"show": False},
-                                    "toolbox": {
-                                        "show": True,
-                                        "top": 8,
-                                        "right": 10,
-                                        "feature": {
-                                            "saveAsImage": {"show": True, "title": "Download"},
-                                            "restore": {"show": True},
-                                            "dataZoom": {"show": True},
+                                else:
+                                    values = [by_year.get(str(y)) for y in years]
+                                    values = [
+                                        None
+                                        if (
+                                            v is None
+                                            or (isinstance(v, (int, float)) and pd.isna(v))
+                                        )
+                                        else v
+                                        for v in values
+                                    ]
+                                    x_years = [str(y) for y in years]
+                                    echarts_options = {
+                                        "animation": True,
+                                        "title": {
+                                            "text": f"{series_name_short} over Years",
+                                            "left": "center",
+                                            "top": 8,
+                                            "textStyle": {"fontSize": 15},
                                         },
-                                    },
-                                    "grid": {
-                                        "left": "6%",
-                                        "right": "5%",
-                                        "top": 84,
-                                        "bottom": 74,
-                                        "containLabel": True,
-                                    },
-                                    "xAxis": {
-                                        "type": "category",
-                                        "name": "Year",
-                                        "data": x_years,
-                                    },
-                                    "yAxis": {"type": "value", "name": series_name_short},
-                                    "series": [
-                                        {
-                                            "name": series_name_short,
-                                            "type": chart_type.lower(),
-                                            "data": values,
-                                            "smooth": chart_type == "Line",
-                                            "label": {
-                                                "show": True,
-                                                "position": "top",
-                                                "formatter": "{c}",
+                                        "tooltip": {"trigger": "axis"},
+                                        # Single-series chart: hide legend to prevent duplicate
+                                        # label text colliding with the title area.
+                                        "legend": {"show": False},
+                                        "toolbox": {
+                                            "show": True,
+                                            "top": 8,
+                                            "right": 10,
+                                            "feature": {
+                                                "saveAsImage": {"show": True, "title": "Download"},
+                                                "restore": {"show": True},
+                                                "dataZoom": {"show": True},
                                             },
-                                        }
-                                    ],
-                                    "dataZoom": [
-                                        {"type": "inside"},
-                                        {"type": "slider", "height": 18},
-                                    ],
-                                }
-                                st_echarts(
-                                    options=echarts_options,
-                                    height="460px",
-                                    key=f"echarts_{aid}_{plot_metric}",
-                                )
-                                st.caption(
-                                    "Use the chart toolbar (top-right) -> camera icon to download image."
-                                )
-
-                export_rows.append(author_export_payload)
+                                        },
+                                        "grid": {
+                                            "left": "6%",
+                                            "right": "5%",
+                                            "top": 84,
+                                            "bottom": 74,
+                                            "containLabel": True,
+                                        },
+                                        "xAxis": {
+                                            "type": "category",
+                                            "name": "Year",
+                                            "data": x_years,
+                                        },
+                                        "yAxis": {"type": "value", "name": series_name_short},
+                                        "series": [
+                                            {
+                                                "name": series_name_short,
+                                                "type": chart_type.lower(),
+                                                "data": values,
+                                                "smooth": chart_type == "Line",
+                                                "label": {
+                                                    "show": True,
+                                                    "position": "top",
+                                                    "formatter": "{c}",
+                                                },
+                                            }
+                                        ],
+                                        "dataZoom": [
+                                            {"type": "inside"},
+                                            {"type": "slider", "height": 18},
+                                        ],
+                                    }
+                                    st_echarts(
+                                        options=echarts_options,
+                                        height="460px",
+                                        key=f"echarts_{aid}_{plot_metric}",
+                                    )
+                                    st.caption(
+                                        "Use the chart toolbar (top-right) -> camera icon to download image."
+                                    )
+    
+                    export_rows.append(author_export_payload)
 
             st.markdown(
                 '<div id="export-downloads-anchor"></div>',
                 unsafe_allow_html=True,
             )
             st.divider()
+            export_body_sub = (
+                "Download your research metrics in PDF or Excel. "
+                "Set the filename below; the file includes only the scholar(s) and metrics you selected above."
+                if len(valid) > 1
+                else (
+                    "Download your research metrics in PDF or Excel. "
+                    "Set the filename below; the file includes all authors in this run."
+                )
+            )
             with st.container(border=True, key="export_results_shell"):
                 st.markdown(
                     '<div class="export-results-head">'
@@ -3083,9 +3220,8 @@ def main() -> None:
                     "</div>"
                     '<div class="export-results-head-text">'
                     '<p class="export-results-title">Export Results</p>'
-                    "<p class=\"export-results-sub\">"
-                    "Download your research metrics in PDF or Excel. "
-                    "Set the filename below; the file includes all authors in this run."
+                    '<p class="export-results-sub">'
+                    f"{html.escape(export_body_sub)}"
                     "</p>"
                     "</div></div></div>",
                     unsafe_allow_html=True,
