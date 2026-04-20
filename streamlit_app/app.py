@@ -2446,7 +2446,6 @@ def _export_workspace_module_head_html(*, bundle_prep: bool) -> str:
         )
     return (
         '<header class="export-workspace-module-head" role="presentation">'
-        '<p class="export-workspace-module-kicker">Standalone outputs</p>'
         '<div class="export-workspace-module-head-row">'
         '<div class="export-workspace-module-icon" aria-hidden="true">'
         f"{_EXPORT_WORKSPACE_ICON}</div>"
@@ -2837,7 +2836,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     st.markdown("##### Benchmarking (Bubble chart)")
     st.caption(
         "Each axis and bubble size use the **Total** value for your selected metric window "
-        "(same SciVal period as the table), not a single calendar year."
+        "not a single calendar year."
     )
     bubble_metric_opts = [i for i in order_opts if i in en]
 
