@@ -225,15 +225,28 @@ def export_pdf_bytes(data: List[Dict[str, Any]], filename_base: str = "research-
         pdf.multi_cell(0, 8, _pdf_safe(title))
         ds = author_data.get("dataSource")
         if ds:
+            # Use multi_cell so long sourceName / labels wrap; plain cell() truncates at page edge.
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.multi_cell(0, 5, _pdf_safe("Source"))
             pdf.set_font("Helvetica", "", 9)
-            pdf.cell(
+            pdf.multi_cell(
                 0,
-                6,
-                _pdf_safe(
-                    f"Source: {ds.get('sourceName', '')} | Last Updated: {ds.get('lastUpdated', '')}"
-                ),
-                ln=True,
+                5,
+                _pdf_safe(str(ds.get("sourceName", "") or "—")),
             )
+            pdf.multi_cell(
+                0,
+                5,
+                _pdf_safe(f"Last updated: {ds.get('lastUpdated', '')}"),
+            )
+            ms, me = ds.get("metricStartYear", ""), ds.get("metricEndYear", "")
+            if ms or me:
+                pdf.multi_cell(
+                    0,
+                    5,
+                    _pdf_safe(f"Metric period: {ms} - {me}"),
+                )
+            pdf.ln(2)
 
         selected = _get_selected_metrics(author_data)
         years = _get_dynamic_years(author_data)

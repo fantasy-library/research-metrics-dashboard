@@ -5,6 +5,7 @@ Run from repository root:  streamlit run streamlit_app/app.py
 
 from __future__ import annotations
 
+import hashlib
 import html
 import re
 import sys
@@ -1430,6 +1431,24 @@ p.metric-subtext {
   color: #1e293b;
   margin: 0 0 0.85rem 0;
 }
+/* Between multi-author charts and Prepare export */
+hr.charts-export-divider {
+  border: none;
+  border-top: 3px solid #8b5cf6;
+  margin: 1.65rem 0 1.35rem 0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 4px 14px rgba(124, 58, 237, 0.18);
+  border-radius: 2px;
+  height: 0;
+  opacity: 1;
+}
+p.prepare-export-heading {
+  font-size: 1.38rem !important;
+  font-weight: 700 !important;
+  color: #5b21b6 !important;
+  letter-spacing: -0.02em;
+  margin: 0.35rem 0 0.45rem 0 !important;
+  line-height: 1.25 !important;
+}
 .metrics-grid-hint {
   font-size: 0.85rem;
   color: #4b5563;
@@ -2248,6 +2267,10 @@ def _metrics_multiselect_and_order_ui(
     st.session_state[order_state_key] = existing_order
     order_pick = existing_order
 
+    # Remount sortables when the multiselect set changes so removed metrics drop
+    # from the list (streamlit-sortables can otherwise keep stale items).
+    _pick_sig = hashlib.md5(",".join(sorted(picked)).encode()).hexdigest()[:12]
+
     st.markdown("Display order (top to bottom)")
     display_to_metric = {label_map.get(m, m): m for m in order_pick}
     sortable_style = """
@@ -2272,7 +2295,7 @@ def _metrics_multiselect_and_order_ui(
         list(display_to_metric.keys()),
         direction="vertical",
         custom_style=sortable_style,
-        key=sortable_key,
+        key=f"{sortable_key}_{_pick_sig}",
     )
     if (
         isinstance(sorted_display, list)
@@ -2280,7 +2303,9 @@ def _metrics_multiselect_and_order_ui(
         and all(isinstance(s, str) for s in sorted_display)
     ):
         order_pick = [
-            display_to_metric[s] for s in sorted_display if s in display_to_metric
+            display_to_metric[s]
+            for s in sorted_display
+            if s in display_to_metric and display_to_metric[s] in picked
         ]
     else:
         st.caption("Drag area unavailable for this card. Use fallback selector below.")
@@ -2288,15 +2313,18 @@ def _metrics_multiselect_and_order_ui(
             "Fallback order",
             options=list(display_to_metric.keys()),
             default=list(display_to_metric.keys()),
-            key=fallback_key,
+            key=f"{fallback_key}_{_pick_sig}",
             label_visibility="collapsed",
         )
         if fallback_display:
             order_pick = [
-                display_to_metric[s] for s in fallback_display if s in display_to_metric
+                display_to_metric[s]
+                for s in fallback_display
+                if s in display_to_metric and display_to_metric[s] in picked
             ]
         else:
-            order_pick = existing_order
+            order_pick = [m for m in existing_order if m in picked]
+    order_pick = [m for m in order_pick if m in picked]
     st.session_state[order_state_key] = order_pick
     st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
     return picked, order_pick
@@ -2407,47 +2435,58 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     line_series.append(ser)
                 if line_series:
                     toolbox_line = _compare_toolbox()
-                    toolbox_line["right"] = 10
-                    toolbox_line["top"] = 8
+                    # Keep toolbox clear of the vertical legend column on the right.
+                    toolbox_line["right"] = 220
+                    toolbox_line["top"] = 6
                     line_opts = {
                         "animation": True,
                         "title": {
                             "text": "Trends by years",
-                            "subtext": line_short,
                             "left": "center",
-                            "top": 2,
+                            "top": 6,
                             "textStyle": {
                                 "fontSize": 15,
                                 "fontWeight": 600,
                                 "color": "#1e293b",
                             },
-                            "subtextStyle": {"fontSize": 12, "color": "#64748b"},
                         },
                         "tooltip": {"trigger": "axis"},
                         "legend": {
-                            "type": "plain",
+                            "type": "scroll",
+                            "orient": "vertical",
+                            "right": 4,
+                            "top": 44,
+                            "bottom": 86,
+                            "width": 220,
                             "data": [s["name"] for s in line_series],
-                            "top": 34,
-                            "left": "center",
                             "itemWidth": 10,
                             "itemHeight": 10,
                             "itemGap": 8,
-                            "textStyle": {"fontSize": 10},
+                            "textStyle": {"fontSize": 10, "lineHeight": 14},
                         },
                         "toolbox": toolbox_line,
                         "grid": {
-                            "left": "4%",
-                            "right": "3%",
-                            "top": 108,
-                            "bottom": 72,
+                            "left": "11%",
+                            "right": "26%",
+                            "top": 44,
+                            "bottom": 76,
                             "containLabel": True,
                         },
-                        "xAxis": {"type": "category", "name": "Year", "data": x_years},
+                        "xAxis": {
+                            "type": "category",
+                            "name": "Year",
+                            "nameLocation": "middle",
+                            "nameGap": 32,
+                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                            "data": x_years,
+                        },
                         "yAxis": {
                             "type": "value",
                             "name": line_short,
                             "nameLocation": "middle",
-                            "nameGap": 48,
+                            "nameGap": 58,
+                            "nameRotate": 90,
+                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
                         },
                         "series": line_series,
                         "dataZoom": [
@@ -2457,7 +2496,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     }
                     st_echarts(
                         options=line_opts,
-                        height="520px",
+                        height="560px",
                         key=f"compare_line_v2_{line_metric}_{line_chart_type}",
                     )
                     st.caption(
@@ -2471,7 +2510,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     st.divider()
 
     # --- Bubble chart (three dimensions: SciVal period totals, no year) ---
-    st.markdown("##### Bubble chart (X × Y × size)")
+    st.markdown("##### Benchmarking (Bubble chart)")
     st.caption(
         "Each axis and bubble size use the **Total** value for your selected metric window "
         "(same SciVal period as the table), not a single calendar year."
@@ -3016,6 +3055,11 @@ def main() -> None:
         with st.container(border=True):
             label_map_global = {x["id"]: x["label"] for x in DEFAULT_METRICS}
             _render_compare_authors_charts(valid, label_map_global)
+            if len(valid) > 1:
+                st.markdown(
+                    '<hr class="charts-export-divider" aria-hidden="true" />',
+                    unsafe_allow_html=True,
+                )
             if len(valid) >= 2:
                 st.markdown(
                     '<div class="analyze-hint" style="margin: 0.35rem 0 1.1rem 0;">'
@@ -3046,8 +3090,7 @@ def main() -> None:
                 label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
                 opt_list_m = [i for i in order_opts_m if i in en_m]
                 st.markdown(
-                    '<p class="section-title" style="margin:0.85rem 0 0.35rem 0;">'
-                    "Prepare export</p>",
+                    '<p class="prepare-export-heading">Prepare export</p>',
                     unsafe_allow_html=True,
                 )
                 st.caption(
