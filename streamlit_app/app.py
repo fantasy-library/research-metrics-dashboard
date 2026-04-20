@@ -488,32 +488,32 @@ footer[data-testid="stFooter"] {
 /* Full-width Analyze CTA (sibling after metrics card; marker span for styling) */
 [class*="st-key-analyze_zone"] {
   width: 100% !important;
-  margin-top: 0.35rem !important;
-  margin-bottom: 0.5rem !important;
+  margin-top: 0.05rem !important;
+  margin-bottom: 0.3rem !important;
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"],
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] {
   width: 100% !important;
-  min-height: 3rem !important;
+  min-height: 3.35rem !important;
   height: auto !important;
-  font-size: 1.12rem !important;
+  font-size: 1.22rem !important;
   border-radius: 12px !important;
-  background: linear-gradient(180deg, #f5f9ff 0%, #e8f1ff 100%) !important;
+  background: linear-gradient(180deg, #7c83ff 0%, #6366f1 100%) !important;
   background-color: transparent !important;
-  color: #1e3a8a !important;
-  border: 1px solid #93c5fd !important;
-  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.12) !important;
+  color: #ffffff !important;
+  border: 1px solid #4f46e5 !important;
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.24) !important;
   font-weight: 800 !important;
   letter-spacing: 0.02em !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 0 rgba(49, 46, 129, 0.4);
   transition: all 0.2s ease !important;
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:hover,
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:hover {
-  background: linear-gradient(180deg, #ebf4ff 0%, #dbeafe 100%) !important;
-  border-color: #60a5fa !important;
-  color: #1e40af !important;
-  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.18) !important;
+  background: linear-gradient(180deg, #6d74ff 0%, #5558eb 100%) !important;
+  border-color: #4338ca !important;
+  color: #ffffff !important;
+  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.3) !important;
   transform: translateY(-1px);
 }
 
@@ -1114,7 +1114,7 @@ a.minimal-go-analyze-btn:hover,
   border-left: 4px solid #7c3aed !important;
   border-radius: 12px !important;
   padding: 2rem 1.75rem 1.5rem !important;
-  margin: 0.5rem 0 1.25rem 0 !important;
+  margin: 0.5rem 0 0.55rem 0 !important;
   box-shadow:
     0 4px 8px rgba(15, 23, 42, 0.04),
     0 14px 32px rgba(99, 102, 241, 0.08),
@@ -1749,24 +1749,24 @@ hr.export-workspace-split {
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"],
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] {
   width: 100% !important;
-  min-height: 3rem !important;
+  min-height: 3.35rem !important;
   border-radius: 12px !important;
-  background: linear-gradient(180deg, #f5f9ff 0%, #e8f1ff 100%) !important;
+  background: linear-gradient(180deg, #7c83ff 0%, #6366f1 100%) !important;
   background-color: transparent !important;
-  color: #1e3a8a !important;
-  border: 1px solid #93c5fd !important;
-  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.12) !important;
-  font-size: 1.12rem !important;
+  color: #ffffff !important;
+  border: 1px solid #4f46e5 !important;
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.24) !important;
+  font-size: 1.22rem !important;
   font-weight: 800 !important;
   letter-spacing: 0.02em !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 0 rgba(49, 46, 129, 0.4);
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:hover,
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:hover {
-  background: linear-gradient(180deg, #ebf4ff 0%, #dbeafe 100%) !important;
-  border-color: #60a5fa !important;
-  color: #1e40af !important;
-  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.18) !important;
+  background: linear-gradient(180deg, #6d74ff 0%, #5558eb 100%) !important;
+  border-color: #4338ca !important;
+  color: #ffffff !important;
+  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.3) !important;
   transform: translateY(-1px);
 }
 
@@ -2813,6 +2813,19 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         f"Values used in trends chart ({label_map.get(line_metric, line_metric)} by year):"
                     )
                     st.dataframe(trends_tbl, use_container_width=True, hide_index=True)
+                    trends_stub = re.sub(
+                        r"[^a-z0-9]+",
+                        "-",
+                        f"trends-by-years-{line_metric}-{line_chart_type}".lower(),
+                    ).strip("-")
+                    st.download_button(
+                        "Download trends table (.csv)",
+                        data=trends_tbl.to_csv(index=False).encode("utf-8-sig"),
+                        file_name=f"{trends_stub}.csv",
+                        mime="text/csv",
+                        key=f"dl_trends_tbl_csv_{line_metric}_{line_chart_type}",
+                        use_container_width=True,
+                    )
                 else:
                     st.caption(
                         "No series to plot for this metric (missing year data for all authors)."
