@@ -496,23 +496,24 @@ footer[data-testid="stFooter"] {
   width: 100% !important;
   min-height: 3rem !important;
   height: auto !important;
-  font-size: 1.02rem !important;
+  font-size: 1.12rem !important;
   border-radius: 12px !important;
-  background: linear-gradient(180deg, #f8fbff 0%, #edf3fb 100%) !important;
+  background: linear-gradient(180deg, #f5f9ff 0%, #e8f1ff 100%) !important;
   background-color: transparent !important;
-  color: #4a5568 !important;
-  border: 1px solid #7b92b1 !important;
-  box-shadow: 0 10px 24px rgba(123, 146, 177, 0.12) !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.01em !important;
+  color: #1e3a8a !important;
+  border: 1px solid #93c5fd !important;
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.12) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
   transition: all 0.2s ease !important;
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:hover,
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:hover {
-  background: linear-gradient(180deg, #6f86a8 0%, #5c7cfa 100%) !important;
-  border-color: #5c7cfa !important;
-  color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(92, 124, 250, 0.20) !important;
+  background: linear-gradient(180deg, #ebf4ff 0%, #dbeafe 100%) !important;
+  border-color: #60a5fa !important;
+  color: #1e40af !important;
+  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.18) !important;
   transform: translateY(-1px);
 }
 
@@ -1722,20 +1723,22 @@ hr.export-workspace-split {
   width: 100% !important;
   min-height: 3rem !important;
   border-radius: 12px !important;
-  background: linear-gradient(180deg, #f8fbff 0%, #edf3fb 100%) !important;
+  background: linear-gradient(180deg, #f5f9ff 0%, #e8f1ff 100%) !important;
   background-color: transparent !important;
-  color: #4a5568 !important;
-  border: 1px solid #7b92b1 !important;
-  box-shadow: 0 10px 24px rgba(123, 146, 177, 0.12) !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.01em !important;
+  color: #1e3a8a !important;
+  border: 1px solid #93c5fd !important;
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.12) !important;
+  font-size: 1.12rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:hover,
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:hover {
-  background: linear-gradient(180deg, #6f86a8 0%, #5c7cfa 100%) !important;
-  border-color: #5c7cfa !important;
-  color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(92, 124, 250, 0.20) !important;
+  background: linear-gradient(180deg, #ebf4ff 0%, #dbeafe 100%) !important;
+  border-color: #60a5fa !important;
+  color: #1e40af !important;
+  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.18) !important;
   transform: translateY(-1px);
 }
 
@@ -2406,8 +2409,7 @@ def _export_workspace_module_head_html(*, bundle_prep: bool) -> str:
     title = "Export workspace"
     if bundle_prep:
         desc = (
-            "This area is independent of the comparison charts: PDF and Excel follow only "
-            "the three steps below—not chart filters or zoom state."
+            "Choose export options below, then download PDF or Excel."
         )
     else:
         desc = (
@@ -2757,9 +2759,6 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         options=line_opts,
                         height="600px",
                         key=f"compare_line_v2_{line_metric}_{line_chart_type}",
-                    )
-                    st.caption(
-                        "Toolbar (top-right): camera icon to download image."
                     )
                 else:
                     st.caption(
@@ -3624,9 +3623,6 @@ def main() -> None:
                                         options=echarts_options,
                                         height="460px",
                                         key=f"echarts_{aid}_{plot_metric}",
-                                    )
-                                    st.caption(
-                                        "Use the chart toolbar (top-right) -> camera icon to download image."
                                     )
     
                     export_rows.append(author_export_payload)
