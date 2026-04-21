@@ -89,6 +89,7 @@ _rate_limiter = _RateLimiter()
 
 
 def _retry_with_backoff(operation):
+    """Retry rate-limited SciVal calls. Do not retry read/connect timeouts (avoids long silent spinners)."""
     last_err: Optional[Exception] = None
     max_attempts = RATE_LIMIT_CONFIG["retry_attempts"]
     base_delay = RATE_LIMIT_CONFIG["retry_delay"]
@@ -100,13 +101,35 @@ def _retry_with_backoff(operation):
             last_err = e
             if not e.is_rate_limit_error and attempt > 1:
                 raise
+        except httpx.TimeoutException as e:
+            last_err = e
+            break
+        except httpx.ConnectError as e:
+            last_err = e
+            break
+        except httpx.NetworkError as e:
+            last_err = e
+            break
         except Exception as e:
             last_err = e
         if attempt >= max_attempts:
             break
         delay = base_delay * (mult ** (attempt - 1)) + random.random()
         time.sleep(delay)
-    raise last_err if last_err else RuntimeError("retry failed")
+    if last_err is None:
+        raise RuntimeError("retry failed")
+    if isinstance(last_err, httpx.TimeoutException):
+        raise APIError(
+            "SciVal did not respond in time. The Elsevier API may be slow or unavailable; "
+            "wait a moment and try again."
+        ) from last_err
+    if isinstance(last_err, (httpx.ConnectError, httpx.NetworkError)):
+        raise APIError(
+            "Could not reach SciVal (network error). Check your connection and try again."
+        ) from last_err
+    if isinstance(last_err, APIError):
+        raise last_err
+    raise APIError(str(last_err)) from last_err
 
 
 def is_missing_scival_api_key_error(message: str) -> bool:
@@ -133,6 +156,68 @@ def is_scival_authentication_error(message: str) -> bool:
     ):
         return True
     return False
+
+
+def _extract_scival_error_detail(body: str) -> str:
+    """Best-effort parse of Elsevier SciVal JSON/XML error bodies for UI (avoids generic 'HTTP 500' only)."""
+    s = (body or "").strip()
+    if not s:
+        return ""
+    if len(s) > 12000:
+        s = s[:12000]
+    low = s.lower()
+    if low.startswith("<!doctype") or low.startswith("<html"):
+        return "HTML error page (often gateway or proxy), not JSON from SciVal."
+
+    try:
+        data = json.loads(s)
+    except json.JSONDecodeError:
+        one = " ".join(s.split())
+        return one[:420] + ("…" if len(one) > 420 else "")
+
+    def walk(o: Any, depth: int = 0) -> Optional[str]:
+        if depth > 12:
+            return None
+        if isinstance(o, dict):
+            for key in (
+                "statusText",
+                "developerMessage",
+                "message",
+                "detail",
+                "errorText",
+                "title",
+            ):
+                v = o.get(key)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()[:500]
+            st = o.get("status")
+            if isinstance(st, dict):
+                code = st.get("statusCode") or st.get("code")
+                txt = st.get("statusText") or st.get("message")
+                parts = [str(x) for x in (code, txt) if x]
+                if parts:
+                    return ": ".join(parts)[:500]
+            for key in ("service-error", "serviceError", "error", "errors"):
+                if key in o:
+                    inner = walk(o[key], depth + 1)
+                    if inner:
+                        return inner
+            if "errors" in o and isinstance(o["errors"], list) and o["errors"]:
+                inner = walk(o["errors"][0], depth + 1)
+                if inner:
+                    return inner
+        elif isinstance(o, list) and o:
+            return walk(o[0], depth + 1)
+        return None
+
+    out = walk(data)
+    if out:
+        return out
+    try:
+        flat = json.dumps(data, ensure_ascii=False)[:450]
+    except (TypeError, ValueError):
+        flat = str(data)[:450]
+    return flat + ("…" if len(flat) >= 450 else "")
 
 
 def _classify_api_error_plain(message: str, low: str) -> str | None:
@@ -225,6 +310,9 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
             "Please try again in a few minutes."
         )
     if "500" in message or "internal server" in low:
+        # Direct SciVal path may already attach Elsevier detail — do not replace with generic text.
+        if "scival returned http" in low or "api detail:" in low:
+            return None
         return (
             "The API returned a server error. This is usually temporary — try again shortly. "
             "If it persists, contact support with the time of the request."
@@ -259,7 +347,7 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
 
 def format_error_message_for_user(
     message: str,
-    max_plain: int = 350,
+    max_plain: int = 600,
     *,
     is_entitlement_error: bool = False,
     is_rate_limit_error: bool = False,
@@ -353,7 +441,8 @@ def _parse_supabase_error(
 
 class APIService:
     def __init__(self) -> None:
-        self._client = httpx.Client(timeout=120.0)
+        # Tighter than 120s: long hangs made "Fetching metrics…" feel stuck; Elsevier usually responds in seconds.
+        self._client = httpx.Client(timeout=httpx.Timeout(55.0, connect=12.0))
 
     def close(self) -> None:
         self._client.close()
@@ -461,8 +550,23 @@ class APIService:
                             "API Access Error: Your SciVal API key does not have the "
                             "required permissions for SciVal author metrics."
                         )
+                    elif r.status_code >= 500:
+                        detail = _extract_scival_error_detail(text)
+                        msg = (
+                            f"SciVal returned HTTP {r.status_code} (server error from Elsevier). "
+                        )
+                        if detail:
+                            msg += f"API detail: {detail} "
+                        msg += (
+                            "This is often temporary—try again in a few minutes. "
+                            "If it keeps happening, confirm SCIVAL_API_KEY and, if your institution uses one, "
+                            "ELSEVIER_INSTTOKEN with your library."
+                        )
                     else:
-                        msg = format_error_message_for_user(msg)
+                        detail = _extract_scival_error_detail(text)
+                        msg = format_error_message_for_user(
+                            f"API Error ({r.status_code}): {detail or text[:900]}"
+                        )
                     raise APIError(msg, r.status_code, is_ent, is_rl)
                 return r.json()
             finally:
@@ -1120,7 +1224,7 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
     if inst:
         headers["X-ELS-Insttoken"] = inst
 
-    client = httpx.Client(timeout=60.0)
+    client = httpx.Client(timeout=httpx.Timeout(45.0, connect=10.0))
     try:
         r = client.get(base, params=params, headers=headers)
         if not r.is_success:

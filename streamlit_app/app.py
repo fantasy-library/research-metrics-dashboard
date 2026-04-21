@@ -3654,6 +3654,11 @@ def main() -> None:
                     am_payload = [dict(m) for m in st.session_state.available_metrics]
                     try:
                         with st.spinner("Fetching metrics…"):
+                            if USE_DIRECT_API:
+                                st.caption(
+                                    "SciVal uses several requests in sequence; slow Elsevier responses "
+                                    "can take up to about a minute. If it stops with a timeout message, try again shortly."
+                                )
                             resolved_ids, resolution_warnings = (
                                 resolve_author_ids_for_metrics_safe(
                                     ids, api_key_effective
