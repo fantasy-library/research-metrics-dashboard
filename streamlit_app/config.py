@@ -82,6 +82,11 @@ def _resolve_insttoken() -> str:
 # Optional institutional token (Elsevier query param insttoken and/or header X-ELS-Insttoken)
 ELSEVIER_INSTTOKEN: str = _resolve_insttoken()
 
+# Optional HTTP(S) proxy for SciVal HTTP client only (Elsevier direct API + ORCID lookup).
+# Use when Cloudflare blocks your server's datacenter IP: point this at a library/campus proxy
+# so traffic exits from an allowlisted university address. Example: http://proxy.ust.hk:8080
+SCIVAL_HTTP_PROXY: str = (os.getenv("SCIVAL_HTTP_PROXY") or "").strip()
+
 DIRECT_API_BASE: str = (
     "https://api.elsevier.com/analytics/scival/author/metrics"
 )

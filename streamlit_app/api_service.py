@@ -19,6 +19,7 @@ from streamlit_app.config import (
     DIRECT_API_BASE,
     ELSEVIER_INSTTOKEN,
     SCIVAL_API_KEY,
+    SCIVAL_HTTP_PROXY,
     SUPABASE_ANON_KEY,
     USE_DIRECT_API,
     supabase_proxy_url,
@@ -378,12 +379,12 @@ def format_error_message_for_user(
     ):
         return (
             "Cloudflare blocked this traffic (Elsevier’s edge security). "
-            "Common causes: hosting the app on a public cloud IP (Railway, AWS, etc.), using a consumer VPN, "
-            "or sending many SciVal requests in a short time. "
-            "Try: run from your university network or an institutional VPN that exits on campus, "
-            "turn off other VPNs, wait 15–30 minutes, and avoid rapid repeated Analyze clicks. "
-            "If it persists, contact your library or Elsevier support with the Ray ID shown on the block page "
-            "and mention API access to api.elsevier.com (SciVal author metrics)."
+            "Turning off a personal VPN or clearing the browser cache usually does **not** fix this when the "
+            "block is on the **server’s IP** (e.g. Railway/AWS) or on Elsevier’s side. "
+            "What helps: run the app on a machine that exits through your **university network**, "
+            "or set an institutional **HTTP proxy** in the environment (SCIVAL_HTTP_PROXY, or standard HTTPS_PROXY) "
+            "so SciVal calls leave from an allowlisted campus address — ask HKUST Library / IT for proxy details. "
+            "You can also try again later with fewer Analyze clicks. For repeated blocks, contact Elsevier with the Ray ID."
         )
     looks_html = (
         "<html" in low
@@ -460,10 +461,21 @@ def _parse_supabase_error(
     return msg, is_ent, is_rl
 
 
+def _scival_http_client_proxy() -> str | None:
+    """Explicit SciVal-only proxy; otherwise httpx uses trust_env (HTTPS_PROXY, etc.)."""
+    p = (SCIVAL_HTTP_PROXY or "").strip()
+    return p or None
+
+
 class APIService:
     def __init__(self) -> None:
         # Tighter than 120s: long hangs made "Fetching metrics…" feel stuck; Elsevier usually responds in seconds.
-        self._client = httpx.Client(timeout=httpx.Timeout(55.0, connect=12.0))
+        px = _scival_http_client_proxy()
+        self._client = httpx.Client(
+            timeout=httpx.Timeout(55.0, connect=12.0),
+            proxy=px,
+            trust_env=True,
+        )
 
     def close(self) -> None:
         self._client.close()
@@ -1250,7 +1262,11 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
     if inst:
         headers["X-ELS-Insttoken"] = inst
 
-    client = httpx.Client(timeout=httpx.Timeout(45.0, connect=10.0))
+    client = httpx.Client(
+        timeout=httpx.Timeout(45.0, connect=10.0),
+        proxy=_scival_http_client_proxy(),
+        trust_env=True,
+    )
     try:
         r = client.get(base, params=params, headers=headers)
         if not r.is_success:
