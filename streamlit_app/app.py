@@ -2190,31 +2190,31 @@ DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {
 _METRICS_SESSION_DEFAULT_VERSION = 5
 
 YEAR_OPTIONS = {
-    "3yrs": "Last 3 complete years — compact recent window",
-    "3yrsAndCurrent": "Last 3 years + current year — includes in-progress year",
+    "3yrs": "Last 3 completed calendar years — compact recent window",
+    "3yrsAndCurrent": "Last 3 completed calendar years + current year — includes in-progress year",
     "3yrsAndCurrentAndFuture": (
-        "Last 3 years + current + future — completed years, in-progress year, "
-        "and indexed early-access with future pub dates"
+        "Last 3 completed calendar years + current + future — adds indexed manuscripts "
+        "whose official publication date is still in the future"
     ),
-    "5yrs": "Last 5 complete years — balanced default window",
-    "5yrsAndCurrent": "Last 5 years + current year — extended with current",
+    "5yrs": "Last 5 completed calendar years — balanced default window",
+    "5yrsAndCurrent": "Last 5 completed calendar years + current year — extended with current",
     "5yrsAndCurrentAndFuture": (
-        "Last 5 years + current + future — widest recent window plus indexed "
-        "early-access with future pub dates"
+        "Last 5 completed calendar years + current + future — widest recent window plus indexed "
+        "manuscripts whose official publication date is still in the future"
     ),
-    "10yrs": "Last 10 complete years — long-term trend view",
+    "10yrs": "Last 10 completed calendar years — long-term trend view",
 }
 MAX_AUTHORS_PER_RUN = 10
 
 # Short labels for dropdowns (matches compact SaaS-style UI)
 YEAR_OPTIONS_DISPLAY = {
-    "3yrs": "Last 3 complete years",
-    "3yrsAndCurrent": "Last 3 years + current year",
-    "3yrsAndCurrentAndFuture": "Last 3 years + current + future",
-    "5yrs": "Last 5 years (default)",
-    "5yrsAndCurrent": "Last 5 years + current year",
-    "5yrsAndCurrentAndFuture": "Last 5 years + current + future",
-    "10yrs": "Last 10 complete years",
+    "3yrs": "Last 3 completed calendar years",
+    "3yrsAndCurrent": "Last 3 completed calendar years + current year",
+    "3yrsAndCurrentAndFuture": "Last 3 completed calendar years + current + future",
+    "5yrs": "Last 5 completed calendar years (default)",
+    "5yrsAndCurrent": "Last 5 completed calendar years + current year",
+    "5yrsAndCurrentAndFuture": "Last 5 completed calendar years + current + future",
+    "10yrs": "Last 10 completed calendar years",
 }
 
 DOCS_OPTIONS = {
@@ -2241,37 +2241,62 @@ SELF_CIT_RADIO_LABELS = {
 }
 
 YEAR_FOOTNOTES = {
-    "3yrs": "3 complete years",
-    "3yrsAndCurrent": "3 complete years plus current year",
-    "3yrsAndCurrentAndFuture": "3 complete years, current year, and future-dated indexed items",
-    "5yrs": "5 complete years",
-    "5yrsAndCurrent": "5 complete years plus current year",
-    "5yrsAndCurrentAndFuture": "5 complete years, current year, and future-dated indexed items",
-    "10yrs": "10 complete years",
-}
-
-# Streamlit selectbox “?” tooltip (compact; text follows SciVal yearRange semantics).
-YEAR_SELECT_HELP = {
-    "3yrs": "Last 3 completed calendar years only.",
-    "3yrsAndCurrent": "Last 3 completed calendar years plus the ongoing current year.",
+    "3yrs": "3 completed calendar years",
+    "3yrsAndCurrent": "3 completed calendar years plus current year",
     "3yrsAndCurrentAndFuture": (
-        "Includes the 3 most recently completed calendar years, the ongoing current year, "
-        'and early-access "Articles in Press" with future publication dates.'
+        "3 completed calendar years, current year, and manuscripts indexed before their official publication date"
     ),
-    "5yrs": "Last 5 completed calendar years only.",
-    "5yrsAndCurrent": "Last 5 completed calendar years plus the ongoing current year.",
+    "5yrs": "5 completed calendar years",
+    "5yrsAndCurrent": "5 completed calendar years plus current year",
     "5yrsAndCurrentAndFuture": (
-        "Includes the 5 most recently completed calendar years, the ongoing current year, "
-        'and early-access "Articles in Press" with future publication dates.'
+        "5 completed calendar years, current year, and manuscripts indexed before their official publication date"
     ),
-    "10yrs": "Last 10 completed calendar years only.",
+    "10yrs": "10 completed calendar years",
 }
 
-# HTML body for the “?” popup next to the Year filter label (not the selectbox help).
+# Streamlit selectbox “?” — precise definition of the selected preset (SciVal yearRange).
+YEAR_SELECT_HELP = {
+    "3yrs": (
+        "This preset: metrics use publication years in the last 3 completed calendar years only "
+        "(SciVal yearRange 3yrs)."
+    ),
+    "3yrsAndCurrent": (
+        "This preset: the last 3 completed calendar years plus the ongoing calendar year "
+        "(SciVal yearRange 3yrsAndCurrent)."
+    ),
+    "3yrsAndCurrentAndFuture": (
+        "This preset: the last 3 completed calendar years, the current calendar year, and indexed manuscripts "
+        "whose official publication date is still in the future (SciVal 3yrsAndCurrentAndFuture). "
+        "Which records appear depends on SciVal–Scopus indexing and updates."
+    ),
+    "5yrs": (
+        "This preset: metrics use publication years in the last 5 completed calendar years only "
+        "(SciVal yearRange 5yrs)."
+    ),
+    "5yrsAndCurrent": (
+        "This preset: the last 5 completed calendar years plus the ongoing calendar year "
+        "(SciVal yearRange 5yrsAndCurrent)."
+    ),
+    "5yrsAndCurrentAndFuture": (
+        "This preset: the last 5 completed calendar years, the current calendar year, and indexed manuscripts "
+        "whose official publication date is still in the future (SciVal 5yrsAndCurrentAndFuture). "
+        "Which records appear depends on SciVal–Scopus indexing and updates."
+    ),
+    "10yrs": (
+        "This preset: metrics use publication years in the last 10 completed calendar years only "
+        "(SciVal yearRange 10yrs)."
+    ),
+}
+
+# Label “?” — three building blocks only; details live in the Year dropdown help.
 YEAR_FILTER_LABEL_TOOLTIP_HTML = (
-    "<strong>Options:</strong><br />"
-    "The most recently completed calendar years, the ongoing current year, and "
-    'early-access &quot;Articles in Press&quot; with future publication dates.'
+    "<strong>SciVal year windows can mix:</strong><br />"
+    "• Completed calendar years<br />"
+    "• The current calendar year<br />"
+    "• Indexed manuscripts with a future official publication date<br />"
+    "<span style=\"font-size:0.85em;color:#64748b\">"
+    "Open the <strong>Year</strong> dropdown and use its (?) help for the exact wording of each preset."
+    "</span>"
 )
 
 SELF_CIT_HELP = (
@@ -2650,8 +2675,9 @@ def _render_export_results_block(export_rows: list, n_valid: int) -> None:
         unsafe_allow_html=True,
     )
     export_body_sub = (
-        "Download your research metrics in PDF or Excel. "
-        "Set the filename below; the file includes only the scholar(s) and metrics you selected above."
+        "Download your research metrics in PDF or Excel. Set the filename below. "
+        "The export uses the metrics and table row order from steps (1)–(2), "
+        "and only the author(s) checked in step (3)."
         if n_valid > 1
         else (
             "Download your research metrics in PDF or Excel. Set the filename below."
@@ -3284,13 +3310,18 @@ def main() -> None:
   <div class="disclaimer-card">
     <p class="disclaimer-heading"><span aria-hidden="true">⚠️</span> Research Impact Dashboard — Disclaimer</p>
     <p>
-      This dashboard provides a high-level synthesis of research impact via Elsevier&rsquo;s SciVal APIs.
-      Designed for rapid insight, this dashboard serves as a strategic shortcut; for granular benchmarking and
-      comprehensive longitudinal data, please consult the full <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a> via HKUST Library.
+      This dashboard provides a high-level summary of research-impact indicators using Elsevier&rsquo;s SciVal APIs.
+      It is intended as a starting point for exploration, not a substitute for the full SciVal platform.
+      For granular benchmarking and comprehensive longitudinal data, please consult the
+      <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a> via HKUST Library.
     </p>
     <p>
       <strong>Important: Metric accuracy is contingent upon your Scopus Author ID integrity. We strongly recommend
       verifying your profile to ensure all citations and publications are correctly attributed.</strong>
+    </p>
+    <p>
+      Where institutional policy governs hiring, reappointment, tenure, or promotion, do not rely on this dashboard
+      alone; follow unit- and university-approved evidence and procedures.
     </p>
     <div class="disclaimer-links">
       Resources:
@@ -3423,7 +3454,7 @@ def main() -> None:
                 '<p class="metrics-panel-heading">Select Metrics to Include</p>',
                 unsafe_allow_html=True,
             )
-            st.caption("Toggle metrics on or off. Unchecked metrics are not requested from the API.")
+            st.caption("Toggle metrics on or off.")
 
             am = st.session_state.available_metrics
             # Keep widget state as the single source of truth to avoid
@@ -3640,7 +3671,7 @@ def main() -> None:
                             '<div class="analyze-hint" style="margin: 0 0 1rem 0;">'
                             '<div class="analyze-hint-inner">'
                             '<p class="analyze-hint-text">'
-                            "Select metrics, their order, and which scholar(s) to export, "
+                            "Select metrics, their order, and which author(s) to include in the export, "
                             "then use Export Results below."
                             "</p>"
                             '<a class="analyze-hint-cta" href="#export-downloads-anchor">'
@@ -3669,7 +3700,7 @@ def main() -> None:
                         )
                         st.caption(
                             "Choose metrics to include, drag to set row order, then pick one or more "
-                            "scholars. PDF/Excel in Export Results use only these choices."
+                            "authors. PDF/Excel in Export Results use only these choices."
                         )
                         picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
                             opt_list_m,
@@ -3685,7 +3716,7 @@ def main() -> None:
                         st.markdown(
                             '<p class="export-step-label" style="margin-top:0.65rem;">'
                             '<span class="export-step-badge" aria-hidden="true">(3)</span>'
-                            '<span class="export-step-label-text">Scholar(s) to export</span></p>',
+                            '<span class="export-step-label-text">Author(s) to include in export</span></p>',
                             unsafe_allow_html=True,
                         )
                         _prev_bundle_pick = st.session_state.get("export_bundle_scholar_pick")
@@ -3707,7 +3738,7 @@ def main() -> None:
                         ]
                         if not picked_m or not export_scholar_pick:
                             st.info(
-                                "Select at least one metric and one scholar to build the export file."
+                                "Select at least one metric and one author to build the export file."
                             )
                         for r in valid:
                             if r["id"] not in export_scholar_pick:

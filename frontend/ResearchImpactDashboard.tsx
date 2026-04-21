@@ -324,8 +324,7 @@ export function ResearchImpactDashboard() {
             </span>
           </div>
           <p className="mb-4 text-sm text-violet-900/80">
-            Toggle metrics on or off. Unchecked metrics are not requested from
-            the API.
+            Toggle metrics on or off.
           </p>
           <div className="mb-4 flex flex-wrap justify-end gap-2">
             <button
