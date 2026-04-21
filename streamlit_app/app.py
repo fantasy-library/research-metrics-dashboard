@@ -152,12 +152,17 @@ _EXPORT_WORKSPACE_ICON = (
 
 
 def _inject_export_download_styles() -> None:
-    """Lighter PDF/Excel export buttons with file + download icons (data-URI SVGs)."""
+    """Styled PDF / Word / Excel export row (file + download icons, data-URI SVGs)."""
     from urllib.parse import quote
 
     svg_pdf = (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff">'
         '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 1.4L18.6 9H14V3.4zM8 12.5h8v1.25H8v-1.25zm0 3h6v1.25H8v-1.25z"/>'
+        "</svg>"
+    )
+    svg_doc = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff">'
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 1.4L18.6 9H14V3.4zM8 11h8v1.15H8V11zm0 2.65h8v1.15H8v-1.15zm0 2.65h6v1.15H8v-1.15z"/>'
         "</svg>"
     )
     svg_xls = (
@@ -174,15 +179,16 @@ def _inject_export_download_styles() -> None:
         '<path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M5 21h14"/>'
         "</svg>"
     )
-    u_pdf, u_xls, u_dl = (
+    u_pdf, u_doc, u_xls, u_dl = (
         quote(svg_pdf, safe=""),
+        quote(svg_doc, safe=""),
         quote(svg_xls, safe=""),
         quote(svg_dl, safe=""),
     )
     st.markdown(
         f"""
 <style>
-/* Compact export row: hug content, minimal space between PDF + Excel */
+/* Compact export row: PDF + Word + Excel */
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] {{
   display: flex !important;
   flex-direction: row !important;
@@ -281,14 +287,14 @@ def _inject_export_download_styles() -> None:
   font-size: 0.8125rem !important;
   line-height: 1.2 !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 12px rgba(34, 197, 94, 0.32) !important;
-  background: linear-gradient(145deg, #6ee7b7 0%, #34d399 42%, #16a34a 100%) !important;
-  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.35) !important;
+  background: linear-gradient(145deg, #dbeafe 0%, #93c5fd 42%, #3b82f6 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.12) !important;
 }}
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button:hover,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button:hover {{
   filter: brightness(1.05) saturate(1.05);
-  box-shadow: 0 3px 16px rgba(22, 163, 74, 0.38) !important;
+  box-shadow: 0 3px 16px rgba(37, 99, 235, 0.4) !important;
 }}
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::before,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::before {{
@@ -297,10 +303,57 @@ def _inject_export_download_styles() -> None:
   width: 1.05rem !important;
   height: 1.05rem !important;
   flex-shrink: 0 !important;
-  background: url("data:image/svg+xml,{u_xls}") center / contain no-repeat !important;
+  background: url("data:image/svg+xml,{u_doc}") center / contain no-repeat !important;
 }}
 [class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::after,
 [class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::after {{
+  content: "" !important;
+  display: block !important;
+  width: 0.9rem !important;
+  height: 0.9rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
+}}
+
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) .stDownloadButton > button,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) .stDownloadButton > button {{
+  width: auto !important;
+  min-height: 2.25rem !important;
+  height: auto !important;
+  padding: 0.4rem 0.7rem !important;
+  border-radius: 10px !important;
+  border: none !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 12px rgba(34, 197, 94, 0.28) !important;
+  background: linear-gradient(145deg, #d1fae5 0%, #86efac 45%, #22c55e 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button:hover,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button:hover {{
+  filter: brightness(1.05) saturate(1.05);
+  box-shadow: 0 3px 16px rgba(22, 163, 74, 0.36) !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button::before,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button::before {{
+  content: "" !important;
+  display: block !important;
+  width: 1.05rem !important;
+  height: 1.05rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_xls}") center / contain no-repeat !important;
+}}
+[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button::after,
+[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button::after {{
   content: "" !important;
   display: block !important;
   width: 0.9rem !important;
@@ -2753,7 +2806,7 @@ def _export_workspace_module_head_html(*, bundle_prep: bool) -> str:
 
 
 def _render_export_results_block(export_rows: list, n_valid: int) -> None:
-    """Anchor, copy, filename, and PDF/Excel downloads (used inside export workspace)."""
+    """Anchor, copy, filename, and PDF / Word / Excel downloads (used inside export workspace)."""
     st.markdown(
         '<div id="export-downloads-anchor"></div>',
         unsafe_allow_html=True,
