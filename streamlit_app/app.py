@@ -1782,81 +1782,157 @@ hr.export-workspace-split {
   margin-bottom: 0.65rem;
 }
 
-/* Site footer — light “glass” panel */
+/* Site footer — light band: logo + contact / library columns */
 .site-footer {
-  margin-top: 3rem;
-  margin-bottom: 2.25rem;
-  padding: 2rem 1.75rem 1.5rem;
-  background: linear-gradient(165deg, #ffffff 0%, #f9fbfd 45%, #f4f7fb 100%);
-  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding: 1.1rem 0 0.95rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8fc 100%);
   border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.38) !important;
   box-shadow:
-    0 4px 14px rgba(15, 23, 42, 0.04),
-    0 12px 28px rgba(148, 163, 184, 0.06);
+    0 4px 14px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
   scroll-margin-bottom: 3rem;
 }
-.site-footer-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2rem 2.5rem;
-  max-width: 1100px;
+.site-footer-inner {
+  max-width: 1120px;
   margin: 0 auto;
+  padding: 0 1.25rem;
 }
-@media (max-width: 768px) {
-  .site-footer-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.site-footer h4 {
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #5f74a0;
-  margin: 0 0 0.85rem 0;
-}
-.site-footer .sf-body {
-  margin: 0;
-  font-size: 0.92rem;
-  color: #4a5568;
-  line-height: 1.6;
-}
-.site-footer .sf-body + .sf-body {
-  margin-top: 0.5rem;
-}
-.site-footer a {
-  color: #5c7cfa;
-  font-weight: 600;
-  text-decoration: none;
-}
-.site-footer a:hover {
-  text-decoration: underline;
-  color: #4263eb;
-}
-.site-footer .sf-contact-row {
+.site-footer-main {
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin: 0 0 0.55rem 0;
-  font-size: 0.92rem;
-  color: #4a5568;
+  align-items: flex-start;
+  gap: 1.35rem 2rem;
 }
-.site-footer .sf-contact-row:last-child {
-  margin-bottom: 0;
-}
-.site-footer .sf-icon {
+.site-footer-brand {
   flex-shrink: 0;
-  color: #7b92b1;
-  opacity: 0.95;
+  padding-top: 0.15rem;
+}
+.site-footer-logo {
+  height: 48px;
+  width: auto;
+  max-width: min(200px, 38vw);
+  object-fit: contain;
+  opacity: 0.96;
+  display: block;
+}
+.site-footer-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1.75rem;
+  padding: 0.15rem 0 0 0.25rem;
+  border-left: 3px solid rgba(31, 55, 108, 0.12);
+}
+/* Use <p>, not <h2>: Streamlit markdown applies large default styles to headings */
+footer.site-footer p.site-footer-block-title {
+  margin: 0 0 0.4rem 0 !important;
+  padding: 0 !important;
+  font-size: calc(0.8125rem * 2) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.012em;
+  color: #1e3a5f !important;
+  line-height: 1.25 !important;
+  border: none !important;
+}
+.site-footer-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-footer-lines li {
+  margin: 0;
+  padding: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #334155;
+}
+.site-footer-lines a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #1f376c;
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.site-footer-lines a .site-footer-line-icon {
+  flex-shrink: 0;
+  width: 1.05em;
+  height: 1.05em;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.88;
+}
+.site-footer-lines a:hover,
+.site-footer-lines a:focus-visible {
+  color: #0f172a;
+  border-bottom-color: rgba(31, 55, 108, 0.35);
+  outline: none;
+}
+.site-footer-lines a:hover .site-footer-line-icon,
+.site-footer-lines a:focus-visible .site-footer-line-icon {
+  opacity: 1;
+}
+.site-footer-address {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #475569;
 }
 .site-footer-copy {
-  text-align: center;
-  margin: 2rem 0 0;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  margin: 0.75rem 0 0;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.32);
+  text-align: right;
+  color: #64748b;
   font-size: 0.78rem;
-  color: #4a5568;
-  line-height: 1.5;
+  line-height: 1.45;
+}
+@media (max-width: 720px) {
+  .site-footer-main {
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .site-footer-info {
+    border-left: none;
+    padding-left: 0;
+    padding-top: 0.65rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.28);
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+  .site-footer-copy {
+    text-align: left;
+  }
+}
+@media (max-width: 480px) {
+  .site-footer {
+    padding: 0.95rem 0 0.85rem;
+    border-radius: 10px;
+  }
+  .site-footer-inner {
+    padding: 0 0.85rem;
+  }
+  .site-footer-logo {
+    height: 40px;
+  }
+  footer.site-footer p.site-footer-block-title {
+    font-size: calc(0.78rem * 2) !important;
+  }
+  .site-footer-lines li,
+  .site-footer-address {
+    font-size: 0.8rem;
+  }
+  .site-footer-copy {
+    font-size: 0.74rem;
+  }
 }
 
 /* Stable key-based styling to reduce rerun flicker from :has selectors */
@@ -2059,41 +2135,49 @@ hr.export-workspace-split {
 
 
 def _render_footer_html() -> None:
-    """Footer: Resources / Contact / Address + copyright (light band, matches page theme)."""
+    """Footer: HKUST mark, library contact/address, copyright."""
     year = datetime.now().year
     st.markdown(
         f"""
 <footer class="site-footer" role="contentinfo">
-  <div class="site-footer-grid">
-    <div>
-      <h4>Resources</h4>
-      <p class="sf-body"><a href="https://library.hkust.edu.hk/" target="_blank" rel="noopener noreferrer">HKUST Library</a></p>
-    </div>
-    <div>
-      <h4>Contact &amp; Support</h4>
-      <div class="sf-contact-row">
-        <svg class="sf-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="m22 6-10 7L2 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <a href="mailto:lbrs@ust.hk">lbrs@ust.hk</a>
+  <div class="site-footer-inner">
+    <div class="site-footer-main">
+      <div class="site-footer-brand">
+        <a href="https://hkust.edu.hk/" target="_blank" rel="noopener noreferrer" aria-label="HKUST home">
+          <img class="site-footer-logo" src="{HKUST_LOGO}" alt="HKUST logo" />
+        </a>
       </div>
-      <div class="sf-contact-row">
-        <svg class="sf-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <a href="tel:+85223586772">+852 2358 6772</a>
+      <div class="site-footer-info" aria-label="Library contact and location">
+        <div>
+          <p class="site-footer-block-title">Contact &amp; Support</p>
+          <ul class="site-footer-lines">
+            <li>
+              <a href="mailto:lbrs@ust.hk">
+                <svg class="site-footer-line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+                lbrs@ust.hk
+              </a>
+            </li>
+            <li>
+              <a href="tel:+85223586772">
+                <svg class="site-footer-line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z"/></svg>
+                +852 2358 6772
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <p class="site-footer-block-title">HKUST Library</p>
+          <p class="site-footer-address">
+            Hong Kong University of Science and Technology<br />
+            Clear Water Bay, Hong Kong
+          </p>
+        </div>
       </div>
     </div>
-    <div>
-      <h4>HKUST Library</h4>
-      <p class="sf-body">Hong Kong University of Science and Technology</p>
-      <p class="sf-body">Clear Water Bay, Hong Kong</p>
-    </div>
+    <p class="site-footer-copy">
+      Copyright &copy; {year} The Hong Kong University of Science and Technology. All rights reserved.
+    </p>
   </div>
-  <p class="site-footer-copy">
-    © {year} Hong Kong University of Science and Technology Library. All rights reserved.
-  </p>
 </footer>
         """,
         unsafe_allow_html=True,
