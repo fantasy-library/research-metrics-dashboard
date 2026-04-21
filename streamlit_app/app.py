@@ -901,6 +901,22 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 .minimal-filter-icon-badge--funnel svg {
   color: #9c4121 !important;
 }
+.year-range-help {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #4b5563;
+  margin: 0.35rem 0 0 0;
+  padding: 0.55rem 0.7rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #eef0f3;
+}
+.year-range-help p {
+  margin: 0 0 0.45rem 0;
+}
+.year-range-help p:last-child {
+  margin-bottom: 0;
+}
 [class*="st-key-search_shell"] [data-testid="stSelectbox"] {
   margin-top: 0.05rem !important;
   margin-bottom: 0.22rem !important;
@@ -2038,8 +2054,16 @@ _METRICS_SESSION_DEFAULT_VERSION = 5
 YEAR_OPTIONS = {
     "3yrs": "Last 3 complete years — compact recent window",
     "3yrsAndCurrent": "Last 3 years + current year — includes in-progress year",
+    "3yrsAndCurrentAndFuture": (
+        "Last 3 years + current + future — completed years, in-progress year, "
+        "and indexed early-access with future pub dates"
+    ),
     "5yrs": "Last 5 complete years — balanced default window",
     "5yrsAndCurrent": "Last 5 years + current year — extended with current",
+    "5yrsAndCurrentAndFuture": (
+        "Last 5 years + current + future — widest recent window plus indexed "
+        "early-access with future pub dates"
+    ),
     "10yrs": "Last 10 complete years — long-term trend view",
 }
 MAX_AUTHORS_PER_RUN = 10
@@ -2048,8 +2072,10 @@ MAX_AUTHORS_PER_RUN = 10
 YEAR_OPTIONS_DISPLAY = {
     "3yrs": "Last 3 complete years",
     "3yrsAndCurrent": "Last 3 years + current year",
+    "3yrsAndCurrentAndFuture": "Last 3 years + current + future",
     "5yrs": "Last 5 years (default)",
     "5yrsAndCurrent": "Last 5 years + current year",
+    "5yrsAndCurrentAndFuture": "Last 5 years + current + future",
     "10yrs": "Last 10 complete years",
 }
 
@@ -2079,9 +2105,49 @@ SELF_CIT_RADIO_LABELS = {
 YEAR_FOOTNOTES = {
     "3yrs": "3 complete years",
     "3yrsAndCurrent": "3 complete years plus current year",
+    "3yrsAndCurrentAndFuture": "3 complete years, current year, and future-dated indexed items",
     "5yrs": "5 complete years",
     "5yrsAndCurrent": "5 complete years plus current year",
+    "5yrsAndCurrentAndFuture": "5 complete years, current year, and future-dated indexed items",
     "10yrs": "10 complete years",
+}
+
+# Shown under the Year select when the window includes “future” (SciVal yearRange).
+YEAR_RANGE_EXPANDED_HELP = {
+    "3yrsAndCurrentAndFuture": """
+<div class="year-range-help">
+
+<p><strong>Time Range: 3yrsAndCurrentAndFuture</strong></p>
+
+<p>Calculates metrics using a broad window for recent research output:</p>
+
+<p><strong>3yrs:</strong> The last 3 completed calendar years (stable data).</p>
+
+<p><strong>Current:</strong> The ongoing calendar year (maturing data).</p>
+
+<p><strong>Future:</strong> Indexed early-access papers with future official publication dates.</p>
+
+<p>Want a shorter rolling horizon that still blends stable history, the live year, and indexed forthcoming publications?</p>
+
+</div>
+""".strip(),
+    "5yrsAndCurrentAndFuture": """
+<div class="year-range-help">
+
+<p><strong>Time Range: 5yrsAndCurrentAndFuture</strong></p>
+
+<p>Calculates metrics using the widest available window for recent research output:</p>
+
+<p><strong>5yrs:</strong> The last 5 completed calendar years (stable data).</p>
+
+<p><strong>Current:</strong> The ongoing calendar year (maturing data).</p>
+
+<p><strong>Future:</strong> Indexed early-access papers with future official publication dates.</p>
+
+<p>Need the broadest mix of stable history, the in-progress year, and indexed ahead-of-print items?</p>
+
+</div>
+""".strip(),
 }
 
 SELF_CIT_HELP = (
@@ -3148,6 +3214,9 @@ def main() -> None:
                     label_visibility="collapsed",
                     key="year_filter_select",
                 )
+                _yr_help = YEAR_RANGE_EXPANDED_HELP.get(year_key)
+                if _yr_help:
+                    st.markdown(_yr_help, unsafe_allow_html=True)
             with fd:
                 st.markdown(
                     '<div class="minimal-filter-label">'
