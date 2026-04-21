@@ -514,6 +514,11 @@ class APIService:
             "yearRange": year_range,
             "includeSelfCitations": include_self_citations,
             "byYear": str(by_year).lower(),
+            # Match Elsevier SciVal browser / Data Fetcher examples (see dev.elsevier.com SciVal payloads).
+            # Requests without these sometimes differ in behaviour across metric types or tenants.
+            "journalImpactType": "CiteScore",
+            "showAsFieldWeighted": "false",
+            "indexType": "hIndex",
         }
         if inst:
             params["insttoken"] = inst
