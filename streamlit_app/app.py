@@ -1886,11 +1886,11 @@ footer.site-footer p.site-footer-block-title {
   line-height: 1.5;
   color: #475569;
 }
-.site-footer-copy {
+footer.site-footer .site-footer-copy {
   margin: 0.75rem 0 0;
   padding-top: 0.65rem;
   border-top: 1px solid rgba(148, 163, 184, 0.32);
-  text-align: right;
+  text-align: center !important;
   color: #64748b;
   font-size: 0.78rem;
   line-height: 1.45;
@@ -1907,9 +1907,6 @@ footer.site-footer p.site-footer-block-title {
     border-top: 1px solid rgba(148, 163, 184, 0.28);
     grid-template-columns: 1fr;
     gap: 0.85rem;
-  }
-  .site-footer-copy {
-    text-align: left;
   }
 }
 @media (max-width: 480px) {
@@ -1930,7 +1927,7 @@ footer.site-footer p.site-footer-block-title {
   .site-footer-address {
     font-size: 0.8rem;
   }
-  .site-footer-copy {
+  footer.site-footer .site-footer-copy {
     font-size: 0.74rem;
   }
 }
