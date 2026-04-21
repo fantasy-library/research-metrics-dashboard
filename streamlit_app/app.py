@@ -2191,13 +2191,17 @@ _METRICS_SESSION_DEFAULT_VERSION = 5
 
 YEAR_OPTIONS = {
     "3yrs": "Last 3 completed calendar years — compact recent window",
-    "3yrsAndCurrent": "Last 3 completed calendar years + current year — includes in-progress year",
+    "3yrsAndCurrent": (
+        "Last 3 completed calendar years + current year — includes the calendar year still in progress"
+    ),
     "3yrsAndCurrentAndFuture": (
         "Last 3 completed calendar years + current + future — adds indexed manuscripts "
         "whose official publication date is still in the future"
     ),
     "5yrs": "Last 5 completed calendar years — balanced default window",
-    "5yrsAndCurrent": "Last 5 completed calendar years + current year — extended with current",
+    "5yrsAndCurrent": (
+        "Last 5 completed calendar years + current year — includes the calendar year still in progress"
+    ),
     "5yrsAndCurrentAndFuture": (
         "Last 5 completed calendar years + current + future — widest recent window plus indexed "
         "manuscripts whose official publication date is still in the future"
@@ -2257,40 +2261,42 @@ YEAR_FOOTNOTES = {
 # Streamlit selectbox “?” — precise definition of the selected preset (SciVal yearRange).
 YEAR_SELECT_HELP = {
     "3yrs": (
-        "This preset: metrics use publication years in the last 3 completed calendar years only "
+        "For this preset, metrics use publication years in the last 3 completed calendar years only "
         "(SciVal yearRange 3yrs)."
     ),
     "3yrsAndCurrent": (
-        "This preset: the last 3 completed calendar years plus the ongoing calendar year "
+        "For this preset, metrics use the last 3 completed calendar years plus the ongoing calendar year "
         "(SciVal yearRange 3yrsAndCurrent)."
     ),
     "3yrsAndCurrentAndFuture": (
-        "This preset: the last 3 completed calendar years, the current calendar year, and indexed manuscripts "
-        "whose official publication date is still in the future (SciVal 3yrsAndCurrentAndFuture). "
-        "Which records appear depends on SciVal–Scopus indexing and updates."
+        "For this preset, metrics use the last 3 completed calendar years, the current calendar year, "
+        "and indexed manuscripts whose official publication date is still in the future "
+        "(SciVal 3yrsAndCurrentAndFuture). "
+        "Record inclusion depends on SciVal–Scopus indexing and updates."
     ),
     "5yrs": (
-        "This preset: metrics use publication years in the last 5 completed calendar years only "
+        "For this preset, metrics use publication years in the last 5 completed calendar years only "
         "(SciVal yearRange 5yrs)."
     ),
     "5yrsAndCurrent": (
-        "This preset: the last 5 completed calendar years plus the ongoing calendar year "
+        "For this preset, metrics use the last 5 completed calendar years plus the ongoing calendar year "
         "(SciVal yearRange 5yrsAndCurrent)."
     ),
     "5yrsAndCurrentAndFuture": (
-        "This preset: the last 5 completed calendar years, the current calendar year, and indexed manuscripts "
-        "whose official publication date is still in the future (SciVal 5yrsAndCurrentAndFuture). "
-        "Which records appear depends on SciVal–Scopus indexing and updates."
+        "For this preset, metrics use the last 5 completed calendar years, the current calendar year, "
+        "and indexed manuscripts whose official publication date is still in the future "
+        "(SciVal 5yrsAndCurrentAndFuture). "
+        "Record inclusion depends on SciVal–Scopus indexing and updates."
     ),
     "10yrs": (
-        "This preset: metrics use publication years in the last 10 completed calendar years only "
+        "For this preset, metrics use publication years in the last 10 completed calendar years only "
         "(SciVal yearRange 10yrs)."
     ),
 }
 
 # Label “?” — three building blocks only; details live in the Year dropdown help.
 YEAR_FILTER_LABEL_TOOLTIP_HTML = (
-    "<strong>SciVal year windows can mix:</strong><br />"
+    "<strong>Year range:</strong><br />"
     "• Completed calendar years<br />"
     "• The current calendar year<br />"
     "• Indexed manuscripts with a future official publication date<br />"
@@ -2941,7 +2947,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     line_opts = {
                         "animation": True,
                         "title": {
-                            "text": "Trends by years",
+                            "text": "Trends by year",
                             "subtext": line_short,
                             "left": "center",
                             "top": 8,
@@ -3047,8 +3053,8 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     # --- Bubble chart (three dimensions: SciVal period totals, no year) ---
     st.markdown("##### Benchmarking (Bubble chart)")
     st.caption(
-        "Each axis and bubble size use the **Total** value for your selected metric window "
-        "not a single calendar year."
+        "Values on both axes and for bubble size are **Total** values for your selected "
+        "metric window, not for a single calendar year."
     )
     bubble_metric_opts = [i for i in order_opts if i in en]
 
@@ -3316,8 +3322,8 @@ def main() -> None:
       <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a> via HKUST Library.
     </p>
     <p>
-      <strong>Important: Metric accuracy is contingent upon your Scopus Author ID integrity. We strongly recommend
-      verifying your profile to ensure all citations and publications are correctly attributed.</strong>
+      <strong>Important: Metric accuracy depends on a correct Scopus Author ID and profile. We strongly recommend
+      verifying your profile so that citations and publications are attributed correctly.</strong>
     </p>
     <p>
       Where institutional policy governs hiring, reappointment, tenure, or promotion, do not rely on this dashboard
@@ -3431,7 +3437,7 @@ def main() -> None:
                 f'{_limit_cls}"><span class="author-limit-icon" aria-hidden="true">👥</span>'
                 "<span><strong>Search up to "
                 f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
-                "Use commas, semicolons, or new lines to separate entries."
+                "Use commas, semicolons, or line breaks to separate entries."
                 '<span class="author-limit-count">'
                 f"{len(parsed_author_ids)}/{MAX_AUTHORS_PER_RUN} entered"
                 "</span></span></div>",
@@ -3695,12 +3701,12 @@ def main() -> None:
                         label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
                         opt_list_m = [i for i in order_opts_m if i in en_m]
                         st.markdown(
-                            '<p class="prepare-export-heading">Export Option</p>',
+                            '<p class="prepare-export-heading">Export options</p>',
                             unsafe_allow_html=True,
                         )
                         st.caption(
                             "Choose metrics to include, drag to set row order, then pick one or more "
-                            "authors. PDF/Excel in Export Results use only these choices."
+                            "authors. The PDF and Excel files produced in Export Results reflect only these choices."
                         )
                         picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
                             opt_list_m,
@@ -3738,7 +3744,7 @@ def main() -> None:
                         ]
                         if not picked_m or not export_scholar_pick:
                             st.info(
-                                "Select at least one metric and one author to build the export file."
+                                "Select at least one metric and one author before generating the export."
                             )
                         for r in valid:
                             if r["id"] not in export_scholar_pick:

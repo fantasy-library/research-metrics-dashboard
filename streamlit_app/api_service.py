@@ -170,7 +170,7 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
     ):
         return (
             "The service is temporarily limiting requests (rate limit). "
-            "Wait one to two minutes, then try again—or analyze fewer authors at once."
+            "Wait one to two minutes, then try again — or analyze fewer authors at once."
         )
 
     # Authentication
@@ -184,7 +184,7 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
         return (
             "Authentication failed (HTTP 401). Verify your Elsevier API key: use Settings, "
             "or set SCIVAL_API_KEY in Railway (or .env). If your institution requires it, "
-            "check ELSEVIER_INSTTOKEN too—wrong or missing tokens also return 401."
+            "check ELSEVIER_INSTTOKEN too — wrong or missing tokens also return 401."
         )
 
     # Forbidden (non-entitlement)
@@ -226,7 +226,7 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
         )
     if "500" in message or "internal server" in low:
         return (
-            "The API returned a server error. This is usually temporary—try again shortly. "
+            "The API returned a server error. This is usually temporary — try again shortly. "
             "If it persists, contact support with the time of the request."
         )
 
@@ -278,7 +278,7 @@ def format_error_message_for_user(
     if is_rate_limit_error:
         return (
             "The service is temporarily limiting requests (rate limit). "
-            "Wait one to two minutes, then try again—or analyze fewer authors at once."
+            "Wait one to two minutes, then try again — or analyze fewer authors at once."
         )
     s = message.strip()
     low = s.lower()
