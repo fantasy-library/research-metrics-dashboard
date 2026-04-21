@@ -321,6 +321,16 @@ def _inject_theme_css() -> None:
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap');
 
+/* Design tokens — primary actions & focus ring (Streamlit overrides use these hues) */
+:root {
+  --rm-primary: #673ab7;
+  --rm-primary-hover: #5e35b1;
+  --rm-focus-ring: rgba(103, 58, 183, 0.22);
+  --rm-radius-card: 12px;
+  --rm-radius-input: 12px;
+  --rm-radius-pill: 999px;
+}
+
 html, body, .stApp, [class*="stMarkdown"] {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
@@ -485,36 +495,89 @@ footer[data-testid="stFooter"] {
   display: none !important;
 }
 
-/* Full-width Analyze CTA (sibling after metrics card; marker span for styling) */
+/* Analyze CTA — centered pill (sibling after metrics card; marker span for styling) */
 [class*="st-key-analyze_zone"] {
   width: 100% !important;
-  margin-top: 0.05rem !important;
+  /* Pull button up toward metrics panel bottom border (stays outside the panel) */
+  margin-top: -1.35rem !important;
   margin-bottom: 0.3rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+[class*="st-key-analyze_zone"] [data-testid="stVerticalBlock"] {
+  width: 100% !important;
+  align-items: center !important;
+}
+[class*="st-key-analyze_zone"] [data-testid="element-container"] {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+[class*="st-key-analyze_zone"] .stButton {
+  display: flex !important;
+  justify-content: center !important;
+  width: auto !important;
+  max-width: 100% !important;
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"],
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] {
-  width: 100% !important;
-  min-height: 3.35rem !important;
+  width: min(100%, 56rem) !important;
+  min-width: min(100%, 560px) !important;
+  max-width: 56rem !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  min-height: 3.85rem !important;
   height: auto !important;
-  font-size: 1.22rem !important;
-  border-radius: 12px !important;
-  background: linear-gradient(180deg, #7c83ff 0%, #6366f1 100%) !important;
-  background-color: transparent !important;
-  color: #ffffff !important;
-  border: 1px solid #4f46e5 !important;
-  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.24) !important;
-  font-weight: 800 !important;
+  font-size: 1.2rem !important;
+  border-radius: 999px !important;
+  background: #fff5d6 !important;
+  background-image: none !important;
+  background-color: #fff5d6 !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  border: 1px solid rgba(0, 0, 0, 0.07) !important;
+  box-shadow:
+    0 4px 16px rgba(15, 23, 42, 0.07),
+    0 1px 3px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65) !important;
+  font-weight: 700 !important;
   letter-spacing: 0.02em !important;
-  text-shadow: 0 1px 0 rgba(49, 46, 129, 0.4);
-  transition: all 0.2s ease !important;
+  text-shadow: none !important;
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif !important;
+  cursor: pointer !important;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    -webkit-text-fill-color 0.2s ease !important;
+}
+[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"] p,
+[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] p,
+[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"] span,
+[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] span {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:hover,
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:hover {
-  background: linear-gradient(180deg, #6d74ff 0%, #5558eb 100%) !important;
-  border-color: #4338ca !important;
+  background: #673ab7 !important;
+  background-image: none !important;
+  background-color: #673ab7 !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
   color: #ffffff !important;
-  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.3) !important;
-  transform: translateY(-1px);
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow:
+    0 6px 24px rgba(103, 58, 183, 0.45),
+    0 0 0 3px rgba(103, 58, 183, 0.22),
+    0 2px 8px rgba(15, 23, 42, 0.12) !important;
+  transform: none !important;
+}
+[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:focus-visible,
+[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:focus-visible {
+  outline: 2px solid #673ab7 !important;
+  outline-offset: 3px !important;
 }
 
 /* Metric toggle cards: stronger “on” vs “off” affordance */
@@ -728,12 +791,6 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 [class*="st-key-filter_panel_peach"] h3 {
   display: none !important;
 }
-/* Search, year/docs/self-cite filters, metrics: same white inset as .dash-top-header / .site-footer */
-[class*="st-key-search_shell"],
-[class*="st-key-metrics_panel_shell"] {
-  padding: 2rem 1.75rem 1.5rem !important;
-  background: #ffffff !important;
-}
 /* Partition: extra air between Search / IDs and filter cards */
 .search-to-filters-gap {
   margin-bottom: 30px !important;
@@ -843,22 +900,13 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   box-shadow: 0 3px 14px rgba(124, 58, 237, 0.15), inset 0 1px 0 #fff;
 }
 
-/* —— Search configuration (minimal, compact, single-column flow) —— */
-[class*="st-key-search_shell"] {
-  padding: 1rem 1.05rem 0.9rem !important;
-  border: 1px solid #E5E7EB !important;
-  border-left: 1px solid #E5E7EB !important;
-  border-radius: 12px !important;
-  background: #ffffff !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
-  margin-bottom: 0.95rem !important;
-}
+/* —— Search configuration (shell + widgets: final shell tokens live in “Stable key-based” block) —— */
 .search-config-title {
   margin: 0 0 0.65rem 0 !important;
   font-family: 'Inter', 'Segoe UI', sans-serif !important;
   font-size: 1.25rem !important;
   font-weight: 600 !important;
-  letter-spacing: 0.07em !important;
+  letter-spacing: 0.055em !important;
   text-transform: uppercase !important;
   color: #111827 !important;
 }
@@ -871,6 +919,72 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   font-weight: 700 !important;
   color: #374151 !important;
   letter-spacing: 0.01em;
+}
+[class*="st-key-search_shell"] .minimal-filter-label {
+  overflow: visible !important;
+  position: relative;
+  z-index: 2;
+}
+.year-filter-label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.year-filter-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  outline: none;
+}
+.year-filter-tip-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #4b5563;
+  background: #e5e7eb;
+  border: 1px solid #d1d5db;
+  cursor: help;
+}
+.year-filter-tip:hover .year-filter-tip-marker,
+.year-filter-tip:focus .year-filter-tip-marker,
+.year-filter-tip:focus-within .year-filter-tip-marker {
+  background: #ede7f6;
+  border-color: #b39ddb;
+  color: #5e35b1;
+}
+.year-filter-tip-popup {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 100;
+  width: min(18.5rem, 78vw);
+  padding: 0.55rem 0.65rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #1f2937;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+.year-filter-tip:hover .year-filter-tip-popup,
+.year-filter-tip:focus .year-filter-tip-popup,
+.year-filter-tip:focus-within .year-filter-tip-popup {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 /* Circular “FAB” badge: white disc, hairline border, soft shadow (filter row icons) */
 .minimal-filter-icon-badge {
@@ -901,29 +1015,13 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 .minimal-filter-icon-badge--funnel svg {
   color: #9c4121 !important;
 }
-.year-range-help {
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: #4b5563;
-  margin: 0.35rem 0 0 0;
-  padding: 0.55rem 0.7rem;
-  background: #f9fafb;
-  border-radius: 8px;
-  border: 1px solid #eef0f3;
-}
-.year-range-help p {
-  margin: 0 0 0.45rem 0;
-}
-.year-range-help p:last-child {
-  margin-bottom: 0;
-}
 [class*="st-key-search_shell"] [data-testid="stSelectbox"] {
   margin-top: 0.05rem !important;
   margin-bottom: 0.22rem !important;
 }
 [class*="st-key-search_shell"] [data-baseweb="select"] > div {
-  border: 1px solid #E5E7EB !important;
-  border-radius: 10px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
   background: #ffffff !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
   min-height: 42px !important;
@@ -936,17 +1034,6 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   font-size: 0.875rem !important;
   font-weight: 500 !important;
   color: #4B5563 !important;
-}
-[class*="st-key-search_shell"] textarea {
-  border: 1px solid #E5E7EB !important;
-  border-radius: 10px !important;
-  padding: 0.75rem 0.85rem !important;
-  background: #ffffff !important;
-  color: #111827 !important;
-  -webkit-text-fill-color: #111827 !important;
-  caret-color: #111827 !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
-  min-height: 96px !important;
 }
 [class*="st-key-search_shell"] textarea::placeholder {
   color: #9CA3AF !important;
@@ -980,10 +1067,6 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 [class*="st-key-search_shell"] .author-limit-count {
   font-weight: 700;
   margin-left: 0.25rem;
-}
-[class*="st-key-search_shell"] textarea:focus {
-  border-color: #5D5CDE !important;
-  box-shadow: 0 0 0 3px rgba(93, 92, 222, 0.14) !important;
 }
 .minimal-section-divider {
   border-top: 1px solid #E5E7EB;
@@ -1051,7 +1134,7 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   flex-shrink: 0;
 }
 [class*="st-key-search_shell"] .stRadio input {
-  accent-color: #7c3aed !important;
+  accent-color: #673ab7 !important;
 }
 .minimal-go-analyze-wrap {
   display: flex;
@@ -1063,23 +1146,45 @@ a.minimal-go-analyze-btn,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 250px;
-  padding: 0.56rem 1.2rem !important;
-  border-radius: 10px !important;
-  border: 1px solid #5D5CDE !important;
-  background: #5D5CDE !important;
-  color: #ffffff !important;
+  min-width: min(250px, 100%);
+  max-width: 28rem;
+  padding: 0.56rem 1.35rem !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(0, 0, 0, 0.07) !important;
+  background: #fff5d6 !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
   text-decoration: none !important;
   font-size: 0.98rem !important;
   font-weight: 600 !important;
-  box-shadow: 0 6px 18px rgba(93, 92, 222, 0.25) !important;
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif !important;
+  box-shadow:
+    0 4px 16px rgba(15, 23, 42, 0.07),
+    0 1px 3px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65) !important;
+  cursor: pointer !important;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    -webkit-text-fill-color 0.2s ease !important;
 }
 a.minimal-go-analyze-btn:hover,
 .minimal-go-analyze-btn:hover {
-  background: #4f4ec8 !important;
-  border-color: #4f4ec8 !important;
+  background: #673ab7 !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
   color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
   text-decoration: none !important;
+  box-shadow:
+    0 6px 20px rgba(103, 58, 183, 0.35),
+    0 2px 6px rgba(15, 23, 42, 0.1) !important;
+}
+a.minimal-go-analyze-btn:focus-visible,
+.minimal-go-analyze-btn:focus-visible {
+  outline: 2px solid #673ab7 !important;
+  outline-offset: 3px !important;
 }
 
 /* Compare — trends & bubble: narrow control column, chart uses remaining width */
@@ -1123,18 +1228,17 @@ a.minimal-go-analyze-btn:hover,
   line-height: 1.35 !important;
 }
 
-/* Metrics container: white elevated card (same chrome as header/footer band) */
+/* Metrics container: white card + purple accent rail (calmer than full tint) */
 [class*="st-key-metrics_panel_shell"]:not(:has(span.skin-unified-form-shell)) {
-  background: #f5f3ff !important;
+  background: #ffffff !important;
   border: 1px solid rgba(226, 232, 240, 0.95) !important;
   border-left: 4px solid #7c3aed !important;
   border-radius: 12px !important;
   padding: 2rem 1.75rem 1.5rem !important;
   margin: 0.5rem 0 0.55rem 0 !important;
   box-shadow:
-    0 4px 8px rgba(15, 23, 42, 0.04),
-    0 14px 32px rgba(99, 102, 241, 0.08),
-    0 24px 48px rgba(15, 23, 42, 0.06) !important;
+    0 4px 8px rgba(15, 23, 42, 0.05),
+    0 12px 28px rgba(15, 23, 42, 0.06) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -1311,9 +1415,27 @@ p.metric-subtext {
   padding: 0 !important;
   line-height: 1.5 !important;
 }
-/* Anchor for “Go to Analyze” link */
-#analyze-metrics-anchor {
+/* Anchor for “Go to Analyze” link — zero layout height, keeps scroll target */
+#analyze-metrics-anchor.analyze-anchor-tight {
   scroll-margin-top: 1rem;
+  display: block;
+  height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+}
+[data-testid="element-container"]:has(#analyze-metrics-anchor) {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+[data-testid="element-container"]:has(#analyze-metrics-anchor) [data-testid="stMarkdownContainer"] {
+  margin-bottom: 0 !important;
+}
+[data-testid="element-container"]:has(#analyze-metrics-anchor) [data-testid="stMarkdownContainer"] p {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
 }
 /* Anchor for “Download all” jump (PDF / Excel at end of results) */
 #export-downloads-anchor {
@@ -1734,56 +1856,43 @@ hr.export-workspace-split {
 [class*="st-key-search_shell"] {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-left: 4px solid #e8eef7 !important;
+  border-left: 4px solid #dbe4f0 !important;
   border-radius: 12px !important;
   padding: 2rem 1.75rem 1.5rem !important;
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  margin-bottom: 0.95rem !important;
 }
 [class*="st-key-search_shell"] textarea {
-  border: 2px solid #e2e8f0 !important;
-  border-radius: 16px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 0.75rem 0.85rem !important;
   background: #ffffff !important;
   color: #0f172a !important;
   -webkit-text-fill-color: #0f172a !important;
   caret-color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+  min-height: 96px !important;
+}
+[class*="st-key-search_shell"] textarea:focus {
+  border-color: #673ab7 !important;
+  box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.2) !important;
 }
 
 [class*="st-key-metrics_panel_shell"] {
-  background: #f5f3ff !important;
+  background: #ffffff !important;
   border: 1px solid rgba(226, 232, 240, 0.95) !important;
   border-left: 4px solid #7c3aed !important;
   border-radius: 12px !important;
   padding: 2rem 1.75rem 1.5rem !important;
+  /* Tighten gap before Analyze row (button remains outside this shell) */
+  margin-bottom: -0.5rem !important;
 }
 [class*="st-key-metrics_grid_shell"],
 [class*="st-key-collab_metrics_shell"] {
   background: transparent !important;
   border: none !important;
-}
-[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"],
-[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] {
-  width: 100% !important;
-  min-height: 3.35rem !important;
-  border-radius: 12px !important;
-  background: linear-gradient(180deg, #7c83ff 0%, #6366f1 100%) !important;
-  background-color: transparent !important;
-  color: #ffffff !important;
-  border: 1px solid #4f46e5 !important;
-  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.24) !important;
-  font-size: 1.22rem !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.02em !important;
-  text-shadow: 0 1px 0 rgba(49, 46, 129, 0.4);
-}
-[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:hover,
-[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:hover {
-  background: linear-gradient(180deg, #6d74ff 0%, #5558eb 100%) !important;
-  border-color: #4338ca !important;
-  color: #ffffff !important;
-  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.3) !important;
-  transform: translateY(-1px);
 }
 
 /* -------- Streamlit DOM-safe final overrides (keep at end) --------
@@ -2112,43 +2221,29 @@ YEAR_FOOTNOTES = {
     "10yrs": "10 complete years",
 }
 
-# Shown under the Year select when the window includes “future” (SciVal yearRange).
-YEAR_RANGE_EXPANDED_HELP = {
-    "3yrsAndCurrentAndFuture": """
-<div class="year-range-help">
-
-<p><strong>Time Range: 3yrsAndCurrentAndFuture</strong></p>
-
-<p>Calculates metrics using a broad window for recent research output:</p>
-
-<p><strong>3yrs:</strong> The last 3 completed calendar years (stable data).</p>
-
-<p><strong>Current:</strong> The ongoing calendar year (maturing data).</p>
-
-<p><strong>Future:</strong> Indexed early-access papers with future official publication dates.</p>
-
-<p>Want a shorter rolling horizon that still blends stable history, the live year, and indexed forthcoming publications?</p>
-
-</div>
-""".strip(),
-    "5yrsAndCurrentAndFuture": """
-<div class="year-range-help">
-
-<p><strong>Time Range: 5yrsAndCurrentAndFuture</strong></p>
-
-<p>Calculates metrics using the widest available window for recent research output:</p>
-
-<p><strong>5yrs:</strong> The last 5 completed calendar years (stable data).</p>
-
-<p><strong>Current:</strong> The ongoing calendar year (maturing data).</p>
-
-<p><strong>Future:</strong> Indexed early-access papers with future official publication dates.</p>
-
-<p>Need the broadest mix of stable history, the in-progress year, and indexed ahead-of-print items?</p>
-
-</div>
-""".strip(),
+# Streamlit selectbox “?” tooltip (compact; text follows SciVal yearRange semantics).
+YEAR_SELECT_HELP = {
+    "3yrs": "Last 3 completed calendar years only.",
+    "3yrsAndCurrent": "Last 3 completed calendar years plus the ongoing current year.",
+    "3yrsAndCurrentAndFuture": (
+        "Includes the 3 most recently completed calendar years, the ongoing current year, "
+        'and early-access "Articles in Press" with future publication dates.'
+    ),
+    "5yrs": "Last 5 completed calendar years only.",
+    "5yrsAndCurrent": "Last 5 completed calendar years plus the ongoing current year.",
+    "5yrsAndCurrentAndFuture": (
+        "Includes the 5 most recently completed calendar years, the ongoing current year, "
+        'and early-access "Articles in Press" with future publication dates.'
+    ),
+    "10yrs": "Last 10 completed calendar years only.",
 }
+
+# HTML body for the “?” popup next to the Year filter label (not the selectbox help).
+YEAR_FILTER_LABEL_TOOLTIP_HTML = (
+    "<strong>Options:</strong><br />"
+    "The most recently completed calendar years, the ongoing current year, and "
+    'early-access &quot;Articles in Press&quot; with future publication dates.'
+)
 
 SELF_CIT_HELP = (
     "Self-citations are citations where an author cites their own previous work."
@@ -3203,9 +3298,19 @@ def main() -> None:
                 st.markdown(
                     '<div class="minimal-filter-label">'
                     f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--calendar" '
-                    f'aria-hidden="true">{_FILTER_ICON_CALENDAR}</span><span>Year</span></div>',
+                    f'aria-hidden="true">{_FILTER_ICON_CALENDAR}</span>'
+                    '<span class="year-filter-label-with-tip">'
+                    "<span>Year</span>"
+                    '<span class="year-filter-tip" tabindex="0" role="button" '
+                    'aria-label="Year range options, details in tooltip">'
+                    '<span class="year-filter-tip-marker" aria-hidden="true">?</span>'
+                    '<span class="year-filter-tip-popup" role="tooltip" '
+                    'id="year-range-options-tooltip">'
+                    f"{YEAR_FILTER_LABEL_TOOLTIP_HTML}"
+                    "</span></span></span></div>",
                     unsafe_allow_html=True,
                 )
+                _year_help_key = st.session_state.get("year_filter_select", "5yrs")
                 year_key = st.selectbox(
                     "Year",
                     options=list(YEAR_OPTIONS.keys()),
@@ -3213,10 +3318,10 @@ def main() -> None:
                     index=list(YEAR_OPTIONS.keys()).index("5yrs"),
                     label_visibility="collapsed",
                     key="year_filter_select",
+                    help=YEAR_SELECT_HELP.get(
+                        _year_help_key, YEAR_SELECT_HELP["5yrs"]
+                    ),
                 )
-                _yr_help = YEAR_RANGE_EXPANDED_HELP.get(year_key)
-                if _yr_help:
-                    st.markdown(_yr_help, unsafe_allow_html=True)
             with fd:
                 st.markdown(
                     '<div class="minimal-filter-label">'
@@ -3366,7 +3471,7 @@ def main() -> None:
                                         )
 
         st.markdown(
-            '<div id="analyze-metrics-anchor"></div>',
+            '<div id="analyze-metrics-anchor" class="analyze-anchor-tight"></div>',
             unsafe_allow_html=True,
         )
         if not st.session_state.get("_deep_link_analyze_injected"):
@@ -3378,9 +3483,9 @@ def main() -> None:
                 unsafe_allow_html=True,
             )
             if st.button(
-                "📈 Analyze Metrics",
+                "📊 Analyze Metrics",
                 type="primary",
-                use_container_width=True,
+                use_container_width=False,
             ):
                 st.session_state.error_msg = ""
                 st.session_state.entitlement_error = False
