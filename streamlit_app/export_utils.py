@@ -1,4 +1,4 @@
-"""PDF and Excel export — ported from src/utils/exportUtils.ts."""
+"""PDF, Word (.docx), and Excel export — ported from src/utils/exportUtils.ts."""
 
 from __future__ import annotations
 
@@ -7,6 +7,9 @@ import re
 from datetime import date
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches
 from fpdf import FPDF
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -537,3 +540,153 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
     wb.save(buf)
     # Ensure strict bytes for st.download_button
     return bytes(buf.getvalue()), f"{name}.xlsx"
+
+
+def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research-metrics") -> Tuple[bytes, str]:
+    """Export the same metric tables as Excel, as a Word (.docx) document."""
+    validated = _validate_export_data(data)
+    name = _sanitize_filename(filename_base)
+    doc = Document()
+    h0 = doc.add_heading("SciVal Research Metrics Report", 0)
+    h0.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p0 = doc.add_paragraph(f"Generated on: {date.today().isoformat()}")
+    p0.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph()
+
+    for index, author_data in enumerate(validated):
+        if index > 0:
+            doc.add_page_break()
+
+        if len(validated) > 1:
+            doc.add_heading(f"Author {index + 1}", level=1)
+
+        line2 = (
+            f"Author: {author_data.get('authorName', '')} (ID: {author_data['authorId']})"
+            if author_data.get("authorName")
+            else f"Author ID: {author_data['authorId']}"
+        )
+        doc.add_paragraph(line2)
+
+        ds = author_data.get("dataSource")
+        if ds:
+            doc.add_paragraph(f"Source: {ds.get('sourceName', '')}")
+            doc.add_paragraph(f"Last Updated: {ds.get('lastUpdated', '')}")
+            doc.add_paragraph(
+                f"Period: {ds.get('metricStartYear', '')} - {ds.get('metricEndYear', '')}"
+            )
+
+        years = _get_dynamic_years(author_data)
+        selected = _get_selected_metrics(author_data)
+        metrics = author_data.get("metrics") or {}
+
+        if not selected:
+            doc.add_paragraph("No metrics selected for export")
+            continue
+
+        headers = ["Metric"] + years + ["Total"]
+        ncols = len(headers)
+        table = doc.add_table(rows=1, cols=ncols)
+        table.style = "Table Grid"
+        hdr_cells = table.rows[0].cells
+        for c, h in enumerate(headers):
+            hdr_cells[c].text = str(h)
+            for run in hdr_cells[c].paragraphs[0].runs:
+                run.bold = True
+
+        for metric in selected:
+            get_data: MetricGetter = metric["getData"]
+            d = get_data(metrics)
+            mid = metric["id"]
+            row_cells = table.add_row().cells
+            if metric["isYearBased"]:
+                cells = [metric["label"]]
+                for y in years:
+                    v = (d.get("byYear") or {}).get(y)
+                    if v is not None:
+                        if mid in ("fwci", "citationsPerPublication"):
+                            cells.append(f"{float(v):.2f}")
+                        else:
+                            cells.append(str(round(v)))
+                    else:
+                        cells.append("N/A")
+                tot = d.get("total")
+                if isinstance(tot, (int, float)):
+                    if mid in ("fwci", "citationsPerPublication", "topJournal"):
+                        cells.append(f"{float(tot):.2f}")
+                    else:
+                        cells.append(str(round(tot)))
+                else:
+                    cells.append(str(tot))
+            else:
+                tot = d.get("total")
+                cells = [metric["label"]] + ["N/A"] * len(years)
+                if isinstance(tot, (int, float)):
+                    if mid in ("fwci", "citationsPerPublication", "topJournal"):
+                        cells.append(f"{float(tot):.2f}")
+                    else:
+                        cells.append(str(round(tot)))
+                else:
+                    cells.append(str(tot))
+            for c, val in enumerate(cells):
+                row_cells[c].text = str(val)
+
+        try:
+            table.columns[0].width = Inches(1.9)
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+        collab_m = next((m for m in selected if m["id"] == "collaboration"), None)
+        if collab_m and (metrics.get("collaboration") or {}).get("collaborationTypes"):
+            doc.add_paragraph()
+            doc.add_heading("Collaboration Breakdown", level=2)
+            ct = doc.add_table(rows=1, cols=2)
+            ct.style = "Table Grid"
+            ct.rows[0].cells[0].text = "Collaboration Type"
+            ct.rows[0].cells[1].text = "Average %"
+            for run in ct.rows[0].cells[0].paragraphs[0].runs:
+                run.bold = True
+            for run in ct.rows[0].cells[1].paragraphs[0].runs:
+                run.bold = True
+            for tname, tdata in metrics["collaboration"]["collaborationTypes"].items():
+                label = re.sub(r"([A-Z])", r" \1", tname).strip()
+                r = ct.add_row().cells
+                r[0].text = label
+                tot = tdata.get("total")
+                r[1].text = (
+                    f"{float(tot):.2f}"
+                    if isinstance(tot, (int, float))
+                    else str(tot)
+                )
+
+        acc_m = next(
+            (m for m in selected if m["id"] == "academicCorporateCollaboration"), None
+        )
+        if acc_m and (metrics.get("academicCorporateCollaboration") or {}).get(
+            "collaborationTypes"
+        ):
+            doc.add_paragraph()
+            doc.add_heading("Academic Corporate Collaboration Breakdown", level=2)
+            ct2 = doc.add_table(rows=1, cols=2)
+            ct2.style = "Table Grid"
+            ct2.rows[0].cells[0].text = "Collaboration Type"
+            ct2.rows[0].cells[1].text = "Average %"
+            for run in ct2.rows[0].cells[0].paragraphs[0].runs:
+                run.bold = True
+            for run in ct2.rows[0].cells[1].paragraphs[0].runs:
+                run.bold = True
+            for tname, tdata in metrics["academicCorporateCollaboration"][
+                "collaborationTypes"
+            ].items():
+                label = re.sub(r"([A-Z])", r" \1", tname).strip()
+                r = ct2.add_row().cells
+                r[0].text = label
+                tot = tdata.get("total")
+                r[1].text = (
+                    f"{float(tot):.2f}"
+                    if isinstance(tot, (int, float))
+                    else str(tot)
+                )
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return bytes(buf.getvalue()), f"{name}.docx"

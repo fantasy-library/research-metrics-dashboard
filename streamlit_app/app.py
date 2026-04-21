@@ -32,7 +32,7 @@ from streamlit_app.api_service import (
     resolve_author_ids_for_metrics_safe,
 )
 from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_API
-from streamlit_app.export_utils import export_excel_bytes, export_pdf_bytes
+from streamlit_app.export_utils import export_docx_bytes, export_excel_bytes, export_pdf_bytes
 
 st.set_page_config(
     page_title="Research Metrics Dashboard",
@@ -2736,10 +2736,10 @@ def _export_workspace_module_head_html(*, bundle_prep: bool) -> str:
     title = "Export workspace"
     if bundle_prep:
         desc = (
-            "Choose export options below, then download PDF or Excel."
+            "Choose export options below, then download PDF, Word, or Excel."
         )
     else:
-        desc = "Choose export options below, then download PDF or Excel."
+        desc = "Choose export options below, then download PDF, Word, or Excel."
     return (
         '<header class="export-workspace-module-head" role="presentation">'
         '<div class="export-workspace-module-head-row">'
@@ -2759,12 +2759,12 @@ def _render_export_results_block(export_rows: list, n_valid: int) -> None:
         unsafe_allow_html=True,
     )
     export_body_sub = (
-        "Download your research metrics in PDF or Excel. Set the filename below. "
+        "Download your research metrics in PDF, Word, or Excel. Set the filename below. "
         "The export uses the metrics and table row order from steps (1)–(2), "
         "and only the author(s) checked in step (3)."
         if n_valid > 1
         else (
-            "Download your research metrics in PDF or Excel. Set the filename below."
+            "Download your research metrics in PDF, Word, or Excel. Set the filename below."
         )
     )
     with st.container(border=True, key="export_results_shell"):
@@ -2785,7 +2785,7 @@ def _render_export_results_block(export_rows: list, n_valid: int) -> None:
         fn = st.text_input(
             "Export filename (without extension)", value="research-metrics"
         )
-        b1, b2 = st.columns(2, gap="xxsmall")
+        b1, b2, b3 = st.columns(3, gap="xxsmall")
         with b1:
             pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
             st.download_button(
@@ -2796,6 +2796,15 @@ def _render_export_results_block(export_rows: list, n_valid: int) -> None:
                 use_container_width=False,
             )
         with b2:
+            doc_b, doc_n = export_docx_bytes(export_rows, fn)
+            st.download_button(
+                "Export as Word",
+                doc_b,
+                file_name=doc_n,
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=False,
+            )
+        with b3:
             xl_b, xl_n = export_excel_bytes(export_rows, fn)
             st.download_button(
                 "Export as Excel",
@@ -3916,20 +3925,35 @@ def main() -> None:
                         df = pd.DataFrame(table_rows, columns=col_names)
                         st.dataframe(df, use_container_width=True, hide_index=True)
                         try:
+                            dl_w, dl_x = st.columns(2, gap="xxsmall")
+                            doc_author_b, doc_author_n = export_docx_bytes(
+                                [author_export_payload],
+                                f"research-metrics-{aid}",
+                            )
+                            with dl_w:
+                                st.download_button(
+                                    "Download this table (Word)",
+                                    doc_author_b,
+                                    file_name=doc_author_n,
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    key=f"export_docx_author_{aid}_{card_idx}",
+                                    use_container_width=False,
+                                )
                             xl_author_b, xl_author_n = export_excel_bytes(
                                 [author_export_payload],
                                 f"research-metrics-{aid}",
                             )
-                            st.download_button(
-                                "Download this table (Excel)",
-                                xl_author_b,
-                                file_name=xl_author_n,
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                key=f"export_xl_author_{aid}_{card_idx}",
-                                use_container_width=False,
-                            )
+                            with dl_x:
+                                st.download_button(
+                                    "Download this table (Excel)",
+                                    xl_author_b,
+                                    file_name=xl_author_n,
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    key=f"export_xl_author_{aid}_{card_idx}",
+                                    use_container_width=False,
+                                )
                         except Exception:
-                            st.caption("Could not build Excel file for this author.")
+                            st.caption("Could not build Word/Excel file for this author.")
     
                         years = []
                         for c in col_names[1:-1]:
