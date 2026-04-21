@@ -495,7 +495,7 @@ footer[data-testid="stFooter"] {
   display: none !important;
 }
 
-/* Analyze CTA — centered pill (sibling after metrics card; marker span for styling) */
+/* Analyze CTA — full-width pill (label centered, wide bar like reference) */
 [class*="st-key-analyze_zone"] {
   width: 100% !important;
   /* Pull button up toward metrics panel bottom border (stays outside the panel) */
@@ -503,34 +503,41 @@ footer[data-testid="stFooter"] {
   margin-bottom: 0.3rem !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: center !important;
+  align-items: stretch !important;
 }
 [class*="st-key-analyze_zone"] [data-testid="stVerticalBlock"] {
   width: 100% !important;
-  align-items: center !important;
+  align-items: stretch !important;
 }
 [class*="st-key-analyze_zone"] [data-testid="element-container"] {
-  display: flex !important;
-  justify-content: center !important;
+  display: block !important;
   width: 100% !important;
+  max-width: 100% !important;
 }
 [class*="st-key-analyze_zone"] .stButton {
-  display: flex !important;
-  justify-content: center !important;
-  width: auto !important;
+  display: block !important;
+  width: 100% !important;
   max-width: 100% !important;
+}
+[class*="st-key-analyze_zone"] .stButton > button {
+  width: 100% !important;
 }
 [class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"],
 [class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] {
-  width: min(100%, 56rem) !important;
-  min-width: min(100%, 560px) !important;
-  max-width: 56rem !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
   min-height: 3.85rem !important;
   height: auto !important;
   font-size: 1.2rem !important;
   border-radius: 999px !important;
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   background: #fff5d6 !important;
   background-image: none !important;
   background-color: #fff5d6 !important;
@@ -2022,6 +2029,28 @@ hr.export-workspace-split {
 [class*="st-key-export_results_shell"] [data-testid="stTextInput"] {
   margin-bottom: 0.65rem !important;
 }
+/* Filename field: clear bordered box (Streamlit BaseWeb + plain input) */
+[class*="st-key-export_results_shell"] [data-testid="stTextInput"] div[data-baseweb="input"] {
+  border: 1px solid #64748b !important;
+  border-radius: 10px !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  min-height: 2.65rem !important;
+}
+[class*="st-key-export_results_shell"] [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+  border-color: #673ab7 !important;
+  box-shadow: 0 0 0 2px rgba(103, 58, 183, 0.2) !important;
+}
+[class*="st-key-export_results_shell"] [data-testid="stTextInput"] div[data-baseweb="input"] input {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  font-size: 0.95rem !important;
+  padding: 0.55rem 0.75rem !important;
+}
 </style>
         """,
         unsafe_allow_html=True,
@@ -2601,10 +2630,7 @@ def _export_workspace_module_head_html(*, bundle_prep: bool) -> str:
             "Choose export options below, then download PDF or Excel."
         )
     else:
-        desc = (
-            "Separate from the tables and charts above: combined PDF/Excel use the metric "
-            "rows and scholars from this run."
-        )
+        desc = "Choose export options below, then download PDF or Excel."
     return (
         '<header class="export-workspace-module-head" role="presentation">'
         '<div class="export-workspace-module-head-row">'
@@ -2628,8 +2654,7 @@ def _render_export_results_block(export_rows: list, n_valid: int) -> None:
         "Set the filename below; the file includes only the scholar(s) and metrics you selected above."
         if n_valid > 1
         else (
-            "Download your research metrics in PDF or Excel. "
-            "Set the filename below; the file includes all authors in this run."
+            "Download your research metrics in PDF or Excel. Set the filename below."
         )
     )
     with st.container(border=True, key="export_results_shell"):
@@ -3485,7 +3510,7 @@ def main() -> None:
             if st.button(
                 "📊 Analyze Metrics",
                 type="primary",
-                use_container_width=False,
+                use_container_width=True,
             ):
                 st.session_state.error_msg = ""
                 st.session_state.entitlement_error = False
