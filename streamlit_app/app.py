@@ -2375,15 +2375,12 @@ YEAR_SELECT_HELP = {
     ),
 }
 
-# Label “?” — three building blocks only; details live in the Year dropdown help.
+# Year “?” tooltip — short summary of what the year window can include.
 YEAR_FILTER_LABEL_TOOLTIP_HTML = (
     "<strong>Year range:</strong><br />"
     "• Completed calendar years<br />"
     "• The current calendar year<br />"
     "• Indexed manuscripts with a future official publication date<br />"
-    "<span style=\"font-size:0.85em;color:#64748b\">"
-    "Open the <strong>Year</strong> dropdown and use its (?) help for the exact wording of each preset."
-    "</span>"
 )
 
 SELF_CIT_HELP = (
