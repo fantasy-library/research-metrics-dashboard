@@ -12,7 +12,6 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
 
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
@@ -44,19 +43,6 @@ st.set_page_config(
 
 HKUST_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/profiles/ust/modules/custom/hkust_signature_affiliate/assets/images/HKUST-logo.png"
 LIB_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/core/assets/library/library_logo.png_transparent_bkgd_h300.png"
-
-# HKUST Library EZproxy — shareable links for on/off-campus access to licensed resources.
-EZPROXY_LOGIN_PREFIX = "https://lib.ezproxy.hkust.edu.hk/login?url="
-
-
-def _ezproxy_wrap(url: str) -> str:
-    """Wrap a resource URL with HKUST EZproxy (library.hkust pattern)."""
-    u = (url or "").strip()
-    if not u or u.lower().startswith("mailto:") or u.lower().startswith("tel:"):
-        return u
-    if "lib.ezproxy.hkust.edu.hk" in u:
-        return u
-    return EZPROXY_LOGIN_PREFIX + quote(u, safe="")
 
 # Defer #analyze-metrics-anchor scroll until the node exists (avoids “wrong view then jump”).
 _DEEP_LINK_ANALYZE_HTML = """
@@ -1900,29 +1886,6 @@ footer.site-footer p.site-footer-block-title {
   line-height: 1.5;
   color: #475569;
 }
-.site-footer-library-web {
-  margin: 0.4rem 0 0 0;
-  font-size: 0.84rem;
-  line-height: 1.45;
-}
-.site-footer-library-web a {
-  color: #1f376c;
-  font-weight: 500;
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.12s ease, color 0.12s ease;
-}
-.site-footer-library-web a:hover,
-.site-footer-library-web a:focus-visible {
-  color: #0f172a;
-  border-bottom-color: rgba(31, 55, 108, 0.35);
-  outline: none;
-}
-.site-footer-ezproxy-hint {
-  color: #94a3b8;
-  font-weight: 400;
-  font-size: 0.78rem;
-}
 footer.site-footer .site-footer-copy {
   margin: 0.75rem 0 0;
   padding-top: 0.65rem;
@@ -2205,10 +2168,6 @@ def _render_footer_html() -> None:
             Hong Kong University of Science and Technology<br />
             Clear Water Bay, Hong Kong
           </p>
-          <p class="site-footer-library-web">
-            <a href="{html.escape(_ezproxy_wrap('https://library.hkust.edu.hk/'))}" target="_blank" rel="noopener noreferrer">HKUST Library website</a>
-            <span class="site-footer-ezproxy-hint" aria-hidden="true"> (EZproxy)</span>
-          </p>
         </div>
       </div>
     </div>
@@ -2232,7 +2191,7 @@ def _render_header_html() -> None:
         <img src="{HKUST_LOGO}" alt="HKUST" />
       </a>
       <div class="dash-logo-rule"></div>
-      <a href="{_ezproxy_wrap('https://library.hkust.edu.hk/')}" target="_blank" rel="noopener noreferrer">
+      <a href="https://library.hkust.edu.hk/" target="_blank" rel="noopener noreferrer">
         <img src="{LIB_LOGO}" alt="HKUST Library" />
       </a>
     </div>
@@ -3425,23 +3384,6 @@ def main() -> None:
         if (SCIVAL_HTTP_PROXY or "").strip():
             _mode_caption += " SciVal traffic uses SCIVAL_HTTP_PROXY (Elsevier via institutional proxy)."
         st.caption(_mode_caption)
-        with st.expander("EZproxy: shareable library resource links", expanded=False):
-            st.markdown(
-                """
-To help HKUST users open licensed resources **on or off campus**, prefix the destination URL with:
-
-`https://lib.ezproxy.hkust.edu.hk/login?url=`
-
-**Example (database persistent link):**  
-Original: `https://search.ebscohost.com/login.aspx?direct=true&db=buh&AN=24940779&site=ehost-live`  
-Wrapped: `https://lib.ezproxy.hkust.edu.hk/login?url=` plus the same URL (URL-encode the part after `url=` if it contains `&` or other special characters).
-
-**Example (DOI):**  
-`https://lib.ezproxy.hkust.edu.hk/login?url=https://doi.org/10.1002/jmv.27304`
-
-This does **not** work for every link (some contain session ids or other non-persistent values). For this app, **Resources** links in the disclaimer and the **HKUST Library** logo in the header use EZproxy automatically.
-                """.strip()
-            )
         custom_key = st.text_input(
             "Optional SciVal API key",
             type="password",
@@ -3452,18 +3394,8 @@ This does **not** work for every link (some contain session ids or other non-per
     _render_header_html()
 
     if not st.session_state.disclaimer_ok:
-        _u_scival = _ezproxy_wrap(
-            "https://lbdiscover.hkust.edu.hk/bib/991012525864503412"
-        )
-        _u_portal = _ezproxy_wrap("https://researchportal.hkust.edu.hk/")
-        _u_scopus = _ezproxy_wrap(
-            "https://www.elsevier.com/solutions/scopus/how-scopus-works/author-profile-updates"
-        )
-        _u_guide = _ezproxy_wrap(
-            "https://libguides.hkust.edu.hk/research-impact/author-impact"
-        )
         st.markdown(
-            f"""
+            """
 <div class="disclaimer-card-wrap">
   <div class="disclaimer-card">
     <p class="disclaimer-heading"><span aria-hidden="true">⚠️</span> Research Impact Dashboard — Disclaimer</p>
@@ -3471,7 +3403,7 @@ This does **not** work for every link (some contain session ids or other non-per
       This dashboard provides a high-level summary of research-impact indicators using Elsevier&rsquo;s SciVal APIs.
       It is intended as a starting point for exploration, not a substitute for the full SciVal platform.
       For granular benchmarking and comprehensive longitudinal data, please consult the
-      <a href="{html.escape(_u_scival)}" target="_blank" rel="noopener noreferrer">SciVal platform</a> via HKUST Library.
+      <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a> via HKUST Library.
     </p>
     <p>
       <strong>Important: Metric accuracy depends on a correct Scopus Author ID and profile. We strongly recommend
@@ -3482,12 +3414,12 @@ This does **not** work for every link (some contain session ids or other non-per
       alone; follow unit- and university-approved evidence and procedures.
     </p>
     <div class="disclaimer-links">
-      Resources (EZproxy links for HKUST on/off-campus access):
-      <a href="{html.escape(_u_portal)}" target="_blank" rel="noopener noreferrer">HKUST Research Portal</a>
+      Resources:
+      <a href="https://researchportal.hkust.edu.hk/" target="_blank" rel="noopener noreferrer">HKUST Research Portal</a>
       &nbsp;&middot;&nbsp;
-      <a href="{html.escape(_u_scopus)}" target="_blank" rel="noopener noreferrer">Manage Scopus ID</a>
+      <a href="https://www.elsevier.com/solutions/scopus/how-scopus-works/author-profile-updates" target="_blank" rel="noopener noreferrer">Manage Scopus ID</a>
       &nbsp;&middot;&nbsp;
-      <a href="{html.escape(_u_guide)}" target="_blank" rel="noopener noreferrer">Metric Guidance</a>
+      <a href="https://libguides.hkust.edu.hk/research-impact/author-impact" target="_blank" rel="noopener noreferrer">Metric Guidance</a>
     </div>
   </div>
 </div>
