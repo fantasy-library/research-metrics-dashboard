@@ -370,6 +370,21 @@ def format_error_message_for_user(
         )
     s = message.strip()
     low = s.lower()
+    if (
+        "you have been blocked" in low
+        or "sorry, you have been blocked" in low
+        or ("cloudflare" in low and "ray id" in low)
+        or "unable to access elsevier" in low
+    ):
+        return (
+            "Cloudflare blocked this traffic (Elsevier’s edge security). "
+            "Common causes: hosting the app on a public cloud IP (Railway, AWS, etc.), using a consumer VPN, "
+            "or sending many SciVal requests in a short time. "
+            "Try: run from your university network or an institutional VPN that exits on campus, "
+            "turn off other VPNs, wait 15–30 minutes, and avoid rapid repeated Analyze clicks. "
+            "If it persists, contact your library or Elsevier support with the Ray ID shown on the block page "
+            "and mention API access to api.elsevier.com (SciVal author metrics)."
+        )
     looks_html = (
         "<html" in low
         or "<!doctype" in low
@@ -385,6 +400,12 @@ def format_error_message_for_user(
             return (
                 "Too many requests were sent in a short time. "
                 "Please wait a minute and try again."
+            )
+        if "cloudflare" in low or "you have been blocked" in low:
+            return (
+                "The response was an HTML block page (often Cloudflare) instead of JSON from SciVal. "
+                "Retry from a campus or institutional network, avoid consumer VPNs and burst traffic, "
+                "or contact Elsevier/your librarian with the Ray ID if you host on a public cloud IP."
             )
         return (
             "The API returned an HTML error page instead of data. "
