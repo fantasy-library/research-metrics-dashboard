@@ -6,6 +6,7 @@ Run from repository root:  streamlit run streamlit_app/app.py
 from __future__ import annotations
 
 import base64
+from contextlib import nullcontext
 import hashlib
 import html
 import re
@@ -3342,7 +3343,7 @@ def _metric_order_pill_cell_html(label: str) -> str:
     return (
         f'<div style="text-align:center;background:#e0ecff;border:1px solid #bfd3ff;'
         f'color:#1f2937;font-weight:600;border-radius:8px;padding:10px 14px;'
-        f'margin:2px 0;">{esc}</div>'
+        f'margin:2px 0 8px 0;">{esc}</div>'
     )
 
 
@@ -3357,95 +3358,119 @@ def _render_pick_via_metric_order_section(
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
     """Display order for single-author: pill rows with inline reorder (↑↓) and remove (✕)."""
-    if step_order is not None:
-        st.markdown(
-            _export_step_heading_html(step_order, "Display order (top to bottom)"),
-            unsafe_allow_html=True,
+    _in_export_options = step_order is None
+    _section = (
+        st.expander(
+            "Export Options",
+            expanded=True,
+            key=f"{sortable_key}_{_pick_sig}_export_opts",
         )
-    else:
-        st.markdown("Display order (top to bottom)")
-    order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
-    picked = list(order_pick)
-    if order_pick:
-        with st.container(border=True):
-            for _i, _mid in enumerate(order_pick):
-                _lbl = label_map.get(_mid, _mid)
-                _c_pill, _c_up, _c_dn, _c_x = st.columns(
-                    [22, 1, 1, 1], gap="small", vertical_alignment="center"
-                )
-                with _c_pill:
+        if _in_export_options
+        else nullcontext()
+    )
+    with _section:
+        if step_order is not None:
+            st.markdown(
+                _export_step_heading_html(step_order, "Display order (top to bottom)"),
+                unsafe_allow_html=True,
+            )
+        elif _in_export_options:
+            st.markdown("##### Display order (top to bottom)")
+        else:
+            st.markdown("Display order (top to bottom)")
+        order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
+        picked = list(order_pick)
+        if order_pick:
+            with st.container(border=True):
+                for _i, _mid in enumerate(order_pick):
+                    _lbl = label_map.get(_mid, _mid)
                     st.markdown(
                         _metric_order_pill_cell_html(_lbl),
                         unsafe_allow_html=True,
                     )
-                with _c_up:
-                    if st.button(
-                        "↑",
-                        key=f"{sortable_key}_{_pick_sig}_up_{_mid}",
-                        disabled=_i == 0,
-                        help="Move up",
-                    ):
-                        _metric_order_swap_neighbor(order_state_key, _mid, "up")
-                with _c_dn:
-                    if st.button(
-                        "↓",
-                        key=f"{sortable_key}_{_pick_sig}_dn_{_mid}",
-                        disabled=_i >= len(order_pick) - 1,
-                        help="Move down",
-                    ):
-                        _metric_order_swap_neighbor(order_state_key, _mid, "down")
-                with _c_x:
-                    if st.button(
-                        "✕",
-                        key=f"{sortable_key}_{_pick_sig}_rmx_{_mid}",
-                        help=f"Remove «{_lbl}»",
-                    ):
-                        _metric_mock_row_remove(order_state_key, removed_key, _mid)
-                        st.rerun()
+                    _sp_l, _c_up, _c_dn, _c_x, _sp_r = st.columns(
+                        [3, 1, 1, 1, 3], gap="small", vertical_alignment="center"
+                    )
+                    with _sp_l:
+                        st.empty()
+                    with _c_up:
+                        if st.button(
+                            "↑",
+                            key=f"{sortable_key}_{_pick_sig}_up_{_mid}",
+                            disabled=_i == 0,
+                            help="Move up",
+                            type="secondary",
+                            use_container_width=True,
+                        ):
+                            _metric_order_swap_neighbor(order_state_key, _mid, "up")
+                    with _c_dn:
+                        if st.button(
+                            "↓",
+                            key=f"{sortable_key}_{_pick_sig}_dn_{_mid}",
+                            disabled=_i >= len(order_pick) - 1,
+                            help="Move down",
+                            type="secondary",
+                            use_container_width=True,
+                        ):
+                            _metric_order_swap_neighbor(order_state_key, _mid, "down")
+                    with _c_x:
+                        if st.button(
+                            "✕",
+                            key=f"{sortable_key}_{_pick_sig}_rmx_{_mid}",
+                            help=f"Remove «{_lbl}»",
+                            type="secondary",
+                            use_container_width=True,
+                        ):
+                            _metric_mock_row_remove(order_state_key, removed_key, _mid)
+                            st.rerun()
+                    with _sp_r:
+                        st.empty()
 
-    removed_now = [
-        m
-        for m in st.session_state.get(removed_key, [])
-        if m in opt_list and m not in st.session_state.get(order_state_key, [])
-    ]
-    st.session_state[removed_key] = removed_now
-    can_add = [m for m in opt_list if m not in st.session_state.get(order_state_key, [])]
-    if can_add:
-        c_a1, c_a2 = st.columns([3, 1], gap="small", vertical_alignment="bottom")
-        with c_a1:
-            to_add = st.selectbox(
-                "Restore removed metric",
-                options=can_add,
-                index=0,
-                format_func=lambda i: label_map.get(i, i),
-                key=f"{sortable_key}_{_pick_sig}_restore_sel",
-            )
-        with c_a2:
-            if st.button("Add", key=f"{sortable_key}_{_pick_sig}_restore_btn"):
-                od = list(st.session_state.get(order_state_key, []))
-                if to_add in opt_list and to_add not in od:
-                    st.session_state[order_state_key] = od + [to_add]
-                    rm = [
-                        m
-                        for m in st.session_state.get(removed_key, [])
-                        if m != to_add
-                    ]
-                    st.session_state[removed_key] = rm
-                st.rerun()
+        removed_now = [
+            m
+            for m in st.session_state.get(removed_key, [])
+            if m in opt_list and m not in st.session_state.get(order_state_key, [])
+        ]
+        st.session_state[removed_key] = removed_now
+        can_add = [
+            m for m in opt_list if m not in st.session_state.get(order_state_key, [])
+        ]
+        if can_add:
+            c_a1, c_a2 = st.columns([3, 1], gap="small", vertical_alignment="bottom")
+            with c_a1:
+                to_add = st.selectbox(
+                    "Restore removed metric",
+                    options=can_add,
+                    index=0,
+                    format_func=lambda i: label_map.get(i, i),
+                    key=f"{sortable_key}_{_pick_sig}_restore_sel",
+                )
+            with c_a2:
+                if st.button("Add", key=f"{sortable_key}_{_pick_sig}_restore_btn"):
+                    od = list(st.session_state.get(order_state_key, []))
+                    if to_add in opt_list and to_add not in od:
+                        st.session_state[order_state_key] = od + [to_add]
+                        rm = [
+                            m
+                            for m in st.session_state.get(removed_key, [])
+                            if m != to_add
+                        ]
+                        st.session_state[removed_key] = rm
+                    st.rerun()
 
-    order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
-    picked = list(order_pick)
-    st.caption(
-        "Use **↑** / **↓** to change order. Click **✕** to remove a metric from this comparison; "
-        "use **Restore removed metric** to add it back."
-    )
-    if not picked:
+        order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
+        picked = list(order_pick)
         st.caption(
-            "Add at least one metric with **Restore removed metric** to show it in the comparison."
+            "Use **↑** / **↓** to change order. Click **✕** to remove a metric from this comparison; "
+            "use **Restore removed metric** to add it back."
         )
-        return [], []
-    st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
-    return picked, order_pick
+        if not picked:
+            st.caption(
+                "Add at least one metric with **Restore removed metric** to show it in the comparison."
+            )
+            return [], []
+        st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
+        return picked, order_pick
 
 
 def _metrics_multiselect_and_order_ui(
