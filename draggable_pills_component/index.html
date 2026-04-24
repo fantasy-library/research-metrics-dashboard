@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Draggable metric pills</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 10px; }
+    #metric-list { list-style: none; padding: 0; margin: 0; }
+
+    .metric-pill {
+      display: flex;
+      align-items: center;
+      background-color: #e6ecf8;
+      border: 1px solid #b4c3e1;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      padding: 10px 15px;
+      cursor: grab;
+      transition: border-color 0.2s, background-color 0.2s;
+      color: #1e1e1e;
+    }
+    .metric-pill:active { cursor: grabbing; }
+    .metric-pill:hover { border-color: #7a97d1; background-color: #dbe4f4; }
+
+    .metric-label { flex-grow: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: #646464;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 0 5px;
+      flex-shrink: 0;
+    }
+    .delete-btn:hover { color: #ff4b4b; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+</head>
+<body>
+  <ul id="metric-list"></ul>
+
+  <script>
+    (function () {
+      var SET_COMPONENT_VALUE = "streamlit:setComponentValue";
+      var SET_FRAME_HEIGHT = "streamlit:setFrameHeight";
+      var COMPONENT_READY = "streamlit:componentReady";
+      var RENDER = "streamlit:render";
+
+      function postToStreamlit(type, payload) {
+        var data = Object.assign({ isStreamlitMessage: true, type: type }, payload || {});
+        window.parent.postMessage(data, "*");
+      }
+
+      function sendComponentValue(value) {
+        postToStreamlit(SET_COMPONENT_VALUE, { value: value, dataType: "json" });
+      }
+
+      function setFrameHeight() {
+        var h = document.body.scrollHeight + 24;
+        postToStreamlit(SET_FRAME_HEIGHT, { height: h });
+      }
+
+      var sortableInstance = null;
+      var lastOrder = [];
+
+      function destroySortable() {
+        if (sortableInstance) {
+          sortableInstance.destroy();
+          sortableInstance = null;
+        }
+      }
+
+      function renderList(items, labels) {
+        destroySortable();
+        var list = document.getElementById("metric-list");
+        list.innerHTML = "";
+
+        items.forEach(function (metricId) {
+          var li = document.createElement("li");
+          li.className = "metric-pill";
+          li.setAttribute("data-id", metricId);
+
+          var span = document.createElement("span");
+          span.className = "metric-label";
+          var text = (labels && labels[metricId]) ? String(labels[metricId]) : String(metricId);
+          span.textContent = text;
+
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "delete-btn";
+          btn.setAttribute("aria-label", "Remove");
+          btn.textContent = "\u00d7";
+          btn.onclick = function () {
+            sendComponentValue({ action: "delete", item: metricId });
+          };
+
+          li.appendChild(span);
+          li.appendChild(btn);
+          list.appendChild(li);
+        });
+
+        lastOrder = items.slice();
+
+        if (items.length > 0) {
+          sortableInstance = new Sortable(list, {
+            animation: 150,
+            onEnd: function () {
+              var newOrder = Array.prototype.map.call(list.children, function (li) {
+                return li.getAttribute("data-id");
+              });
+              if (JSON.stringify(newOrder) !== JSON.stringify(lastOrder)) {
+                lastOrder = newOrder;
+                sendComponentValue({ action: "reorder", items: newOrder });
+              }
+            }
+          });
+        }
+
+        setFrameHeight();
+      }
+
+      function onMessage(event) {
+        var d = event.data;
+        if (!d || !d.isStreamlitMessage) return;
+        if (d.type !== RENDER) return;
+        var args = d.args || {};
+        var items = Array.isArray(args.items) ? args.items : [];
+        var labels = args.labels && typeof args.labels === "object" ? args.labels : {};
+        renderList(items, labels);
+      }
+
+      window.addEventListener("message", onMessage);
+      postToStreamlit(COMPONENT_READY, { apiVersion: 1 });
+    })();
+  </script>
+</body>
+</html>
