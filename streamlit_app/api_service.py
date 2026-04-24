@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 import re
 import threading
@@ -32,6 +33,71 @@ RATE_LIMIT_CONFIG = {
     "retry_delay": 2.0,
     "backoff_multiplier": 2,
 }
+
+# One SciVal ``Collaboration`` request; UI exposes four ``collabType`` rows (see API ``values[]``).
+COLLABORATION_SUBMETRIC_IDS: tuple[str, ...] = (
+    "collaborationInternational",
+    "collaborationNational",
+    "collaborationInstitutional",
+    "collaborationSingleAuthorship",
+)
+COLLABORATION_TYPE_KEY_BY_METRIC_ID: dict[str, str] = {
+    "collaborationInternational": "international",
+    "collaborationNational": "national",
+    "collaborationInstitutional": "institutional",
+    "collaborationSingleAuthorship": "singleAuthorship",
+}
+
+
+def _collaboration_submetrics_enabled(enabled_ids: list[str]) -> bool:
+    if "collaboration" in enabled_ids:
+        return True
+    return any(mid in COLLABORATION_TYPE_KEY_BY_METRIC_ID for mid in enabled_ids)
+
+
+def _apply_collaboration_submetrics(
+    metrics: Dict[str, Any], processed: Dict[str, Any] | None
+) -> None:
+    types = ((processed or {}).get("collaborationTypes")) or {}
+    for mid, tkey in COLLABORATION_TYPE_KEY_BY_METRIC_ID.items():
+        sub = types.get(tkey)
+        if not isinstance(sub, dict):
+            sub = {}
+        metrics[mid] = {
+            "byYear": dict(sub.get("byYear") or {}),
+            "total": sub.get("total", "N/A"),
+        }
+
+
+# One SciVal ``AcademicCorporateCollaboration`` request; two ``collabType`` rows in ``values[]``.
+ACADEMIC_CORPORATE_SUBMETRIC_IDS: tuple[str, ...] = (
+    "academicCorporateWith",
+    "academicCorporateWithout",
+)
+ACADEMIC_CORPORATE_TYPE_KEY_BY_METRIC_ID: dict[str, str] = {
+    "academicCorporateWith": "withAcademicCorporate",
+    "academicCorporateWithout": "noAcademicCorporate",
+}
+
+
+def _academic_corporate_submetrics_enabled(enabled_ids: list[str]) -> bool:
+    if "academicCorporateCollaboration" in enabled_ids:
+        return True
+    return any(mid in ACADEMIC_CORPORATE_TYPE_KEY_BY_METRIC_ID for mid in enabled_ids)
+
+
+def _apply_academic_corporate_submetrics(
+    metrics: Dict[str, Any], processed: Dict[str, Any] | None
+) -> None:
+    types = ((processed or {}).get("collaborationTypes")) or {}
+    for mid, tkey in ACADEMIC_CORPORATE_TYPE_KEY_BY_METRIC_ID.items():
+        sub = types.get(tkey)
+        if not isinstance(sub, dict):
+            sub = {}
+        metrics[mid] = {
+            "byYear": dict(sub.get("byYear") or {}),
+            "total": sub.get("total", "N/A"),
+        }
 
 
 def format_percentage(value: float) -> float:
@@ -301,7 +367,7 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
     ):
         return (
             "No researcher matched this identifier. "
-            "Please verify the Scopus Author ID or ORCID and try again."
+            "Please verify the Scopus Author ID and try again."
         )
 
     # Server / overload
@@ -713,9 +779,9 @@ class APIService:
 
     def _process_collaboration(self, data: Any) -> Dict[str, Any]:
         default_types = {
-            "institutional": {"byYear": {}, "total": "N/A"},
             "international": {"byYear": {}, "total": "N/A"},
             "national": {"byYear": {}, "total": "N/A"},
+            "institutional": {"byYear": {}, "total": "N/A"},
             "singleAuthorship": {"byYear": {}, "total": "N/A"},
         }
         try:
@@ -764,10 +830,10 @@ class APIService:
         }
 
     def _process_academic_corporate(self, data: Any) -> Dict[str, Any]:
+        """Parse SciVal ``AcademicCorporateCollaboration`` ``values[]`` (two ``collabType`` buckets)."""
         default_types = {
-            "academicCorporate": {"byYear": {}, "total": "N/A"},
-            "academicOnly": {"byYear": {}, "total": "N/A"},
-            "corporateOnly": {"byYear": {}, "total": "N/A"},
+            "withAcademicCorporate": {"byYear": {}, "total": "N/A"},
+            "noAcademicCorporate": {"byYear": {}, "total": "N/A"},
         }
         try:
             metric = data["results"][0]["metrics"][0]
@@ -788,21 +854,31 @@ class APIService:
             if not pby:
                 continue
             norm = self._normalize_year_data_with_formatting(pby)
-            vals_list = list(norm.values())
+            vals_list: list[float] = []
+            for v in norm.values():
+                if isinstance(v, (int, float)):
+                    fv = float(v)
+                    if math.isnan(fv):
+                        continue
+                    vals_list.append(fv)
             avg = (
                 format_percentage(sum(vals_list) / len(vals_list))
                 if vals_list
                 else "N/A"
             )
-            if "academic-corporate" in ctype:
-                collaboration_types["academicCorporate"] = {"byYear": norm, "total": avg}
+            # "No academic-corporate collaboration" must match before generic "academic-corporate".
+            if "no academic-corporate" in ctype:
+                collaboration_types["noAcademicCorporate"] = {"byYear": norm, "total": avg}
+            elif "academic-corporate" in ctype:
+                collaboration_types["withAcademicCorporate"] = {"byYear": norm, "total": avg}
                 total_by_year = norm
-            elif "academic only" in ctype:
-                collaboration_types["academicOnly"] = {"byYear": norm, "total": avg}
-            elif "corporate only" in ctype:
-                collaboration_types["corporateOnly"] = {"byYear": norm, "total": avg}
 
-        tv = list(total_by_year.values())
+        tv = []
+        for v in total_by_year.values():
+            if isinstance(v, (int, float)):
+                fv = float(v)
+                if not math.isnan(fv):
+                    tv.append(fv)
         grand = format_percentage(sum(tv) / len(tv)) if tv else "N/A"
         return {
             "byYear": total_by_year,
@@ -955,7 +1031,7 @@ class APIService:
                 str(include_self_citations).lower(),
                 included_docs,
             )
-        if "collaboration" in enabled_ids:
+        if _collaboration_submetrics_enabled(enabled_ids):
             pause()
             collab = self._fetch_direct_metric(
                 author_id,
@@ -966,7 +1042,7 @@ class APIService:
                 "false",
                 included_docs,
             )
-        if "academicCorporateCollaboration" in enabled_ids:
+        if _academic_corporate_submetrics_enabled(enabled_ids):
             pause()
             acc = self._fetch_direct_metric(
                 author_id,
@@ -1015,19 +1091,18 @@ class APIService:
             metrics["citationsPerPublication"] = {"byYear": {}, "total": "N/A"}
 
         if collab:
-            metrics["collaboration"] = self._process_collaboration(collab)
-        else:
-            metrics["collaboration"] = {"byYear": {}, "total": "N/A"}
-
-        if acc:
-            metrics["academicCorporateCollaboration"] = self._process_academic_corporate(
-                acc
+            _apply_collaboration_submetrics(
+                metrics, self._process_collaboration(collab)
             )
         else:
-            metrics["academicCorporateCollaboration"] = {
-                "byYear": {},
-                "total": "N/A",
-            }
+            _apply_collaboration_submetrics(metrics, None)
+
+        if acc:
+            _apply_academic_corporate_submetrics(
+                metrics, self._process_academic_corporate(acc)
+            )
+        else:
+            _apply_academic_corporate_submetrics(metrics, None)
 
         return {
             "authorName": author_name,
@@ -1136,16 +1211,17 @@ class APIService:
 
 def _empty_metrics_payload() -> Dict[str, Any]:
     na = {"byYear": {}, "total": "N/A"}
-    return {
+    out: Dict[str, Any] = {
         "hIndex": {"value": "N/A", "dataSource": {}},
         "scholarlyOutput": dict(na),
         "fwci": dict(na),
         "topJournal": dict(na),
         "citationCount": dict(na),
         "citationsPerPublication": dict(na),
-        "collaboration": dict(na),
-        "academicCorporateCollaboration": dict(na),
     }
+    _apply_collaboration_submetrics(out, None)
+    _apply_academic_corporate_submetrics(out, None)
+    return out
 
 
 def _xml_local_name(tag: str) -> str:
@@ -1231,7 +1307,7 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
     key = (api_key or SCIVAL_API_KEY or "").strip()
     if not key:
         raise APIError(
-            "SciVal API key required for ORCID lookup (set SCIVAL_API_KEY or ELSEVIER_API_KEY)."
+            "SciVal API key required for this lookup (set SCIVAL_API_KEY or ELSEVIER_API_KEY)."
         )
 
     extracted = _extract_orcid_from_input(orcid)
@@ -1245,7 +1321,7 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
         formatted = cleaned
     else:
         raise APIError(
-            "Please enter a valid ORCID (16-digit identifier), or paste an Elsevier/ORCID URL."
+            "Please enter a valid 16-digit identifier (with optional hyphens), or paste a supported profile URL."
         )
 
     base = f"https://api.elsevier.com/analytics/scival/author/orcid/{formatted}"
@@ -1271,7 +1347,7 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
         r = client.get(base, params=params, headers=headers)
         if not r.is_success:
             if r.status_code == 404:
-                raise APIError("No researcher found with this ORCID in SciVal database.")
+                raise APIError("No researcher found for this identifier in the SciVal database.")
             if r.status_code == 401:
                 raise APIError("API authentication failed. Check API key.")
             if r.status_code == 403:

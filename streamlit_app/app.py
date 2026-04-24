@@ -5,6 +5,7 @@ Run from repository root:  streamlit run streamlit_app/app.py
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import html
 import re
@@ -24,7 +25,9 @@ from streamlit_echarts5 import st_echarts
 from streamlit_sortables import sort_items
 
 from streamlit_app.api_service import (
+    ACADEMIC_CORPORATE_SUBMETRIC_IDS,
     APIError,
+    COLLABORATION_SUBMETRIC_IDS,
     format_error_message_for_user,
     get_api_service,
     is_missing_scival_api_key_error,
@@ -149,6 +152,36 @@ _EXPORT_WORKSPACE_ICON = (
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
     '<polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
 )
+_EXPORT_OPTIONS_ICON_PATH = Path(__file__).resolve().parent / "assets" / "export-options-icon.png"
+
+
+def _export_options_heading_html() -> str:
+    """Bundle export card title with custom download/export icon (PNG in ``assets/``)."""
+    img_inner: str
+    try:
+        if _EXPORT_OPTIONS_ICON_PATH.is_file():
+            b64 = base64.standard_b64encode(_EXPORT_OPTIONS_ICON_PATH.read_bytes()).decode(
+                "ascii"
+            )
+            img_inner = (
+                f'<img class="prepare-export-heading-icon-img" '
+                f'src="data:image/png;base64,{b64}" width="48" height="48" alt="" />'
+            )
+        else:
+            img_inner = (
+                f'<span class="prepare-export-heading-icon-fallback">{_EXPORT_WORKSPACE_ICON}</span>'
+            )
+    except OSError:
+        img_inner = (
+            f'<span class="prepare-export-heading-icon-fallback">{_EXPORT_WORKSPACE_ICON}</span>'
+        )
+    return (
+        '<div class="prepare-export-heading-row">'
+        '<div class="prepare-export-heading-icon" aria-hidden="true">'
+        f"{img_inner}</div>"
+        '<p class="prepare-export-heading">Export options</p>'
+        "</div>"
+    )
 
 
 def _inject_export_download_styles() -> None:
@@ -548,35 +581,17 @@ footer[data-testid="stFooter"] {
   display: none !important;
 }
 
-/* Analyze CTA — full-width pill (label centered, wide bar like reference) */
-[class*="st-key-analyze_zone"] {
-  width: 100% !important;
-  /* Pull button up toward metrics panel bottom border (stays outside the panel) */
-  margin-top: -1.35rem !important;
-  margin-bottom: 0.3rem !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-}
-[class*="st-key-analyze_zone"] [data-testid="stVerticalBlock"] {
-  width: 100% !important;
-  align-items: stretch !important;
-}
-[class*="st-key-analyze_zone"] [data-testid="element-container"] {
+/* Inline “Analyze Metrics” in search shell — full-width pill CTA */
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] .stButton {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
 }
-[class*="st-key-analyze_zone"] .stButton {
-  display: block !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}
-[class*="st-key-analyze_zone"] .stButton > button {
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] .stButton > button {
   width: 100% !important;
 }
-[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"],
-[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] {
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="stBaseButton-primary"],
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="baseButton-primary"] {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -611,17 +626,18 @@ footer[data-testid="stFooter"] {
     color 0.2s ease,
     border-color 0.2s ease,
     box-shadow 0.2s ease,
+    transform 0.15s ease,
     -webkit-text-fill-color 0.2s ease !important;
 }
-[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"] p,
-[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] p,
-[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"] span,
-[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"] span {
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="stBaseButton-primary"] p,
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="baseButton-primary"] p,
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="stBaseButton-primary"] span,
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="baseButton-primary"] span {
   color: inherit !important;
   -webkit-text-fill-color: inherit !important;
 }
-[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:hover,
-[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:hover {
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="stBaseButton-primary"]:hover,
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="baseButton-primary"]:hover {
   background: #673ab7 !important;
   background-image: none !important;
   background-color: #673ab7 !important;
@@ -634,8 +650,15 @@ footer[data-testid="stFooter"] {
     0 2px 8px rgba(15, 23, 42, 0.12) !important;
   transform: none !important;
 }
-[class*="st-key-analyze_zone"] button[data-testid="stBaseButton-primary"]:focus-visible,
-[class*="st-key-analyze_zone"] button[data-testid="baseButton-primary"]:focus-visible {
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="stBaseButton-primary"]:active,
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="baseButton-primary"]:active {
+  transform: translateY(1px) !important;
+  box-shadow:
+    0 3px 12px rgba(103, 58, 183, 0.35),
+    0 1px 4px rgba(15, 23, 42, 0.1) !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="stBaseButton-primary"]:focus-visible,
+[class*="st-key-search_shell"] [class*="st-key-analyze_metrics_inline"] button[data-testid="baseButton-primary"]:focus-visible {
   outline: 2px solid #673ab7 !important;
   outline-offset: 3px !important;
 }
@@ -1128,6 +1151,27 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   font-weight: 700;
   margin-left: 0.25rem;
 }
+[class*="st-key-search_shell"] .author-input-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.85rem;
+  margin: 0 0 0.25rem 0;
+}
+[class*="st-key-search_shell"] .author-input-header-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4b5563;
+  flex: 0 0 auto;
+}
+[class*="st-key-search_shell"] .author-limit-hint-inline {
+  margin: 0 !important;
+  flex: 1 1 220px;
+  min-width: min(100%, 14rem);
+  padding: 0.35rem 0.55rem !important;
+  font-size: 0.8rem !important;
+}
 .minimal-section-divider {
   border-top: 1px solid #E5E7EB;
   margin: 0.28rem 0 0.5rem 0;
@@ -1381,8 +1425,11 @@ a.minimal-go-analyze-btn:focus-visible,
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
-[class*="st-key-metrics_grid_row0"] {
+[class*="st-key-metrics_grid_row"] {
   margin-bottom: 0.75rem !important;
+}
+[class*="st-key-metrics_grid_shell"] [class*="st-key-metrics_grid_row"]:last-child {
+  margin-bottom: 0 !important;
 }
 [class*="st-key-metrics_grid_shell"] [data-testid="stHorizontalBlock"] {
   gap: 0.75rem !important;
@@ -1397,6 +1444,7 @@ a.minimal-go-analyze-btn:focus-visible,
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
+  overflow: visible !important;
 }
 [class*="st-key-metric_cell_"] {
   border: 1px solid #e5e7eb !important;
@@ -1411,7 +1459,7 @@ a.minimal-go-analyze-btn:focus-visible,
   box-sizing: border-box !important;
   background: #ffffff !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 [class*="st-key-metric_cell_"] > div[data-testid="stVerticalBlock"] {
   gap: 0 !important;
@@ -1463,6 +1511,73 @@ p.metric-compact-title {
   line-height: 1.25 !important;
   min-height: 2.5em !important;
   display: block !important;
+}
+[class*="st-key-metric_cell_"] p.metric-compact-title--with-info {
+  max-width: 100% !important;
+}
+[class*="st-key-metric_cell_"] p.metric-compact-title--with-info .metric-title-text {
+  word-break: break-word !important;
+}
+[class*="st-key-metric_cell_"] p.metric-compact-title--with-info .metric-info-wrap {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: 0.12em !important;
+  margin-left: 0.35rem !important;
+  position: relative !important;
+  outline: none !important;
+}
+[class*="st-key-metric_cell_"] .metric-info-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.05rem !important;
+  height: 1.05rem !important;
+  border-radius: 50% !important;
+  border: 1.5px solid #64748b !important;
+  color: #475569 !important;
+  font-size: 0.58rem !important;
+  font-weight: 800 !important;
+  font-family: Georgia, "Times New Roman", serif !important;
+  font-style: italic !important;
+  line-height: 1 !important;
+  cursor: help !important;
+  user-select: none !important;
+  background: #f8fafc !important;
+}
+[class*="st-key-metric_cell_"] .metric-info-wrap:hover .metric-info-icon,
+[class*="st-key-metric_cell_"] .metric-info-wrap:focus-within .metric-info-icon {
+  border-color: #4338ca !important;
+  color: #3730a3 !important;
+  background: #eef2ff !important;
+}
+/* Global: tooltip text must stay hidden even if markup sits outside the keyed cell. */
+.metric-info-panel {
+  display: none !important;
+  position: absolute !important;
+  z-index: 80 !important;
+  right: 0 !important;
+  top: calc(100% + 6px) !important;
+  width: min(19.5rem, calc(100vw - 2rem)) !important;
+  max-height: min(70vh, 22rem) !important;
+  overflow-y: auto !important;
+  padding: 0.65rem 0.75rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18) !important;
+  text-align: left !important;
+}
+.metric-info-wrap:hover .metric-info-panel,
+.metric-info-wrap:focus-within .metric-info-panel {
+  display: block !important;
+}
+.metric-info-panel-inner {
+  font-size: 0.78rem !important;
+  font-weight: 400 !important;
+  line-height: 1.45 !important;
+  color: #334155 !important;
+  white-space: pre-wrap !important;
 }
 [class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="true"]) {
   box-shadow: 0 1px 4px rgba(124, 58, 237, 0.12) !important;
@@ -1678,6 +1793,41 @@ hr.charts-export-divider {
   height: 0;
   opacity: 1;
 }
+.prepare-export-heading-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  margin: 0.35rem 0 0.45rem 0 !important;
+}
+.prepare-export-heading-icon {
+  flex-shrink: 0 !important;
+  line-height: 0 !important;
+}
+.prepare-export-heading-icon-img {
+  width: 3rem !important;
+  height: 3rem !important;
+  display: block !important;
+  border-radius: 14px !important;
+  object-fit: cover !important;
+}
+.prepare-export-heading-icon-fallback {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 3.1rem !important;
+  height: 3.1rem !important;
+  border-radius: 14px !important;
+  background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 100%) !important;
+  border: 1px solid rgba(52, 211, 153, 0.65) !important;
+  color: #047857 !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.22) !important;
+}
+.prepare-export-heading-icon-fallback svg {
+  display: block !important;
+}
+.prepare-export-heading-row p.prepare-export-heading {
+  margin: 0 !important;
+}
 p.prepare-export-heading {
   font-size: 1.38rem !important;
   font-weight: 700 !important;
@@ -1814,7 +1964,7 @@ header.export-workspace-module-head {
   border: 1px solid rgba(148, 163, 184, 0.35) !important;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
 }
-[class*="st-key-export_prep_inner"] p.prepare-export-heading {
+[class*="st-key-export_prep_inner"] .prepare-export-heading-row {
   margin-top: 0.15rem !important;
 }
 hr.export-workspace-split {
@@ -2013,6 +2163,22 @@ footer.site-footer .site-footer-copy {
   box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.2) !important;
 }
 
+/* Metrics merged into search shell: single card (no nested white/purple frame) */
+[class*="st-key-search_shell"] [class*="st-key-metrics_panel_shell"]:not(:has(span.skin-unified-form-shell)) {
+  background: transparent !important;
+  border: none !important;
+  border-left: none !important;
+  border-radius: 0 !important;
+  padding: 0.1rem 0 0 0 !important;
+  margin: 0.1rem 0 0 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-metrics_panel_shell"] {
+  margin-bottom: 0 !important;
+}
+
 [class*="st-key-metrics_panel_shell"] {
   background: #ffffff !important;
   border: 1px solid rgba(226, 232, 240, 0.95) !important;
@@ -2026,6 +2192,7 @@ footer.site-footer .site-footer-copy {
 [class*="st-key-collab_metrics_shell"] {
   background: transparent !important;
   border: none !important;
+  overflow: visible !important;
 }
 
 /* -------- Streamlit DOM-safe final overrides (keep at end) --------
@@ -2095,7 +2262,26 @@ footer.site-footer .site-footer-copy {
   align-items: center !important;
 }
 
-/* Select metrics: no rule under heading */
+/* Select metrics: title + caption grouped */
+.metrics-panel-head-group {
+  margin: 0 0 0.35rem 0;
+}
+.metrics-panel-head-group .metrics-panel-heading {
+  margin: 0 0 0.2rem 0 !important;
+}
+.metrics-panel-head-group p.metrics-panel-head-caption {
+  text-align: left;
+  margin: 0 0 0.35rem 0 !important;
+}
+p.metrics-panel-head-caption {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #64748b;
+  line-height: 1.35;
+  text-align: left;
+  margin: 0.12rem 0 0.35rem 0;
+  padding: 0;
+}
 .metrics-panel-heading {
   font-size: 1.05rem;
   font-weight: 800;
@@ -2267,61 +2453,182 @@ DEFAULT_METRICS = [
     {
         "id": "publication",
         "label": "Publication",
-        "description": "Scholarly output count by year",
+        "description": (
+            "Publication (Scholarly output): Scopus-indexed count, usually by publication year."
+        ),
         "enabled": True,
     },
     {
         "id": "fwci",
         "label": "Field-Weighted Citation Impact (FWCI)",
-        "description": "Citation impact normalized by field",
+        "description": (
+            "FWCI: citations vs peer average for similar papers (1.0 = average); "
+            "volatile when the publication set is small."
+        ),
         "enabled": True,
     },
     {
         "id": "topJournal",
         "label": "Top 10% Journal Percentile",
-        "description": "Publications in top-tier journals",
+        "description": (
+            "Top 10% journals: share in journals SciVal ranks in the top tenth by CiteScore, SNIP, or SJR."
+        ),
         "enabled": True,
     },
     {
         "id": "citationCount",
         "label": "Citation Count",
-        "description": "Total citation count",
+        "description": "Citation count: total citations; chart years are publication years.",
         "enabled": True,
     },
     {
         "id": "hIndex",
         "label": "H-Index",
-        "description": "Author productivity and citation impact",
+        "description": "H-index: largest h where at least h papers each have ≥ h citations.",
         "enabled": True,
     },
     {
         "id": "citationsPerPublication",
         "label": "Citations Per Publication",
-        "description": "Average citations per publication",
+        "description": "Citations per publication: total citations divided by publication count in the window.",
         "enabled": True,
     },
     {
-        "id": "collaboration",
-        "label": "Collaboration",
-        "description": "Collaboration patterns by type (institutional, international, national, single authorship)",
+        "id": "collaborationInternational",
+        "label": "International collaboration",
+        "description": (
+            "International collaboration: multi-author; addresses span more than one country/region."
+        ),
         "enabled": True,
     },
     {
-        "id": "academicCorporateCollaboration",
-        "label": "Academic Corporate Collaboration",
-        "description": "Academic–corporate collaboration breakdown",
+        "id": "collaborationNational",
+        "label": "National collaboration",
+        "description": (
+            "National collaboration: multi-author, one country/region, two or more SciVal institutions."
+        ),
+        "enabled": True,
+    },
+    {
+        "id": "collaborationInstitutional",
+        "label": "Institutional collaboration",
+        "description": (
+            "Institutional collaboration: multi-author, one country/region, one SciVal institution."
+        ),
+        "enabled": True,
+    },
+    {
+        "id": "collaborationSingleAuthorship",
+        "label": "Single authorship",
+        "description": "Single authorship: one author; no co-authors.",
+        "enabled": True,
+    },
+    {
+        "id": "academicCorporateWith",
+        "label": "Academic–corporate collaboration",
+        "description": (
+            "Share of papers SciVal tags with academic and corporate sectors on the same article."
+        ),
+        "enabled": True,
+    },
+    {
+        "id": "academicCorporateWithout",
+        "label": "No academic–corporate collaboration",
+        "description": "Share of papers SciVal does not tag as academic–corporate (complement).",
         "enabled": True,
     },
 ]
 
-# Default on/off per metric id (used when creating ``met_*`` session keys).
-DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {
-    m["id"]: bool(m.get("enabled", True)) for m in DEFAULT_METRICS
+# Metric info (i) panels: ``{Topic}: …`` lead line, then detail; collaboration types use bullets.
+METRIC_INFO_TEXT: dict[str, str] = {
+    "publication": (
+        "Publication (Scholarly output): count of this entity’s Scopus-indexed documents. "
+        "Usually shown by publication year."
+    ),
+    "fwci": (
+        "FWCI: citations on this entity’s papers vs the average for similar papers worldwide "
+        "(field, document type, age). 1.0 matches that peer-group average; small samples move easily."
+    ),
+    "topJournal": (
+        "Top 10% journal percentile: share of papers in journals SciVal ranks in the top tenth "
+        "by CiteScore, SNIP, or SJR. Items without those journal metrics (e.g. many books) are out of scope."
+    ),
+    "citationCount": (
+        "Citation count: total citations received on the entity’s publications. "
+        "Year axes use publication year of cited papers, not the year a citation occurred."
+    ),
+    "hIndex": (
+        "H-index: largest h such that at least h publications each have h or more citations. "
+        "Combines how many qualifying papers you have with how often they are cited."
+    ),
+    "citationsPerPublication": (
+        "Citations per publication: total citations divided by publication count in the selected window."
+    ),
+    "collaborationInternational": (
+        "International collaboration:\n"
+        "• More than one author\n"
+        "• More than one country/region among publication addresses"
+    ),
+    "collaborationNational": (
+        "National collaboration:\n"
+        "• More than one author\n"
+        "• One country/Region on the publication\n"
+        "• Affiliations map to two or more SciVal institutions in that country/region"
+    ),
+    "collaborationInstitutional": (
+        "Institutional collaboration:\n"
+        "• More than one author\n"
+        "• One country/Region on the publication\n"
+        "• Every affiliation maps to the same SciVal institution"
+    ),
+    "collaborationSingleAuthorship": (
+        "Single authorship: exactly one author; no co-authors on the publication."
+    ),
+    "academicCorporateWith": (
+        "Academic–corporate collaboration: share of publications with multiple authors where SciVal "
+        "maps at least one affiliation to an academic organization and at least one to a corporate "
+        "(industrial) organization—any co-author may supply the corporate tie."
+    ),
+    "academicCorporateWithout": (
+        "No academic–corporate collaboration: share SciVal assigns outside the academic–corporate class—"
+        "the complement of Academic–corporate collaboration."
+    ),
 }
+
+
+def _metric_title_with_info_html(metric_id: str, label: str) -> str:
+    """Metric label plus (i) hover / focus panel with SciVal-style definition text."""
+    body = METRIC_INFO_TEXT.get(metric_id, "").strip()
+    label_esc = html.escape(label)
+    if not body:
+        return f'<p class="metric-compact-title">{label_esc}</p>'
+    body_esc = html.escape(body)
+    aria = html.escape(f"SciVal definition: {label}")
+    _mid = re.sub(r"[^a-zA-Z0-9_-]", "_", metric_id)
+    return (
+        '<p class="metric-compact-title metric-compact-title--with-info">'
+        f'<span class="metric-title-text">{label_esc}</span>'
+        f'<span class="metric-info-wrap" tabindex="0" aria-describedby="metric-info-{_mid}">'
+        f'<span class="metric-info-icon" aria-label="{aria}">i</span>'
+        f'<span class="metric-info-panel" id="metric-info-{_mid}" role="tooltip">'
+        f'<span class="metric-info-panel-inner">{body_esc}</span></span>'
+        "</span></p>"
+    )
+
+
+# Default on/off per metric id (used when creating ``met_*`` session keys).
+DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {m["id"]: True for m in DEFAULT_METRICS}
 
 # Bump when default metric toggles change so Streamlit widget keys (met_*) resync.
 # v5: reset stuck "all off" sessions; ensure defaults come from DEFAULT_METRICS, not stale dict copies.
-_METRICS_SESSION_DEFAULT_VERSION = 5
+# v6: default UI count is again "all metrics on" (8 of 8) after one-time key refresh.
+# v7: all metrics on by default again (explicit True + one-time met_* refresh).
+# v8: Collaboration split into four SciVal ``collabType`` metrics (one API ``Collaboration`` fetch).
+# v9: Academic–corporate split into two SciVal ``collabType`` rows (one API fetch).
+# v10: Collaboration metric labels + descriptions (operational definitions).
+# v11: Academic–corporate metric descriptions + (i) help text (SciVal definition).
+# v12: Collaboration submetrics UI/export order (international → national → institutional → single).
+_METRICS_SESSION_DEFAULT_VERSION = 12
 
 YEAR_OPTIONS = {
     "3yrs": "Last 3 completed calendar years — compact recent window",
@@ -2506,8 +2813,10 @@ def _resolve_year_columns(metrics_payload: dict, data_source: dict | None) -> li
         "citationsPerPublication",
     ):
         year_sets.extend((m.get(key) or {}).get("byYear") or {})
-    year_sets.extend((m.get("collaboration") or {}).get("byYear") or {})
-    year_sets.extend((m.get("academicCorporateCollaboration") or {}).get("byYear") or {})
+    for _cid in COLLABORATION_SUBMETRIC_IDS:
+        year_sets.extend((m.get(_cid) or {}).get("byYear") or {})
+    for _aid in ACADEMIC_CORPORATE_SUBMETRIC_IDS:
+        year_sets.extend((m.get(_aid) or {}).get("byYear") or {})
     ys = sorted({int(y) for y in year_sets if str(y).isdigit()})
     return ys if ys else [2019, 2020, 2021, 2022, 2023, 2024]
 
@@ -2543,17 +2852,49 @@ def _build_metrics_table_rows(
             False,
         ),
         (
-            "collaboration",
-            "Collaboration (International %)",
-            lambda x: x.get("collaboration")
+            "collaborationInternational",
+            "International collaboration %",
+            lambda x: x.get("collaborationInternational")
             or {"byYear": {}, "total": "N/A"},
             True,
             True,
         ),
         (
-            "academicCorporateCollaboration",
-            "Academic Corporate Collaboration %",
-            lambda x: x.get("academicCorporateCollaboration")
+            "collaborationNational",
+            "National collaboration %",
+            lambda x: x.get("collaborationNational")
+            or {"byYear": {}, "total": "N/A"},
+            True,
+            True,
+        ),
+        (
+            "collaborationInstitutional",
+            "Institutional collaboration %",
+            lambda x: x.get("collaborationInstitutional")
+            or {"byYear": {}, "total": "N/A"},
+            True,
+            True,
+        ),
+        (
+            "collaborationSingleAuthorship",
+            "Single authorship %",
+            lambda x: x.get("collaborationSingleAuthorship")
+            or {"byYear": {}, "total": "N/A"},
+            True,
+            True,
+        ),
+        (
+            "academicCorporateWith",
+            "Academic–corporate collaboration %",
+            lambda x: x.get("academicCorporateWith")
+            or {"byYear": {}, "total": "N/A"},
+            True,
+            True,
+        ),
+        (
+            "academicCorporateWithout",
+            "No academic–corporate collaboration %",
+            lambda x: x.get("academicCorporateWithout")
             or {"byYear": {}, "total": "N/A"},
             True,
             True,
@@ -2609,8 +2950,12 @@ def _extract_metric_by_year(metrics_payload: dict, metric_id: str) -> dict[str, 
         "citationsPerPublication": "citationsPerPublication",
         "fwci": "fwci",
         "topJournal": "topJournal",
-        "collaboration": "collaboration",
-        "academicCorporateCollaboration": "academicCorporateCollaboration",
+        "collaborationInternational": "collaborationInternational",
+        "collaborationNational": "collaborationNational",
+        "collaborationInstitutional": "collaborationInstitutional",
+        "collaborationSingleAuthorship": "collaborationSingleAuthorship",
+        "academicCorporateWith": "academicCorporateWith",
+        "academicCorporateWithout": "academicCorporateWithout",
     }
     payload_key = payload_key_map.get(metric_id)
     if not payload_key:
@@ -2663,8 +3008,12 @@ def _scalar_metric_total(metrics_payload: dict, metric_id: str) -> float | None:
         "citationsPerPublication": "citationsPerPublication",
         "fwci": "fwci",
         "topJournal": "topJournal",
-        "collaboration": "collaboration",
-        "academicCorporateCollaboration": "academicCorporateCollaboration",
+        "collaborationInternational": "collaborationInternational",
+        "collaborationNational": "collaborationNational",
+        "collaborationInstitutional": "collaborationInstitutional",
+        "collaborationSingleAuthorship": "collaborationSingleAuthorship",
+        "academicCorporateWith": "academicCorporateWith",
+        "academicCorporateWithout": "academicCorporateWithout",
     }
     key = payload_key_map.get(metric_id)
     if not key:
@@ -2784,27 +3133,6 @@ def _export_step_heading_html(step: int, text: str) -> str:
     )
 
 
-def _export_workspace_module_head_html(*, bundle_prep: bool) -> str:
-    """Banner for the export lane (separate from charts / analysis above)."""
-    title = "Export workspace"
-    if bundle_prep:
-        desc = (
-            "Choose export options below, then download PDF, Word, or Excel."
-        )
-    else:
-        desc = "Choose export options below, then download PDF, Word, or Excel."
-    return (
-        '<header class="export-workspace-module-head" role="presentation">'
-        '<div class="export-workspace-module-head-row">'
-        '<div class="export-workspace-module-icon" aria-hidden="true">'
-        f"{_EXPORT_WORKSPACE_ICON}</div>"
-        '<div class="export-workspace-module-copy">'
-        f'<p class="export-workspace-module-title">{html.escape(title)}</p>'
-        f'<p class="export-workspace-module-desc">{html.escape(desc)}</p>'
-        "</div></div></header>"
-    )
-
-
 def _render_export_results_block(export_rows: list, n_valid: int) -> None:
     """Anchor, copy, filename, and PDF / Word / Excel downloads (used inside export workspace)."""
     st.markdown(
@@ -2812,13 +3140,10 @@ def _render_export_results_block(export_rows: list, n_valid: int) -> None:
         unsafe_allow_html=True,
     )
     export_body_sub = (
-        "Download your research metrics in PDF, Word, or Excel. Set the filename below. "
-        "The export uses the metrics and table row order from steps (1)–(2), "
-        "and only the author(s) checked in step (3)."
+        "Set the filename, then download PDF, Word, or Excel. "
+        "The file uses authors from (1) and metric rows plus order from (2)–(3)."
         if n_valid > 1
-        else (
-            "Download your research metrics in PDF, Word, or Excel. Set the filename below."
-        )
+        else "Set the filename, then download PDF, Word, or Excel."
     )
     with st.container(border=True, key="export_results_shell"):
         st.markdown(
@@ -2985,8 +3310,8 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
         "fwci",
         "topJournal",
         "hIndex",
-        "collaboration",
-        "academicCorporateCollaboration",
+        *list(COLLABORATION_SUBMETRIC_IDS),
+        *list(ACADEMIC_CORPORATE_SUBMETRIC_IDS),
     ]
     compare_opts = [i for i in order_opts if i in en and i != "hIndex"]
     if len(valid) < 2 or not compare_opts:
@@ -3373,6 +3698,8 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                             "name": y_name,
                             "nameLocation": "middle",
                             "nameGap": 46,
+                            "nameRotate": 90,
+                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
                             "scale": True,
                         },
                         "series": bubble_series,
@@ -3491,6 +3818,7 @@ def main() -> None:
         st.stop()
 
     # --- Search + filters + metrics (compact search/filter shell) ---
+    analyze_metrics_inline = False
     with st.container():
         with st.container(border=True, key="search_shell"):
             st.markdown(
@@ -3558,122 +3886,140 @@ def main() -> None:
                 )
                 self_cit = st.session_state.self_cit_radio == "include"
 
-            st.markdown('<div class="minimal-section-divider"></div>', unsafe_allow_html=True)
+            # --- Metrics (same bordered SEARCH CONFIGURATION section) ---
+            with st.container(border=False, key="metrics_panel_shell"):
+                st.markdown(
+                    '<span class="skin-metrics-panel-shell" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<div class="metrics-panel-head-group">'
+                    '<p class="metrics-panel-heading">Select Metrics to Include</p>'
+                    '<p class="metrics-panel-head-caption">Toggle metrics on or off.</p>'
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
 
+                am = st.session_state.available_metrics
+                # Keep widget state as the single source of truth to avoid
+                # Streamlit warnings about using both `value` and Session State.
+                for m in am:
+                    mk = f"met_{m['id']}"
+                    if mk not in st.session_state:
+                        st.session_state[mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
+                            m["id"], True
+                        )
+                    m["enabled"] = bool(st.session_state.get(mk, True))
+                with st.container(border=False, key="metrics_toolbar_shell"):
+                    tb1, tb2, tb3 = st.columns([1, 1, 2], gap="small")
+                    with tb1:
+                        if st.button(
+                            "Select All",
+                            key="metrics_select_all",
+                            type="secondary",
+                            use_container_width=True,
+                        ):
+                            for m in am:
+                                m["enabled"] = True
+                                st.session_state[f"met_{m['id']}"] = True
+                    with tb2:
+                        if st.button(
+                            "Clear All",
+                            key="metrics_clear_all",
+                            type="secondary",
+                            use_container_width=True,
+                        ):
+                            for m in am:
+                                m["enabled"] = False
+                                st.session_state[f"met_{m['id']}"] = False
+                    # Re-sync after toolbar clicks so the count matches session_state
+                    # in the same run (otherwise n_on is stale until the next rerun).
+                    for m in am:
+                        _mk = f"met_{m['id']}"
+                        if _mk not in st.session_state:
+                            st.session_state[_mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
+                                m["id"], True
+                            )
+                        m["enabled"] = bool(st.session_state.get(_mk, True))
+                    n_on = sum(1 for m in am if m.get("enabled"))
+                    with tb3:
+                        st.markdown(
+                            f'<span class="metrics-count-bar">{n_on} of {len(am)} metrics selected</span>',
+                            unsafe_allow_html=True,
+                        )
+
+                with st.container(border=False, key="metrics_grid_shell"):
+                    for row_idx, row_start in enumerate(range(0, len(am), 4)):
+                        row_key = f"metrics_grid_row{row_idx}"
+                        row = am[row_start : row_start + 4]
+                        with st.container(border=False, key=row_key):
+                            cols = st.columns(4, gap="small")
+                            for i, metric in enumerate(row):
+                                with cols[i]:
+                                    with st.container(key=f"metric_cell_{metric['id']}"):
+                                        ct, csw = st.columns([1, 0.28], gap="small")
+                                        with ct:
+                                            # Avoid ``st.markdown`` here: GFM treats blank lines in help as new blocks.
+                                            st.html(
+                                                _metric_title_with_info_html(
+                                                    str(metric["id"]),
+                                                    str(metric["label"]),
+                                                ),
+                                                width="content",
+                                            )
+                                        with csw:
+                                            _mk = f"met_{metric['id']}"
+                                            metric["enabled"] = st.toggle(
+                                                metric["label"],
+                                                key=_mk,
+                                                label_visibility="collapsed",
+                                            )
+
+            st.markdown(
+                '<div class="minimal-section-divider"></div>',
+                unsafe_allow_html=True,
+            )
+
+            _raw_header_ids = st.session_state.get("scopus_author_ids") or ""
+            _parsed_header_ids = [
+                x.strip() for x in re.split(r"[,\n;]+", _raw_header_ids) if x.strip()
+            ]
+            _limit_cls_header = (
+                "author-limit-hint--warn"
+                if len(_parsed_header_ids) > MAX_AUTHORS_PER_RUN
+                else "author-limit-hint--ok"
+            )
+            st.markdown(
+                '<div class="author-input-header-row">'
+                '<span class="author-input-header-title">Scopus Author ID</span>'
+                '<div class="author-limit-hint author-limit-hint-inline '
+                f'{_limit_cls_header}"><span class="author-limit-icon" aria-hidden="true">👥</span>'
+                "<span><strong>Search up to "
+                f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
+                "Use commas, semicolons, or line breaks to separate entries. "
+                '<span class="author-limit-count">'
+                f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} entered"
+                "</span></span></div></div>",
+                unsafe_allow_html=True,
+            )
             author_ids = st.text_area(
-                "Scopus Author ID (preferred) or ORCID ID",
-                placeholder="Enter Scopus Author ID(s) or ORCID(s)...",
-                label_visibility="visible",
+                "Scopus Author ID",
+                placeholder="Enter Scopus Author ID(s)...",
+                label_visibility="collapsed",
                 key="scopus_author_ids",
                 height=96,
             )
             parsed_author_ids = [
                 x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
             ]
-            _limit_cls = (
-                "author-limit-hint--warn"
-                if len(parsed_author_ids) > MAX_AUTHORS_PER_RUN
-                else "author-limit-hint--ok"
-            )
-            st.markdown(
-                '<div class="author-limit-hint '
-                f'{_limit_cls}"><span class="author-limit-icon" aria-hidden="true">👥</span>'
-                "<span><strong>Search up to "
-                f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
-                "Use commas, semicolons, or line breaks to separate entries."
-                '<span class="author-limit-count">'
-                f"{len(parsed_author_ids)}/{MAX_AUTHORS_PER_RUN} entered"
-                "</span></span></div>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div class="minimal-go-analyze-wrap">'
-                '<a class="minimal-go-analyze-btn" href="#analyze-metrics-anchor">Go to Analyze</a>'
-                "</div>",
-                unsafe_allow_html=True,
-            )
-
-        # --- Metrics: own bordered panel (layered inside main card) ---
-        with st.container(border=True, key="metrics_panel_shell"):
-            st.markdown(
-                '<span class="skin-metrics-panel-shell" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<p class="metrics-panel-heading">Select Metrics to Include</p>',
-                unsafe_allow_html=True,
-            )
-            st.caption("Toggle metrics on or off.")
-
-            am = st.session_state.available_metrics
-            # Keep widget state as the single source of truth to avoid
-            # Streamlit warnings about using both `value` and Session State.
-            for m in am:
-                mk = f"met_{m['id']}"
-                if mk not in st.session_state:
-                    st.session_state[mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
-                        m["id"], True
-                    )
-                m["enabled"] = bool(st.session_state[mk])
-            n_on = sum(1 for m in am if m.get("enabled"))
-            with st.container(border=False, key="metrics_toolbar_shell"):
-                tb1, tb2, tb3 = st.columns([2, 1, 1])
-                with tb1:
-                    st.markdown(
-                        f'<span class="metrics-count-bar">{n_on} of {len(am)} metrics selected</span>',
-                        unsafe_allow_html=True,
-                    )
-                with tb2:
-                    if st.button(
-                        "Select All",
-                        key="metrics_select_all",
-                        type="secondary",
-                        use_container_width=True,
-                    ):
-                        for m in am:
-                            m["enabled"] = True
-                            st.session_state[f"met_{m['id']}"] = True
-                with tb3:
-                    if st.button(
-                        "Clear All",
-                        key="metrics_clear_all",
-                        type="secondary",
-                        use_container_width=True,
-                    ):
-                        for m in am:
-                            m["enabled"] = False
-                            st.session_state[f"met_{m['id']}"] = False
-
-            with st.container(border=False, key="metrics_grid_shell"):
-                for row_key, row_start in (
-                    ("metrics_grid_row0", 0),
-                    ("metrics_grid_row1", 4),
-                ):
-                    row = am[row_start : row_start + 4]
-                    with st.container(border=False, key=row_key):
-                        cols = st.columns(4, gap="small")
-                        for i, metric in enumerate(row):
-                            with cols[i]:
-                                with st.container(key=f"metric_cell_{metric['id']}"):
-                                    ct, csw = st.columns([1, 0.28], gap="small")
-                                    with ct:
-                                        st.markdown(
-                                            f'<p class="metric-compact-title">{html.escape(metric["label"])}</p>',
-                                            unsafe_allow_html=True,
-                                        )
-                                    with csw:
-                                        _mk = f"met_{metric['id']}"
-                                        _def_on = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
-                                            metric["id"], True
-                                        )
-                                        metric["enabled"] = st.toggle(
-                                            metric["label"],
-                                            value=bool(
-                                                st.session_state.get(_mk, _def_on)
-                                            ),
-                                            key=_mk,
-                                            label_visibility="collapsed",
-                                        )
+            _, _analyze_inline_col, _ = st.columns([1, 2, 1])
+            with _analyze_inline_col:
+                analyze_metrics_inline = st.button(
+                    "📊 Analyze Metrics",
+                    type="primary",
+                    use_container_width=True,
+                    key="analyze_metrics_inline",
+                )
 
         st.markdown(
             '<div id="analyze-metrics-anchor" class="analyze-anchor-tight"></div>',
@@ -3682,115 +4028,106 @@ def main() -> None:
         if not st.session_state.get("_deep_link_analyze_injected"):
             st.session_state._deep_link_analyze_injected = True
             components.html(_DEEP_LINK_ANALYZE_HTML, height=0, width=0)
-        with st.container(border=False, key="analyze_zone"):
-            st.markdown(
-                '<span class="skin-analyze-zone" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
+        if analyze_metrics_inline:
+            st.session_state.error_msg = ""
+            st.session_state.entitlement_error = False
+            st.session_state.rate_limit_error = False
+            st.session_state.results = []
+            # Parsed with same separators shown in the author input hint.
+            ids = parsed_author_ids
+            selected_metric_count = sum(
+                1 for m in st.session_state.available_metrics if m.get("enabled")
             )
-            if st.button(
-                "📊 Analyze Metrics",
-                type="primary",
-                use_container_width=True,
-            ):
-                st.session_state.error_msg = ""
-                st.session_state.entitlement_error = False
-                st.session_state.rate_limit_error = False
-                st.session_state.results = []
-                # Parsed with same separators shown in the author input hint.
-                ids = parsed_author_ids
-                selected_metric_count = sum(
-                    1 for m in st.session_state.available_metrics if m.get("enabled")
+            if not ids:
+                st.warning("Enter at least one Scopus Author ID.")
+            elif selected_metric_count == 0:
+                st.warning(
+                    f"Select at least one metric before analyzing ({selected_metric_count} of {len(st.session_state.available_metrics)} metrics selected)."
                 )
-                if not ids:
-                    st.warning("Enter at least one Scopus Author ID or ORCID.")
-                elif selected_metric_count == 0:
-                    st.warning(
-                        f"Select at least one metric before analyzing ({selected_metric_count} of {len(st.session_state.available_metrics)} metrics selected)."
-                    )
-                elif len(ids) > MAX_AUTHORS_PER_RUN:
-                    st.warning(
-                        f"Please limit to {MAX_AUTHORS_PER_RUN} Scopus Author IDs per run."
-                    )
-                else:
-                    svc = get_api_service()
-                    am_payload = [dict(m) for m in st.session_state.available_metrics]
-                    try:
-                        with st.spinner("Fetching metrics…"):
-                            if USE_DIRECT_API:
-                                st.caption(
-                                    "SciVal uses several requests in sequence; slow Elsevier responses "
-                                    "can take up to about a minute. If it stops with a timeout message, try again shortly."
-                                )
-                            resolved_ids, resolution_warnings = (
-                                resolve_author_ids_for_metrics_safe(
-                                    ids, api_key_effective
-                                )
+            elif len(ids) > MAX_AUTHORS_PER_RUN:
+                st.warning(
+                    f"Please limit to {MAX_AUTHORS_PER_RUN} Scopus Author IDs per run."
+                )
+            else:
+                svc = get_api_service()
+                am_payload = [dict(m) for m in st.session_state.available_metrics]
+                try:
+                    with st.spinner("Fetching metrics…"):
+                        if USE_DIRECT_API:
+                            st.caption(
+                                "SciVal uses several requests in sequence; slow Elsevier responses "
+                                "can take up to about a minute. If it stops with a timeout message, try again shortly."
                             )
-                            if resolution_warnings:
-                                msg = "Skipped unresolved ORCID input(s):\n- " + "\n- ".join(
-                                    resolution_warnings
+                        resolved_ids, resolution_warnings = (
+                            resolve_author_ids_for_metrics_safe(
+                                ids, api_key_effective
+                            )
+                        )
+                        if resolution_warnings:
+                            msg = "Skipped unresolved input(s):\n- " + "\n- ".join(
+                                resolution_warnings
+                            )
+                            st.warning(msg)
+                        if not resolved_ids:
+                            st.session_state.error_msg = (
+                                "No valid Scopus Author ID could be resolved from the input."
+                            )
+                            st.session_state.results = []
+                        elif len(resolved_ids) == 1:
+                            try:
+                                data = svc.get_author_metrics(
+                                    resolved_ids[0],
+                                    api_key_effective,
+                                    year_key,
+                                    am_payload,
+                                    docs_key,
+                                    self_cit,
                                 )
-                                st.warning(msg)
-                            if not resolved_ids:
-                                st.session_state.error_msg = (
-                                    "No valid Scopus Author ID could be resolved from the input."
-                                )
-                                st.session_state.results = []
-                            elif len(resolved_ids) == 1:
-                                try:
-                                    data = svc.get_author_metrics(
-                                        resolved_ids[0],
-                                        api_key_effective,
-                                        year_key,
-                                        am_payload,
-                                        docs_key,
-                                        self_cit,
-                                    )
+                                st.session_state.results = [
+                                    {
+                                        "id": resolved_ids[0],
+                                        "data": data,
+                                        "isEntitlementError": False,
+                                        "isRateLimitError": False,
+                                    }
+                                ]
+                            except APIError as e:
+                                st.session_state.error_msg = str(e)
+                                st.session_state.entitlement_error = e.is_entitlement_error
+                                st.session_state.rate_limit_error = e.is_rate_limit_error
+                                if is_missing_scival_api_key_error(str(e)) or is_scival_authentication_error(
+                                    str(e)
+                                ):
+                                    st.session_state.results = []
+                                else:
                                     st.session_state.results = [
                                         {
                                             "id": resolved_ids[0],
-                                            "data": data,
-                                            "isEntitlementError": False,
-                                            "isRateLimitError": False,
+                                            "data": {
+                                                "error": str(e),
+                                                "metrics": _placeholder_metrics(),
+                                            },
+                                            "isEntitlementError": e.is_entitlement_error,
+                                            "isRateLimitError": e.is_rate_limit_error,
                                         }
                                     ]
-                                except APIError as e:
-                                    st.session_state.error_msg = str(e)
-                                    st.session_state.entitlement_error = e.is_entitlement_error
-                                    st.session_state.rate_limit_error = e.is_rate_limit_error
-                                    if is_missing_scival_api_key_error(str(e)) or is_scival_authentication_error(
-                                        str(e)
-                                    ):
-                                        st.session_state.results = []
-                                    else:
-                                        st.session_state.results = [
-                                            {
-                                                "id": resolved_ids[0],
-                                                "data": {
-                                                    "error": str(e),
-                                                    "metrics": _placeholder_metrics(),
-                                                },
-                                                "isEntitlementError": e.is_entitlement_error,
-                                                "isRateLimitError": e.is_rate_limit_error,
-                                            }
-                                        ]
-                            else:
-                                st.session_state.results = (
-                                    _fetch_multi_author_metrics_with_progress(
-                                        svc,
-                                        resolved_ids,
-                                        api_key_effective,
-                                        year_key,
-                                        am_payload,
-                                        docs_key,
-                                        self_cit,
-                                    )
+                        else:
+                            st.session_state.results = (
+                                _fetch_multi_author_metrics_with_progress(
+                                    svc,
+                                    resolved_ids,
+                                    api_key_effective,
+                                    year_key,
+                                    am_payload,
+                                    docs_key,
+                                    self_cit,
                                 )
-                    except APIError as e:
-                        st.session_state.error_msg = str(e)
-                        st.session_state.results = []
-                    except Exception as e:
-                        st.session_state.error_msg = str(e)
+                            )
+                except APIError as e:
+                    st.session_state.error_msg = str(e)
+                    st.session_state.results = []
+                except Exception as e:
+                    st.session_state.error_msg = str(e)
 
     if st.session_state.error_msg:
         st.error(
@@ -3816,24 +4153,6 @@ def main() -> None:
             export_rows = []
             if len(valid) > 1:
                 with st.container(border=False, key="export_workspace_stack"):
-                    st.markdown(
-                        _export_workspace_module_head_html(bundle_prep=True),
-                        unsafe_allow_html=True,
-                    )
-                    if len(valid) >= 2:
-                        st.markdown(
-                            '<div class="analyze-hint" style="margin: 0 0 1rem 0;">'
-                            '<div class="analyze-hint-inner">'
-                            '<p class="analyze-hint-text">'
-                            "Select metrics, their order, and which author(s) to include in the export, "
-                            "then use Export Results below."
-                            "</p>"
-                            '<a class="analyze-hint-cta" href="#export-downloads-anchor">'
-                            "Jump to export <span aria-hidden=\"true\">↓</span>"
-                            "</a>"
-                            "</div></div>",
-                            unsafe_allow_html=True,
-                        )
                     with st.container(border=False, key="export_prep_inner"):
                         en_m = _enabled_metric_ids(st.session_state.available_metrics)
                         order_opts_m = [
@@ -3843,34 +4162,21 @@ def main() -> None:
                             "fwci",
                             "topJournal",
                             "hIndex",
-                            "collaboration",
-                            "academicCorporateCollaboration",
+                            *list(COLLABORATION_SUBMETRIC_IDS),
+                            *list(ACADEMIC_CORPORATE_SUBMETRIC_IDS),
                         ]
                         label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
                         opt_list_m = [i for i in order_opts_m if i in en_m]
                         st.markdown(
-                            '<p class="prepare-export-heading">Export options</p>',
+                            _export_options_heading_html(),
                             unsafe_allow_html=True,
                         )
                         st.caption(
-                            "Choose metrics to include, drag to set row order, then pick one or more "
-                            "authors. The PDF and Excel files produced in Export Results reflect only these choices."
-                        )
-                        picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
-                            opt_list_m,
-                            label_map_m,
-                            multiselect_label="Metrics to export",
-                            multiselect_key="export_bundle_metrics_ms",
-                            order_state_key="export_bundle_metrics_ord_state",
-                            sortable_key="export_bundle_metrics_sort",
-                            fallback_key="export_bundle_metrics_fallback",
-                            step_multiselect=1,
-                            step_order=2,
+                            "Pick authors first, then metrics and how rows are ordered. "
+                            "Export Results uses only what you set here."
                         )
                         st.markdown(
-                            '<p class="export-step-label" style="margin-top:0.65rem;">'
-                            '<span class="export-step-badge" aria-hidden="true">(3)</span>'
-                            '<span class="export-step-label-text">Author(s) to include in export</span></p>',
+                            _export_step_heading_html(1, "Author(s) to include in export"),
                             unsafe_allow_html=True,
                         )
                         _prev_bundle_pick = st.session_state.get("export_bundle_scholar_pick")
@@ -3885,6 +4191,17 @@ def main() -> None:
                                         st.session_state[chk_key] = True
                                 _nm = str(r["data"].get("authorName") or f"Author {aid}")
                                 st.checkbox(_nm, key=chk_key)
+                        picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
+                            opt_list_m,
+                            label_map_m,
+                            multiselect_label="Metrics to export",
+                            multiselect_key="export_bundle_metrics_ms",
+                            order_state_key="export_bundle_metrics_ord_state",
+                            sortable_key="export_bundle_metrics_sort",
+                            fallback_key="export_bundle_metrics_fallback",
+                            step_multiselect=2,
+                            step_order=3,
+                        )
                         export_scholar_pick = [
                             r["id"]
                             for r in valid
@@ -3944,8 +4261,8 @@ def main() -> None:
                         "fwci",
                         "topJournal",
                         "hIndex",
-                        "collaboration",
-                        "academicCorporateCollaboration",
+                        *list(COLLABORATION_SUBMETRIC_IDS),
+                        *list(ACADEMIC_CORPORATE_SUBMETRIC_IDS),
                     ]
                     label_map = {x["id"]: x["label"] for x in DEFAULT_METRICS}
                     opt_list = [i for i in order_opts if i in en]
@@ -4097,9 +4414,19 @@ def main() -> None:
                                         "xAxis": {
                                             "type": "category",
                                             "name": "Year",
+                                            "nameLocation": "middle",
+                                            "nameGap": 28,
+                                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
                                             "data": x_years,
                                         },
-                                        "yAxis": {"type": "value", "name": series_name_short},
+                                        "yAxis": {
+                                            "type": "value",
+                                            "name": series_name_short,
+                                            "nameLocation": "middle",
+                                            "nameGap": 56,
+                                            "nameRotate": 90,
+                                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                        },
                                         "series": [
                                             {
                                                 "name": series_name_short,
@@ -4128,10 +4455,6 @@ def main() -> None:
 
             if len(valid) == 1:
                 with st.container(border=False, key="export_workspace_stack"):
-                    st.markdown(
-                        _export_workspace_module_head_html(bundle_prep=False),
-                        unsafe_allow_html=True,
-                    )
                     _render_export_results_block(export_rows, len(valid))
 
     elif results:
@@ -4148,16 +4471,19 @@ def main() -> None:
 
 def _placeholder_metrics() -> dict:
     na = {"byYear": {}, "total": "N/A"}
-    return {
+    out = {
         "hIndex": {"value": "N/A"},
         "scholarlyOutput": dict(na),
         "fwci": dict(na),
         "topJournal": dict(na),
         "citationCount": dict(na),
         "citationsPerPublication": dict(na),
-        "collaboration": dict(na),
-        "academicCorporateCollaboration": dict(na),
     }
+    for _cid in COLLABORATION_SUBMETRIC_IDS:
+        out[_cid] = dict(na)
+    for _aid in ACADEMIC_CORPORATE_SUBMETRIC_IDS:
+        out[_aid] = dict(na)
+    return out
 
 
 if __name__ == "__main__":

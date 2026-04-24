@@ -29,49 +29,54 @@ const METRICS: MetricDef[] = [
   {
     id: "publication",
     title: "Publication",
-    description: "Scholarly output count by year",
+    description:
+      "Publication (Scholarly output): Scopus-indexed count, usually by publication year.",
     group: "core",
   },
   {
     id: "fwci",
     title: "Field-Weighted Citation Impact (FWCI)",
-    description: "Citation impact normalized by field",
+    description:
+      "FWCI: citations vs peer average for similar papers (1.0 = average); volatile when the set is small.",
     group: "core",
   },
   {
     id: "topJournal",
     title: "Top 10% Journal Percentile",
-    description: "Publications in top-tier journals",
+    description:
+      "Top 10% journals: share in journals SciVal ranks in the top tenth by CiteScore, SNIP, or SJR.",
     group: "core",
   },
   {
     id: "citationCount",
     title: "Citation Count",
-    description: "Total citation count",
+    description: "Citation count: total citations; chart years are publication years.",
     group: "core",
   },
   {
     id: "hIndex",
     title: "H-Index",
-    description: "Author productivity and citation impact",
+    description: "H-index: largest h where at least h papers each have ≥ h citations.",
     group: "core",
   },
   {
     id: "cpp",
     title: "Citations Per Publication",
-    description: "Average citations per publication",
+    description:
+      "Citations per publication: total citations divided by publication count in the window.",
     group: "core",
   },
   {
     id: "collab",
     title: "Collaboration",
-    description: "Collaboration patterns",
+    description: "SciVal collaboration-type splits (institutional / national / international / single author).",
     group: "collab",
   },
   {
     id: "acc",
     title: "Academic Corporate Collaboration",
-    description: "Academic–corporate collaboration",
+    description:
+      "Academic–corporate: papers with academic and corporate SciVal sectors on the same article.",
     group: "collab",
   },
 ];

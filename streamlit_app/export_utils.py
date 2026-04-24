@@ -14,6 +14,11 @@ from fpdf import FPDF
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from streamlit_app.api_service import (
+    ACADEMIC_CORPORATE_SUBMETRIC_IDS,
+    COLLABORATION_SUBMETRIC_IDS,
+)
+
 MetricGetter = Callable[[Dict[str, Any]], Dict[str, Any]]
 
 
@@ -109,18 +114,54 @@ METRIC_DEFS: List[Dict[str, Any]] = [
         "isYearBased": False,
     },
     {
-        "id": "collaboration",
-        "label": "Collaboration (International %)",
-        "getData": lambda m: m.get("collaboration")
+        "id": "collaborationInternational",
+        "label": "International collaboration %",
+        "getData": lambda m: m.get("collaborationInternational")
         or {"byYear": {}, "total": "N/A"},
         "isYearBased": True,
         "isCollaboration": True,
         "suffix": "%",
     },
     {
-        "id": "academicCorporateCollaboration",
-        "label": "Academic Corporate Collaboration %",
-        "getData": lambda m: m.get("academicCorporateCollaboration")
+        "id": "collaborationNational",
+        "label": "National collaboration %",
+        "getData": lambda m: m.get("collaborationNational")
+        or {"byYear": {}, "total": "N/A"},
+        "isYearBased": True,
+        "isCollaboration": True,
+        "suffix": "%",
+    },
+    {
+        "id": "collaborationInstitutional",
+        "label": "Institutional collaboration %",
+        "getData": lambda m: m.get("collaborationInstitutional")
+        or {"byYear": {}, "total": "N/A"},
+        "isYearBased": True,
+        "isCollaboration": True,
+        "suffix": "%",
+    },
+    {
+        "id": "collaborationSingleAuthorship",
+        "label": "Single authorship %",
+        "getData": lambda m: m.get("collaborationSingleAuthorship")
+        or {"byYear": {}, "total": "N/A"},
+        "isYearBased": True,
+        "isCollaboration": True,
+        "suffix": "%",
+    },
+    {
+        "id": "academicCorporateWith",
+        "label": "Academic–corporate collaboration %",
+        "getData": lambda m: m.get("academicCorporateWith")
+        or {"byYear": {}, "total": "N/A"},
+        "isYearBased": True,
+        "isCollaboration": True,
+        "suffix": "%",
+    },
+    {
+        "id": "academicCorporateWithout",
+        "label": "No academic–corporate collaboration %",
+        "getData": lambda m: m.get("academicCorporateWithout")
         or {"byYear": {}, "total": "N/A"},
         "isYearBased": True,
         "isCollaboration": True,
@@ -153,8 +194,14 @@ def _get_dynamic_years(author_data: Dict[str, Any]) -> List[str]:
         metrics.get("topJournal", {}).get("byYear") or {},
         metrics.get("citationCount", {}).get("byYear") or {},
         metrics.get("citationsPerPublication", {}).get("byYear") or {},
-        (metrics.get("collaboration") or {}).get("byYear") or {},
-        (metrics.get("academicCorporateCollaboration") or {}).get("byYear") or {},
+        *[
+            (metrics.get(cid) or {}).get("byYear") or {}
+            for cid in COLLABORATION_SUBMETRIC_IDS
+        ],
+        *[
+            (metrics.get(aid) or {}).get("byYear") or {}
+            for aid in ACADEMIC_CORPORATE_SUBMETRIC_IDS
+        ],
     ]
     years: set[int] = set()
     for yd in keys:
@@ -336,54 +383,6 @@ def export_pdf_bytes(data: List[Dict[str, Any]], filename_base: str = "research-
             pdf.ln()
             fill = not fill
 
-        collab_m = next((m for m in selected if m["id"] == "collaboration"), None)
-        if collab_m and (metrics.get("collaboration") or {}).get("collaborationTypes"):
-            pdf.ln(4)
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 8, _pdf_safe("Collaboration Breakdown"), ln=True)
-            pdf.set_font("Helvetica", "B", 9)
-            pdf.cell(90, 7, _pdf_safe("Collaboration Type"), border=1)
-            pdf.cell(40, 7, _pdf_safe("Average %"), border=1, ln=True)
-            pdf.set_font("Helvetica", "", 8)
-            for tname, tdata in (
-                metrics["collaboration"]["collaborationTypes"].items()
-            ):
-                label = re.sub(r"([A-Z])", r" \1", tname).strip()
-                pdf.cell(90, 6, _pdf_safe(label), border=1)
-                pdf.cell(
-                    40,
-                    6,
-                    _pdf_safe(_format_export_value(tdata.get("total"), "%")),
-                    border=1,
-                    ln=True,
-                )
-
-        acc_m = next(
-            (m for m in selected if m["id"] == "academicCorporateCollaboration"), None
-        )
-        if acc_m and (metrics.get("academicCorporateCollaboration") or {}).get(
-            "collaborationTypes"
-        ):
-            pdf.ln(4)
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 8, _pdf_safe("Academic Corporate Collaboration Breakdown"), ln=True)
-            pdf.set_font("Helvetica", "B", 9)
-            pdf.cell(90, 7, _pdf_safe("Collaboration Type"), border=1)
-            pdf.cell(40, 7, _pdf_safe("Average %"), border=1, ln=True)
-            pdf.set_font("Helvetica", "", 8)
-            for tname, tdata in metrics["academicCorporateCollaboration"][
-                "collaborationTypes"
-            ].items():
-                label = re.sub(r"([A-Z])", r" \1", tname).strip()
-                pdf.cell(90, 6, _pdf_safe(label), border=1)
-                pdf.cell(
-                    40,
-                    6,
-                    _pdf_safe(_format_export_value(tdata.get("total"), "%")),
-                    border=1,
-                    ln=True,
-                )
-
         if idx < len(validated) - 1:
             pdf.ln(6)
             pdf.set_draw_color(200, 200, 200)
@@ -457,7 +456,13 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
                 for y in years:
                     v = (d.get("byYear") or {}).get(y)
                     if v is not None:
-                        if mid in ("fwci", "citationsPerPublication"):
+                        if metric.get("isCollaboration"):
+                            cells.append(
+                                f"{int(v)}%"
+                                if isinstance(v, (int, float)) and v % 1 == 0
+                                else f"{float(v):.2f}%"
+                            )
+                        elif mid in ("fwci", "citationsPerPublication"):
                             cells.append(f"{float(v):.2f}")
                         else:
                             cells.append(str(round(v)))
@@ -465,7 +470,13 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
                         cells.append("N/A")
                 tot = d.get("total")
                 if isinstance(tot, (int, float)):
-                    if mid in ("fwci", "citationsPerPublication", "topJournal"):
+                    if metric.get("isCollaboration"):
+                        cells.append(
+                            f"{int(tot)}%"
+                            if tot % 1 == 0
+                            else f"{float(tot):.2f}%"
+                        )
+                    elif mid in ("fwci", "citationsPerPublication", "topJournal"):
                         cells.append(f"{float(tot):.2f}")
                     else:
                         cells.append(str(round(tot)))
@@ -484,52 +495,6 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
             for c, val in enumerate(cells, 1):
                 ws.cell(row, c, val)
             row += 1
-
-        collab_m = next((m for m in selected if m["id"] == "collaboration"), None)
-        if collab_m and (metrics.get("collaboration") or {}).get("collaborationTypes"):
-            row += 1
-            ws.cell(row, 1, "Collaboration Breakdown").font = Font(bold=True)
-            row += 1
-            ws.cell(row, 1, "Collaboration Type")
-            ws.cell(row, 2, "Average %")
-            row += 1
-            for tname, tdata in metrics["collaboration"]["collaborationTypes"].items():
-                label = re.sub(r"([A-Z])", r" \1", tname).strip()
-                ws.cell(row, 1, label)
-                tot = tdata.get("total")
-                ws.cell(
-                    row,
-                    2,
-                    f"{float(tot):.2f}" if isinstance(tot, (int, float)) else str(tot),
-                )
-                row += 1
-
-        acc_m = next(
-            (m for m in selected if m["id"] == "academicCorporateCollaboration"), None
-        )
-        if acc_m and (metrics.get("academicCorporateCollaboration") or {}).get(
-            "collaborationTypes"
-        ):
-            row += 1
-            ws.cell(row, 1, "Academic Corporate Collaboration Breakdown").font = Font(
-                bold=True
-            )
-            row += 1
-            ws.cell(row, 1, "Collaboration Type")
-            ws.cell(row, 2, "Average %")
-            row += 1
-            for tname, tdata in metrics["academicCorporateCollaboration"][
-                "collaborationTypes"
-            ].items():
-                label = re.sub(r"([A-Z])", r" \1", tname).strip()
-                ws.cell(row, 1, label)
-                tot = tdata.get("total")
-                ws.cell(
-                    row,
-                    2,
-                    f"{float(tot):.2f}" if isinstance(tot, (int, float)) else str(tot),
-                )
-                row += 1
 
         ws.column_dimensions["A"].width = 28
         for i in range(len(years)):
@@ -603,7 +568,13 @@ def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research
                 for y in years:
                     v = (d.get("byYear") or {}).get(y)
                     if v is not None:
-                        if mid in ("fwci", "citationsPerPublication"):
+                        if metric.get("isCollaboration"):
+                            cells.append(
+                                f"{int(v)}%"
+                                if isinstance(v, (int, float)) and v % 1 == 0
+                                else f"{float(v):.2f}%"
+                            )
+                        elif mid in ("fwci", "citationsPerPublication"):
                             cells.append(f"{float(v):.2f}")
                         else:
                             cells.append(str(round(v)))
@@ -611,7 +582,13 @@ def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research
                         cells.append("N/A")
                 tot = d.get("total")
                 if isinstance(tot, (int, float)):
-                    if mid in ("fwci", "citationsPerPublication", "topJournal"):
+                    if metric.get("isCollaboration"):
+                        cells.append(
+                            f"{int(tot)}%"
+                            if tot % 1 == 0
+                            else f"{float(tot):.2f}%"
+                        )
+                    elif mid in ("fwci", "citationsPerPublication", "topJournal"):
                         cells.append(f"{float(tot):.2f}")
                     else:
                         cells.append(str(round(tot)))
@@ -634,58 +611,6 @@ def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research
             table.columns[0].width = Inches(1.9)
         except (AttributeError, ValueError, TypeError):
             pass
-
-        collab_m = next((m for m in selected if m["id"] == "collaboration"), None)
-        if collab_m and (metrics.get("collaboration") or {}).get("collaborationTypes"):
-            doc.add_paragraph()
-            doc.add_heading("Collaboration Breakdown", level=2)
-            ct = doc.add_table(rows=1, cols=2)
-            ct.style = "Table Grid"
-            ct.rows[0].cells[0].text = "Collaboration Type"
-            ct.rows[0].cells[1].text = "Average %"
-            for run in ct.rows[0].cells[0].paragraphs[0].runs:
-                run.bold = True
-            for run in ct.rows[0].cells[1].paragraphs[0].runs:
-                run.bold = True
-            for tname, tdata in metrics["collaboration"]["collaborationTypes"].items():
-                label = re.sub(r"([A-Z])", r" \1", tname).strip()
-                r = ct.add_row().cells
-                r[0].text = label
-                tot = tdata.get("total")
-                r[1].text = (
-                    f"{float(tot):.2f}"
-                    if isinstance(tot, (int, float))
-                    else str(tot)
-                )
-
-        acc_m = next(
-            (m for m in selected if m["id"] == "academicCorporateCollaboration"), None
-        )
-        if acc_m and (metrics.get("academicCorporateCollaboration") or {}).get(
-            "collaborationTypes"
-        ):
-            doc.add_paragraph()
-            doc.add_heading("Academic Corporate Collaboration Breakdown", level=2)
-            ct2 = doc.add_table(rows=1, cols=2)
-            ct2.style = "Table Grid"
-            ct2.rows[0].cells[0].text = "Collaboration Type"
-            ct2.rows[0].cells[1].text = "Average %"
-            for run in ct2.rows[0].cells[0].paragraphs[0].runs:
-                run.bold = True
-            for run in ct2.rows[0].cells[1].paragraphs[0].runs:
-                run.bold = True
-            for tname, tdata in metrics["academicCorporateCollaboration"][
-                "collaborationTypes"
-            ].items():
-                label = re.sub(r"([A-Z])", r" \1", tname).strip()
-                r = ct2.add_row().cells
-                r[0].text = label
-                tot = tdata.get("total")
-                r[1].text = (
-                    f"{float(tot):.2f}"
-                    if isinstance(tot, (int, float))
-                    else str(tot)
-                )
 
     buf = io.BytesIO()
     doc.save(buf)

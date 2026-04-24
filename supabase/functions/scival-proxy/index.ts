@@ -185,57 +185,55 @@ function processCollaboration(data: any) {
 }
 
 function processAcademicCorporateCollaboration(data: any) {
+  const emptySlice = { byYear: {}, total: 'N/A' };
+  const collaborationTypes: any = {
+    withAcademicCorporate: { ...emptySlice },
+    noAcademicCorporate: { ...emptySlice },
+  };
+
   const metric = data.results?.[0]?.metrics?.[0];
   if (!metric || !metric.values) {
     return {
       byYear: {},
       total: 'N/A',
-      collaborationTypes: {
-        academicCorporate: { byYear: {}, total: 'N/A' },
-        academicOnly: { byYear: {}, total: 'N/A' },
-        corporateOnly: { byYear: {}, total: 'N/A' }
-      }
+      collaborationTypes,
     };
   }
-
-  const collaborationTypes: any = {
-    academicCorporate: { byYear: {}, total: 'N/A' },
-    academicOnly: { byYear: {}, total: 'N/A' },
-    corporateOnly: { byYear: {}, total: 'N/A' }
-  };
 
   let totalByYear: { [year: string]: number } = {};
 
   metric.values.forEach((collabData: any) => {
-    const collabType = collabData.collabType?.toLowerCase();
-    
-    // Use percentageByYear for collaboration data
+    const collabType = (collabData.collabType || '').toLowerCase();
+
     if (collabData.percentageByYear) {
       const normalizedData = normalizeYearDataWithFormatting(collabData.percentageByYear);
-      
-      // Calculate total percentage (average across years)
-      const values = Object.values(normalizedData);
-      const total = values.length > 0 ? formatPercentage(values.reduce((sum: number, val: number) => sum + val, 0) / values.length) : 'N/A';
-      
-      if (collabType?.includes('academic-corporate')) {
-        collaborationTypes.academicCorporate = { byYear: normalizedData, total };
-        totalByYear = normalizedData; // Use academic-corporate as main metric
-      } else if (collabType?.includes('academic only')) {
-        collaborationTypes.academicOnly = { byYear: normalizedData, total };
-      } else if (collabType?.includes('corporate only')) {
-        collaborationTypes.corporateOnly = { byYear: normalizedData, total };
+      const values = Object.values(normalizedData).filter(
+        (v: any) => typeof v === 'number' && !Number.isNaN(v)
+      ) as number[];
+      const total =
+        values.length > 0
+          ? formatPercentage(values.reduce((sum: number, val: number) => sum + val, 0) / values.length)
+          : 'N/A';
+
+      if (collabType.includes('no academic-corporate')) {
+        collaborationTypes.noAcademicCorporate = { byYear: normalizedData, total };
+      } else if (collabType.includes('academic-corporate')) {
+        collaborationTypes.withAcademicCorporate = { byYear: normalizedData, total };
+        totalByYear = normalizedData;
       }
     }
   });
 
-  // Calculate grand total as average percentage for academic-corporate collaboration
   const totalValues = Object.values(totalByYear);
-  const grandTotal = totalValues.length > 0 ? formatPercentage(totalValues.reduce((sum: number, val: number) => sum + val, 0) / totalValues.length) : 'N/A';
+  const grandTotal =
+    totalValues.length > 0
+      ? formatPercentage(totalValues.reduce((sum: number, val: number) => sum + val, 0) / totalValues.length)
+      : 'N/A';
 
   return {
     byYear: totalByYear,
     total: grandTotal,
-    collaborationTypes
+    collaborationTypes,
   };
 }
 
@@ -326,13 +324,28 @@ async function getAuthorMetrics(authorId: string, customApiKey?: string, yearRan
       citationInclTotalData = await fetchMetric(authorId, 'CitationCount', false, customApiKey, yearRange, 'true', includedDocs);
     }
 
-    // Fetch collaboration metrics
-    if (enabledMetricIds.includes('collaboration')) {
+    const collaborationSubIds = [
+      'collaborationInternational',
+      'collaborationNational',
+      'collaborationInstitutional',
+      'collaborationSingleAuthorship',
+    ];
+    const wantsCollaboration =
+      enabledMetricIds.includes('collaboration') ||
+      collaborationSubIds.some((id) => enabledMetricIds.includes(id));
+
+    // Fetch collaboration metrics (single API metric; split into four UI rows)
+    if (wantsCollaboration) {
       collaborationData = await fetchMetric(authorId, 'Collaboration', true, customApiKey, yearRange, 'false', includedDocs);
     }
 
     // Fetch academic corporate collaboration metrics
-    if (enabledMetricIds.includes('academicCorporateCollaboration')) {
+    const academicCorporateSubIds = ['academicCorporateWith', 'academicCorporateWithout'];
+    const wantsAcademicCorporate =
+      enabledMetricIds.includes('academicCorporateCollaboration') ||
+      academicCorporateSubIds.some((id) => enabledMetricIds.includes(id));
+
+    if (wantsAcademicCorporate) {
       academicCorporateCollaborationData = await fetchMetric(authorId, 'AcademicCorporateCollaboration', true, customApiKey, yearRange, 'false', includedDocs);
     }
 
@@ -376,18 +389,32 @@ async function getAuthorMetrics(authorId: string, customApiKey?: string, yearRan
       metrics.citationsIncl = { byYear: {}, total: 'N/A' };
     }
 
-    // Process collaboration metrics
+    // Process collaboration metrics → four dashboard keys (match Streamlit direct API)
+    const emptyCollabSlice = { byYear: {}, total: 'N/A' };
     if (collaborationData) {
-      metrics.collaboration = processCollaboration(collaborationData);
+      const cp = processCollaboration(collaborationData);
+      const ct = cp.collaborationTypes || {};
+      metrics.collaborationInstitutional = ct.institutional || { ...emptyCollabSlice };
+      metrics.collaborationNational = ct.national || { ...emptyCollabSlice };
+      metrics.collaborationSingleAuthorship = ct.singleAuthorship || { ...emptyCollabSlice };
+      metrics.collaborationInternational = ct.international || { ...emptyCollabSlice };
     } else {
-      metrics.collaboration = { byYear: {}, total: 'N/A' };
+      metrics.collaborationInstitutional = { ...emptyCollabSlice };
+      metrics.collaborationNational = { ...emptyCollabSlice };
+      metrics.collaborationSingleAuthorship = { ...emptyCollabSlice };
+      metrics.collaborationInternational = { ...emptyCollabSlice };
     }
 
     // Process academic corporate collaboration metrics
+    const emptyAccSlice = { byYear: {}, total: 'N/A' };
     if (academicCorporateCollaborationData) {
-      metrics.academicCorporateCollaboration = processAcademicCorporateCollaboration(academicCorporateCollaborationData);
+      const acp = processAcademicCorporateCollaboration(academicCorporateCollaborationData);
+      const act = acp.collaborationTypes || {};
+      metrics.academicCorporateWith = act.withAcademicCorporate || { ...emptyAccSlice };
+      metrics.academicCorporateWithout = act.noAcademicCorporate || { ...emptyAccSlice };
     } else {
-      metrics.academicCorporateCollaboration = { byYear: {}, total: 'N/A' };
+      metrics.academicCorporateWith = { ...emptyAccSlice };
+      metrics.academicCorporateWithout = { ...emptyAccSlice };
     }
 
     return {

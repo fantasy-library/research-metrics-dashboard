@@ -103,7 +103,12 @@ def make_chart(
             title_opts=opts.TitleOpts(title=f"{metric_name} ({'Year on X' if not invert_axes else 'Year on Y'})"),
             tooltip_opts=opts.TooltipOpts(trigger="axis"),
             xaxis_opts=opts.AxisOpts(name=x_title),
-            yaxis_opts=opts.AxisOpts(name=y_title),
+            yaxis_opts=opts.AxisOpts(
+                name=y_title,
+                name_location="middle",
+                name_gap=56,
+                name_rotate=90 if not invert_axes else 0,
+            ),
         )
         return chart
 
@@ -114,7 +119,12 @@ def make_chart(
         title_opts=opts.TitleOpts(title=f"{metric_name} ({'Year on X' if not invert_axes else 'Year on Y'})"),
         tooltip_opts=opts.TooltipOpts(trigger="axis"),
         xaxis_opts=opts.AxisOpts(name=x_title),
-        yaxis_opts=opts.AxisOpts(name=y_title),
+        yaxis_opts=opts.AxisOpts(
+            name=y_title,
+            name_location="middle",
+            name_gap=56,
+            name_rotate=90 if not invert_axes else 0,
+        ),
     )
     return chart
 
