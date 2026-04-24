@@ -22,6 +22,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_echarts5 import st_echarts
+from streamlit_sortables import sort_items
 from streamlit_app.api_service import (
     ACADEMIC_CORPORATE_SUBMETRIC_IDS,
     APIError,
@@ -3254,66 +3255,90 @@ def _render_export_results_block(
             )
 
 
-def _metric_order_swap_row(order_state_key: str, mid: str, delta: int) -> None:
-    cur = list(st.session_state.get(order_state_key, []))
-    if mid not in cur:
-        return
-    i = cur.index(mid)
-    j = i + delta
-    if j < 0 or j >= len(cur):
-        return
-    cur[i], cur[j] = cur[j], cur[i]
-    st.session_state[order_state_key] = cur
-
-
-def _metric_order_remove_row(
-    multiselect_key: str, order_state_key: str, mid: str
+def _metric_mock_row_remove(
+    order_state_key: str, removed_key: str, mid: str
 ) -> None:
-    ms = list(st.session_state.get(multiselect_key, []))
-    st.session_state[multiselect_key] = [x for x in ms if x != mid]
-    od = list(st.session_state.get(order_state_key, []))
-    st.session_state[order_state_key] = [x for x in od if x != mid]
+    sh = [m for m in st.session_state.get(order_state_key, []) if m != mid]
+    st.session_state[order_state_key] = sh
+    rm = list(st.session_state.get(removed_key, []))
+    if mid not in rm:
+        rm.append(mid)
+    st.session_state[removed_key] = rm
 
 
 def _metrics_multiselect_and_order_ui(
     opt_list: list[str],
     label_map: dict[str, str],
     *,
-    multiselect_label: str,
-    multiselect_key: str,
     order_state_key: str,
     sortable_key: str,
+    pick_via_order_ui_only: bool = False,
+    multiselect_label: str | None = None,
+    multiselect_key: str | None = None,
     step_multiselect: int | None = None,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Pick metrics, reorder rows (▲▼), and remove rows (×). Returns ``(picked, order_pick)``."""
-    if step_multiselect is not None:
-        st.markdown(
-            _export_step_heading_html(step_multiselect, multiselect_label),
-            unsafe_allow_html=True,
+    """Pick metrics (optional multiselect); drag-sort + × remove for single-author; export drag + multiselect."""
+    if not pick_via_order_ui_only and (
+        not multiselect_label or not multiselect_key
+    ):
+        raise TypeError(
+            "multiselect_label and multiselect_key are required when pick_via_order_ui_only is False"
         )
-    picked = st.multiselect(
-        multiselect_label,
-        options=opt_list,
-        default=opt_list,
-        format_func=lambda i: label_map.get(i, i),
-        key=multiselect_key,
-        label_visibility="collapsed" if step_multiselect is not None else "visible",
-    )
-    if not picked:
-        st.caption("Select at least one metric row to display.")
-        return [], []
 
-    existing_order = st.session_state.get(order_state_key, picked.copy())
-    existing_order = [m for m in existing_order if m in picked]
-    for m in picked:
-        if m not in existing_order:
-            existing_order.append(m)
-    st.session_state[order_state_key] = existing_order
-    order_pick = existing_order
+    removed_key = f"{order_state_key}__removed"
+    if pick_via_order_ui_only:
+        raw_shown = st.session_state.get(order_state_key)
+        raw_removed = st.session_state.get(removed_key)
+        removed: list[str] = (
+            [m for m in raw_removed if m in opt_list]
+            if isinstance(raw_removed, list)
+            else []
+        )
+        if isinstance(raw_shown, list) and raw_shown:
+            shown = [m for m in raw_shown if m in opt_list]
+        else:
+            shown = []
+        removed = [m for m in removed if m not in shown]
+        if not shown:
+            shown = [m for m in opt_list if m not in removed]
+        if not shown:
+            shown = list(opt_list)
+            removed = []
+        for m in opt_list:
+            if m not in shown and m not in removed:
+                shown.append(m)
+        st.session_state[order_state_key] = shown
+        st.session_state[removed_key] = removed
+        order_pick = list(shown)
+        picked = list(order_pick)
+        _pick_sig = hashlib.md5(",".join(sorted(order_pick)).encode()).hexdigest()[:12]
+    else:
+        if step_multiselect is not None:
+            st.markdown(
+                _export_step_heading_html(step_multiselect, multiselect_label or ""),
+                unsafe_allow_html=True,
+            )
+        picked = st.multiselect(
+            multiselect_label or "",
+            options=opt_list,
+            default=opt_list,
+            format_func=lambda i: label_map.get(i, i),
+            key=multiselect_key or "",
+            label_visibility="collapsed" if step_multiselect is not None else "visible",
+        )
+        if not picked:
+            st.caption("Select at least one metric row to display.")
+            return [], []
 
-    # Tie row widget keys to the current multiselect set so keys stay unique when selection changes.
-    _pick_sig = hashlib.md5(",".join(sorted(picked)).encode()).hexdigest()[:12]
+        existing_order = st.session_state.get(order_state_key, picked.copy())
+        existing_order = [m for m in existing_order if m in picked]
+        for m in picked:
+            if m not in existing_order:
+                existing_order.append(m)
+        st.session_state[order_state_key] = existing_order
+        order_pick = existing_order
+        _pick_sig = hashlib.md5(",".join(sorted(picked)).encode()).hexdigest()[:12]
 
     if step_order is not None:
         st.markdown(
@@ -3322,74 +3347,191 @@ def _metrics_multiselect_and_order_ui(
         )
     else:
         st.markdown("Display order (top to bottom)")
-    order_pick = [m for m in order_pick if m in picked]
-    st.session_state[order_state_key] = order_pick
-    st.caption(
-        "Reorder with ▲ and ▼. × removes the metric from this comparison "
-        "(select it again in the list above to show it again)."
-    )
-    st.markdown(
-        """
-        <style>
-        div.metric-order-row-label {
-          text-align: center;
-          font-weight: 600;
-          color: #1f2937;
-          background: #e0ecff;
-          border: 1px solid #bfd3ff;
-          border-radius: 8px;
-          padding: 10px 12px;
-          min-height: 2.5rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    for idx, mid in enumerate(order_pick):
-        label = label_map.get(mid, mid)
-        cu, cd, cl, cx = st.columns(
-            [0.65, 0.65, 12, 0.75], gap="small", vertical_alignment="center"
+
+    if pick_via_order_ui_only:
+        order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
+        picked = list(order_pick)
+        display_to_metric = {label_map.get(mid, mid): mid for mid in opt_list}
+        drag_style = """
+                    .sortable-component {
+                        border: 1px solid #e5e7eb;
+                        border-radius: 10px;
+                        padding: 8px;
+                        background: #f8fafc;
+                    }
+                    .sortable-container-header {
+                        display: none;
+                    }
+                    .sortable-item, .sortable-item:hover {
+                        background: #e0ecff;
+                        border: 1px solid #bfd3ff;
+                        color: #1f2937;
+                        font-weight: 600;
+                        border-radius: 8px;
+                    }
+                    """
+        sorted_labels: list[str] = []
+        if order_pick:
+            c_drag, c_del = st.columns([14, 0.72], gap="small", vertical_alignment="top")
+            with c_drag:
+                drag_labels = [label_map.get(m, m) for m in order_pick]
+                sorted_labels = sort_items(
+                    drag_labels,
+                    direction="vertical",
+                    custom_style=drag_style,
+                    key=f"{sortable_key}_{_pick_sig}_drag",
+                )
+            if (
+                isinstance(sorted_labels, list)
+                and sorted_labels
+                and all(isinstance(s, str) for s in sorted_labels)
+            ):
+                new_order = [
+                    display_to_metric[s]
+                    for s in sorted_labels
+                    if s in display_to_metric and display_to_metric[s] in opt_list
+                ]
+                if new_order:
+                    st.session_state[order_state_key] = new_order
+                    order_pick = new_order
+            with c_del:
+                st.markdown(
+                    '<div style="min-height:12px;padding-top:6px"></div>',
+                    unsafe_allow_html=True,
+                )
+                for mid in list(st.session_state.get(order_state_key, [])):
+                    if mid not in opt_list:
+                        continue
+                    if st.button(
+                        "×",
+                        key=f"{sortable_key}_{_pick_sig}_rm_{mid}",
+                        help="Remove from this comparison",
+                        type="tertiary",
+                    ):
+                        _metric_mock_row_remove(order_state_key, removed_key, mid)
+                        st.rerun()
+
+        removed_now = [
+            m
+            for m in st.session_state.get(removed_key, [])
+            if m in opt_list
+            and m not in st.session_state.get(order_state_key, [])
+        ]
+        st.session_state[removed_key] = removed_now
+        can_add = [m for m in opt_list if m not in st.session_state.get(order_state_key, [])]
+        if can_add:
+            c_a1, c_a2 = st.columns([3, 1], gap="small", vertical_alignment="bottom")
+            with c_a1:
+                to_add = st.selectbox(
+                    "Restore removed metric",
+                    options=can_add,
+                    index=0,
+                    format_func=lambda i: label_map.get(i, i),
+                    key=f"{sortable_key}_{_pick_sig}_restore_sel",
+                )
+            with c_a2:
+                if st.button("Add", key=f"{sortable_key}_{_pick_sig}_restore_btn"):
+                    od = list(st.session_state.get(order_state_key, []))
+                    if to_add in opt_list and to_add not in od:
+                        st.session_state[order_state_key] = od + [to_add]
+                        rm = [
+                            m
+                            for m in st.session_state.get(removed_key, [])
+                            if m != to_add
+                        ]
+                        st.session_state[removed_key] = rm
+                    st.rerun()
+
+        order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
+        picked = list(order_pick)
+        st.caption(
+            "Drag rows to reorder. × removes the row from the table; "
+            'use "Restore removed metric" to add it back.'
         )
-        with cu:
-            if st.button(
-                "▲",
-                key=f"{sortable_key}_{_pick_sig}_up_{mid}",
-                disabled=idx == 0,
-                help="Move up",
-            ):
-                _metric_order_swap_row(order_state_key, mid, -1)
-                st.rerun()
-        with cd:
-            if st.button(
-                "▼",
-                key=f"{sortable_key}_{_pick_sig}_dn_{mid}",
-                disabled=idx == len(order_pick) - 1,
-                help="Move down",
-            ):
-                _metric_order_swap_row(order_state_key, mid, 1)
-                st.rerun()
-        with cl:
-            st.markdown(
-                f'<div class="metric-order-row-label">{html.escape(label)}</div>',
-                unsafe_allow_html=True,
+    else:
+        sortable_style = """
+                    .sortable-component {
+                        border: 1px solid #e5e7eb;
+                        border-radius: 10px;
+                        padding: 8px;
+                        background: #f8fafc;
+                    }
+                    .sortable-container-header {
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                        color: #1f2937;
+                    }
+                    .sortable-item, .sortable-item:hover {
+                        background: #e0ecff;
+                        border: 1px solid #bfd3ff;
+                        color: #1f2937;
+                        font-weight: 600;
+                        border-radius: 8px;
+                    }
+                    """
+        order_pick = [m for m in order_pick if m in opt_list]
+        order_pick = [m for m in order_pick if m in picked]
+        st.session_state[order_state_key] = order_pick
+        display_to_metric = {label_map.get(m, m): m for m in order_pick}
+        sorted_display = sort_items(
+            list(display_to_metric.keys()),
+            direction="vertical",
+            custom_style=sortable_style,
+            key=f"{sortable_key}_{_pick_sig}_sc",
+        )
+        if (
+            isinstance(sorted_display, list)
+            and sorted_display
+            and all(isinstance(s, str) for s in sorted_display)
+        ):
+            order_pick = [
+                display_to_metric[s]
+                for s in sorted_display
+                if s in display_to_metric and display_to_metric[s] in picked
+            ]
+        else:
+            st.caption("Drag area unavailable. Use the fallback order control below.")
+            fallback_display = st.multiselect(
+                "Fallback order",
+                options=list(display_to_metric.keys()),
+                default=list(display_to_metric.keys()),
+                key=f"{sortable_key}_{_pick_sig}_fb",
+                label_visibility="collapsed",
             )
-        with cx:
-            if st.button(
-                "×",
-                key=f"{sortable_key}_{_pick_sig}_rm_{mid}",
-                help="Remove from this comparison",
-            ):
-                _metric_order_remove_row(multiselect_key, order_state_key, mid)
-                st.rerun()
-    picked = list(st.session_state.get(multiselect_key, picked))
-    if not picked:
-        st.caption("Select at least one metric row to display.")
-        return [], []
-    order_pick = [m for m in st.session_state.get(order_state_key, []) if m in picked]
+            if fallback_display:
+                order_pick = [
+                    display_to_metric[s]
+                    for s in fallback_display
+                    if s in display_to_metric and display_to_metric[s] in picked
+                ]
+            else:
+                order_pick = [
+                    m
+                    for m in st.session_state.get(order_state_key, [])
+                    if m in picked
+                ]
+        st.session_state[order_state_key] = order_pick
+        st.caption(
+            "Drag rows to reorder export columns. Change which metrics are included "
+            "using the list above."
+        )
+
+    if not pick_via_order_ui_only:
+        picked = list(st.session_state.get(multiselect_key or "", picked))
+        picked = [m for m in picked if m in opt_list]
+    order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
+    if not pick_via_order_ui_only:
+        order_pick = [m for m in order_pick if m in picked]
+    else:
+        picked = list(order_pick)
     st.session_state[order_state_key] = order_pick
+    if not picked:
+        st.caption(
+            "Select at least one metric row to display."
+            if not pick_via_order_ui_only
+            else "Drag at least one metric into **In table** to show it in the comparison."
+        )
+        return [], []
     st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
     return picked, order_pick
 
@@ -4337,10 +4479,10 @@ def main() -> None:
                     picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
                         opt_list_m,
                         label_map_m,
-                        multiselect_label="Metrics to export",
-                        multiselect_key="export_bundle_metrics_ms",
                         order_state_key="export_bundle_metrics_ord_state",
                         sortable_key="export_bundle_metrics_sort",
+                        multiselect_label="Metrics to export",
+                        multiselect_key="export_bundle_metrics_ms",
                         step_multiselect=2,
                         step_order=3,
                     )
@@ -4414,10 +4556,9 @@ def main() -> None:
                     picked, order_pick = _metrics_multiselect_and_order_ui(
                         opt_list,
                         label_map,
-                        multiselect_label="Rows to show in table",
-                        multiselect_key=f"multisel_{aid}",
                         order_state_key=f"multiord_state_{aid}_{card_idx}",
                         sortable_key=f"multiord_sort_{aid}_{card_idx}",
+                        pick_via_order_ui_only=True,
                     )
 
                     author_export_payload = {
