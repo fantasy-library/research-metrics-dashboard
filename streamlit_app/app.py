@@ -22,7 +22,6 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_echarts5 import st_echarts
-from streamlit_sortables import sort_items
 from streamlit_app.api_service import (
     ACADEMIC_CORPORATE_SUBMETRIC_IDS,
     APIError,
@@ -45,27 +44,6 @@ st.set_page_config(
 
 HKUST_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/profiles/ust/modules/custom/hkust_signature_affiliate/assets/images/HKUST-logo.png"
 LIB_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/core/assets/library/library_logo.png_transparent_bkgd_h300.png"
-
-_METRIC_ORDER_SORTABLE_STYLE = """
-                    .sortable-component {
-                        border: 1px solid #e5e7eb;
-                        border-radius: 10px;
-                        padding: 8px;
-                        background: #f8fafc;
-                    }
-                    .sortable-container-header {
-                        font-weight: 600;
-                        font-size: 0.9rem;
-                        color: #1f2937;
-                    }
-                    .sortable-item, .sortable-item:hover {
-                        background: #e0ecff;
-                        border: 1px solid #bfd3ff;
-                        color: #1f2937;
-                        font-weight: 600;
-                        border-radius: 8px;
-                    }
-                    """
 
 # Defer #analyze-metrics-anchor scroll until the node exists (avoids “wrong view then jump”).
 _DEEP_LINK_ANALYZE_HTML = """
@@ -442,7 +420,7 @@ def _inject_theme_css() -> None:
     st.markdown(
         """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap');
 
 /* Design tokens — primary actions & focus ring (Streamlit overrides use these hues) */
 :root {
@@ -1707,19 +1685,9 @@ p.metric-subtext {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  gap: 0.35rem 0.5rem;
   flex: 1;
   min-width: 220px;
-}
-.dash-title-stack {
-  flex: 1;
-  min-width: 0;
-}
-.dash-title-line {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
 }
 .dash-icon-badge {
   width: 42px;
@@ -1735,40 +1703,32 @@ p.metric-subtext {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
 }
 .dash-title-text {
-  font-family: "Cormorant Garamond", "Source Serif 4", Georgia, "Times New Roman", serif;
-  font-size: clamp(1.85rem, 3.6vw, 2.45rem);
-  font-weight: 600;
-  line-height: 1.12;
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.2;
   margin: 0;
-  padding: 0;
-  letter-spacing: 0.04em;
-  color: #0f172a;
-  font-feature-settings: "kern" 1, "liga" 1;
+  background: linear-gradient(90deg, #0f172a, #475569);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 .dash-badge-beta {
   display: inline-block;
-  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  font-size: 0.625rem;
+  background: linear-gradient(90deg, #f97316, #ef4444);
+  color: #fff;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 0.28rem 0.55rem;
-  border-radius: 6px;
-  line-height: 1;
-  vertical-align: 0.15em;
-  box-shadow: none;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35);
+  vertical-align: middle;
 }
 .dash-subtitle {
-  margin: 0.45rem 0 0;
-  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
   color: #64748b;
+  font-weight: 500;
 }
 .disclaimer-card-wrap {
   display: flex;
@@ -2535,12 +2495,10 @@ def _render_header_html() -> None:
     </div>
     <div class="dash-title-row">
       <div class="dash-icon-badge" aria-hidden="true">📊</div>
-      <div class="dash-title-stack">
-        <div class="dash-title-line">
-          <h1 class="dash-title-text">Research Impact Dashboard</h1>
-          <span class="dash-badge-beta">Beta</span>
-        </div>
-        <p class="dash-subtitle">HKUST bibliometric analysis</p>
+      <div>
+        <p class="dash-title-text" style="display:inline;">Research Impact Dashboard</p>
+        <span class="dash-badge-beta">BETA</span>
+        <p class="dash-subtitle">Analyze author metrics and research impact</p>
       </div>
     </div>
   </div>
@@ -3422,6 +3380,22 @@ def _metric_mock_row_remove(
     st.session_state[removed_key] = rm
 
 
+def _bundle_export_remove_metric(
+    order_state_key: str, multiselect_key: str, opt_list: list[str], mid: str
+) -> None:
+    """Drop one metric from export order and from the multiselect widget."""
+    st.session_state[order_state_key] = [
+        m for m in st.session_state.get(order_state_key, []) if m != mid
+    ]
+    if multiselect_key:
+        cur = st.session_state.get(multiselect_key)
+        if isinstance(cur, list):
+            st.session_state[multiselect_key] = [
+                m for m in cur if m != mid and m in opt_list
+            ]
+    st.rerun()
+
+
 def _sync_pick_via_metric_order_session(
     opt_list: list[str], order_state_key: str
 ) -> tuple[list[str], list[str], str, str]:
@@ -3604,7 +3578,7 @@ def _metrics_multiselect_and_order_ui(
     step_multiselect: int | None = None,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Export bundle: multiselect (add/remove) + drag reorder (streamlit-sortables)."""
+    """Export bundle: multiselect (add/remove) + row order (↑↓) and per-row remove (✕)."""
     if step_multiselect is not None:
         st.markdown(
             _export_step_heading_html(step_multiselect, multiselect_label or ""),
@@ -3645,29 +3619,56 @@ def _metrics_multiselect_and_order_ui(
     order_pick = [m for m in order_pick if m in picked_norm]
     st.session_state[order_state_key] = order_pick
 
-    display_to_metric = {label_map.get(m, m): m for m in order_pick}
-    sorted_display = sort_items(
-        [label_map.get(m, m) for m in order_pick],
-        direction="vertical",
-        custom_style=_METRIC_ORDER_SORTABLE_STYLE,
-        key=f"{sortable_key}_{_pick_sig}_bundle_sc",
-    )
-    if (
-        isinstance(sorted_display, list)
-        and sorted_display
-        and all(isinstance(s, str) for s in sorted_display)
-    ):
-        order_pick = [
-            display_to_metric[s]
-            for s in sorted_display
-            if s in display_to_metric and display_to_metric[s] in picked_norm
-        ]
-    else:
-        st.caption("Drag reorder is unavailable; order is unchanged this run.")
-    st.session_state[order_state_key] = order_pick
+    if order_pick:
+        with st.container(border=True):
+            for _i, _mid in enumerate(order_pick):
+                _lbl = label_map.get(_mid, _mid)
+                _c_pill, _c_up, _c_dn, _c_x = st.columns(
+                    [18, 1, 1, 1], gap="small", vertical_alignment="center"
+                )
+                with _c_pill:
+                    st.markdown(
+                        _metric_order_pill_cell_html(_lbl),
+                        unsafe_allow_html=True,
+                    )
+                with _c_up:
+                    if st.button(
+                        "↑",
+                        key=f"{sortable_key}_{_pick_sig}_up_{_mid}",
+                        disabled=_i == 0,
+                        help="Move up",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        _metric_order_swap_neighbor(order_state_key, _mid, "up")
+                with _c_dn:
+                    if st.button(
+                        "↓",
+                        key=f"{sortable_key}_{_pick_sig}_dn_{_mid}",
+                        disabled=_i >= len(order_pick) - 1,
+                        help="Move down",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        _metric_order_swap_neighbor(order_state_key, _mid, "down")
+                with _c_x:
+                    if st.button(
+                        "✕",
+                        key=f"{sortable_key}_{_pick_sig}_rmx_{_mid}",
+                        help=f"Remove «{_lbl}» from export",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        _bundle_export_remove_metric(
+                            order_state_key,
+                            multiselect_key or "",
+                            opt_list,
+                            _mid,
+                        )
 
     st.caption(
-        "Drag rows to reorder export columns. Add or remove metrics with **Metrics to export** above."
+        "Use **↑** / **↓** to change export column order. Click **✕** to remove a row "
+        "(turn it on again in **Metrics to export** above)."
     )
 
     picked = list(st.session_state.get(multiselect_key or "", picked))
