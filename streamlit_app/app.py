@@ -176,10 +176,15 @@ def _export_options_heading_html() -> str:
             f'<span class="prepare-export-heading-icon-fallback">{_EXPORT_WORKSPACE_ICON}</span>'
         )
     return (
+        '<div class="export-module-title-block">'
         '<div class="prepare-export-heading-row">'
         '<div class="prepare-export-heading-icon" aria-hidden="true">'
         f"{img_inner}</div>"
-        '<p class="prepare-export-heading">Export options</p>'
+        '<p class="prepare-export-heading">Export</p>'
+        "</div>"
+        "<p class=\"prepare-export-module-sub\">"
+        "Choose authors and metrics, then download PDF, Word, or Excel below."
+        "</p>"
         "</div>"
     )
 
@@ -670,8 +675,7 @@ footer[data-testid="stFooter"] {
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="true"]),
 [class*="st-key-dense_metric_"]:has(input:checked),
 [class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="true"]),
-[class*="st-key-metric_cell_"]:has(input:checked),
-[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="true"]) {
+[class*="st-key-metric_cell_"]:has([data-baseweb="switch"][aria-checked="true"]) {
   border-color: #a78bfa !important;
   background: linear-gradient(165deg, #faf5ff 0%, #ffffff 55%) !important;
   box-shadow:
@@ -684,8 +688,7 @@ footer[data-testid="stFooter"] {
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]),
 [class*="st-key-dense_metric_"]:has(input:not(:checked)),
 [class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="false"]),
-[class*="st-key-metric_cell_"]:has(input:not(:checked)),
-[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="false"]) {
+[class*="st-key-metric_cell_"]:has([data-baseweb="switch"][aria-checked="false"]) {
   border-color: #e5e7eb !important;
   background: #fafafa !important;
 }
@@ -694,7 +697,7 @@ footer[data-testid="stFooter"] {
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) label,
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) label,
 [class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="false"]) label,
-[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="false"]) label {
+[class*="st-key-metric_cell_"]:has([data-baseweb="switch"][aria-checked="false"]) label {
   color: #64748b !important;
 }
 [class*="st-key-metric_card_"]:has(input:not(:checked)) p.metric-subtext,
@@ -702,7 +705,7 @@ footer[data-testid="stFooter"] {
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext,
 [class*="st-key-metric_card_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext,
 [class*="st-key-dense_metric_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext,
-[class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="false"]) p.metric-subtext {
+[class*="st-key-metric_cell_"]:has([data-baseweb="switch"][aria-checked="false"]) p.metric-subtext {
   color: #94a3b8 !important;
 }
 
@@ -1870,12 +1873,12 @@ span.export-step-badge {
   flex-shrink: 0 !important;
 }
 
-/* Export workspace — self-contained lane (analysis/charts live above) */
-[class*="st-key-export_workspace_stack"] {
+/* Export workspace — one outer card (stack = single-author; bundle = configure + downloads) */
+:is([class*="st-key-export_workspace_stack"], [class*="st-key-export_workspace_bundle"]) {
   margin-top: 0.85rem !important;
   margin-bottom: 0.35rem !important;
-  padding: 1.35rem 1.45rem 1.55rem 1.55rem !important;
-  border-radius: 18px !important;
+  padding: 1.05rem 1.2rem 1.2rem 1.25rem !important;
+  border-radius: 16px !important;
   background: linear-gradient(
     165deg,
     #f8fafc 0%,
@@ -1890,7 +1893,49 @@ span.export-step-badge {
     0 4px 14px rgba(15, 23, 42, 0.06) !important;
   position: relative !important;
 }
-[class*="st-key-export_workspace_stack"]::before {
+.export-module-title-block {
+  margin: 0 0 0.5rem 0 !important;
+}
+.export-module-title-block .prepare-export-heading-row {
+  margin-bottom: 0.25rem !important;
+}
+.prepare-export-module-sub {
+  margin: 0 0 0.35rem 0 !important;
+  padding: 0 0.05rem 0 0 !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  line-height: 1.45 !important;
+  max-width: 44rem !important;
+}
+hr.export-bundle-divider {
+  border: none !important;
+  height: 0 !important;
+  margin: 0.65rem 0 0.75rem 0 !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.45) !important;
+  opacity: 1 !important;
+}
+.export-downloads-section {
+  margin: 0 0 0.35rem 0 !important;
+  padding: 0 !important;
+}
+.export-downloads-kicker {
+  margin: 0 0 0.2rem 0 !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.11em !important;
+  text-transform: uppercase !important;
+  color: #0f766e !important;
+}
+.export-downloads-hint {
+  margin: 0 0 0.55rem 0 !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  line-height: 1.45 !important;
+  max-width: 46rem !important;
+}
+:is([class*="st-key-export_workspace_stack"], [class*="st-key-export_workspace_bundle"])::before {
   content: "";
   position: absolute;
   left: 0;
@@ -1956,24 +2001,15 @@ header.export-workspace-module-head {
   color: #059669 !important;
   margin-bottom: 0.4rem !important;
 }
-[class*="st-key-export_prep_inner"] {
-  background: rgba(255, 255, 255, 0.88) !important;
-  border-radius: 14px !important;
-  padding: 1rem 1.2rem 1.15rem !important;
-  margin-bottom: 1.05rem !important;
-  border: 1px solid rgba(148, 163, 184, 0.35) !important;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
-}
-[class*="st-key-export_prep_inner"] .prepare-export-heading-row {
-  margin-top: 0.15rem !important;
-}
-hr.export-workspace-split {
+/* Merged bundle: downloads sit in same card as steps — no second padded frame */
+[class*="st-key-export_workspace_bundle"] [class*="st-key-export_results_shell"] {
+  background: transparent !important;
   border: none !important;
-  height: 0 !important;
-  margin: 0.2rem 0 1.15rem 0 !important;
-  border-top: 2px dashed rgba(16, 185, 129, 0.45) !important;
-  opacity: 1 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
+/* Single-author export: keep inner white panel for filename + buttons */
 [class*="st-key-export_workspace_stack"] [class*="st-key-export_results_shell"] {
   background: rgba(255, 255, 255, 0.97) !important;
   border-color: rgba(16, 185, 129, 0.28) !important;
@@ -2628,7 +2664,8 @@ DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {m["id"]: True for m in DEFAULT
 # v10: Collaboration metric labels + descriptions (operational definitions).
 # v11: Academic–corporate metric descriptions + (i) help text (SciVal definition).
 # v12: Collaboration submetrics UI/export order (international → national → institutional → single).
-_METRICS_SESSION_DEFAULT_VERSION = 12
+# v13: Re-init metric toggles; pass explicit ``value=`` + scope card CSS to Baseweb switch (default on).
+_METRICS_SESSION_DEFAULT_VERSION = 13
 
 YEAR_OPTIONS = {
     "3yrs": "Last 3 completed calendar years — compact recent window",
@@ -3133,8 +3170,10 @@ def _export_step_heading_html(step: int, text: str) -> str:
     )
 
 
-def _render_export_results_block(export_rows: list, n_valid: int) -> None:
-    """Anchor, copy, filename, and PDF / Word / Excel downloads (used inside export workspace)."""
+def _render_export_results_block(
+    export_rows: list, n_valid: int, *, embedded_in_workspace: bool = False
+) -> None:
+    """Anchor, copy, filename, and PDF / Word / Excel downloads."""
     st.markdown(
         '<div id="export-downloads-anchor"></div>',
         unsafe_allow_html=True,
@@ -3145,21 +3184,31 @@ def _render_export_results_block(export_rows: list, n_valid: int) -> None:
         if n_valid > 1
         else "Set the filename, then download PDF, Word, or Excel."
     )
-    with st.container(border=True, key="export_results_shell"):
-        st.markdown(
-            '<div class="export-results-head">'
-            '<div class="export-results-head-row">'
-            '<div class="export-results-badge" aria-hidden="true">'
-            f"{_FILTER_ICON_DOCUMENT}"
-            "</div>"
-            '<div class="export-results-head-text">'
-            '<p class="export-results-title">Export Results</p>'
-            '<p class="export-results-sub">'
-            f"{html.escape(export_body_sub)}"
-            "</p>"
-            "</div></div></div>",
-            unsafe_allow_html=True,
-        )
+    _shell_border = not embedded_in_workspace
+    with st.container(border=_shell_border, key="export_results_shell"):
+        if embedded_in_workspace:
+            st.markdown(
+                '<div class="export-downloads-section">'
+                '<p class="export-downloads-kicker">Downloads</p>'
+                f'<p class="export-downloads-hint">{html.escape(export_body_sub)}</p>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="export-results-head">'
+                '<div class="export-results-head-row">'
+                '<div class="export-results-badge" aria-hidden="true">'
+                f"{_FILTER_ICON_DOCUMENT}"
+                "</div>"
+                '<div class="export-results-head-text">'
+                '<p class="export-results-title">Export</p>'
+                '<p class="export-results-sub">'
+                f"{html.escape(export_body_sub)}"
+                "</p>"
+                "</div></div></div>",
+                unsafe_allow_html=True,
+            )
         fn = st.text_input(
             "Export filename (without extension)", value="research-metrics"
         )
@@ -3362,6 +3411,9 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                 label_visibility="collapsed",
             )
         line_short = _metric_short_label(label_map, line_metric)
+        _line_is_pct = line_metric in COLLABORATION_SUBMETRIC_IDS or line_metric in (
+            ACADEMIC_CORPORATE_SUBMETRIC_IDS
+        )
 
         with col_chart:
             if not inter_years:
@@ -3398,7 +3450,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         ser["label"] = {
                             "show": True,
                             "position": "top",
-                            "formatter": "{c}",
+                            "formatter": "{c}%" if _line_is_pct else "{c}",
                             "fontSize": 11,
                             "color": "#334155",
                         }
@@ -3409,6 +3461,16 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     toolbox_line["top"] = 8
                     line_legend_rows = max(1, (len(line_series) + 4) // 5)
                     line_grid_top = 128 + max(0, line_legend_rows - 1) * 22
+                    _yaxis_line = {
+                        "type": "value",
+                        "name": (f"{line_short} (%)" if _line_is_pct else line_short),
+                        "nameLocation": "middle",
+                        "nameGap": 58,
+                        "nameRotate": 90,
+                        "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                    }
+                    if _line_is_pct:
+                        _yaxis_line["axisLabel"] = {"formatter": "{value}%"}
                     line_opts = {
                         "animation": True,
                         "title": {
@@ -3453,14 +3515,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                             "nameTextStyle": {"fontSize": 11, "color": "#475569"},
                             "data": x_years,
                         },
-                        "yAxis": {
-                            "type": "value",
-                            "name": line_short,
-                            "nameLocation": "middle",
-                            "nameGap": 58,
-                            "nameRotate": 90,
-                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
-                        },
+                        "yAxis": _yaxis_line,
                         "series": line_series,
                         "dataZoom": [
                             {"type": "inside"},
@@ -3476,6 +3531,11 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         if v is None or (isinstance(v, (int, float)) and pd.isna(v)):
                             return "N/A"
                         if isinstance(v, (int, float)):
+                            if _line_is_pct:
+                                if v % 1 == 0:
+                                    return f"{int(v)}%"
+                                s = f"{float(v):.2f}".rstrip("0").rstrip(".")
+                                return f"{s}%"
                             return f"{v:.4f}".rstrip("0").rstrip(".")
                         return str(v)
 
@@ -3611,10 +3671,24 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     )
                 else:
 
-                    def _fmt_val(v: float) -> str:
+                    def _bubble_pct_metric(mid: str) -> bool:
+                        return mid in COLLABORATION_SUBMETRIC_IDS or mid in (
+                            ACADEMIC_CORPORATE_SUBMETRIC_IDS
+                        )
+
+                    def _fmt_bubble_val(v: float, mid: str) -> str:
+                        if _bubble_pct_metric(mid):
+                            if v % 1 == 0:
+                                return f"{int(v)}%"
+                            s = f"{float(v):.2f}".rstrip("0").rstrip(".")
+                            return f"{s}%"
                         if float(v).is_integer():
                             return str(int(v))
                         return f"{v:.4f}".rstrip("0").rstrip(".")
+
+                    _x_pct = _bubble_pct_metric(x_metric)
+                    _y_pct = _bubble_pct_metric(y_metric)
+                    _z_pct = _bubble_pct_metric(size_metric)
 
                     size_px = _bubble_symbol_sizes([p[3] for p in plotted])
 
@@ -3622,9 +3696,9 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     for i, (author_name, xv, yv, sv) in enumerate(plotted):
                         tooltip_text = (
                             f"{author_name}\n"
-                            f"{y_name}: {_fmt_val(yv)}\n"
-                            f"{x_name}: {_fmt_val(xv)}\n"
-                            f"{z_name}: {_fmt_val(sv)}"
+                            f"{y_name}: {_fmt_bubble_val(yv, y_metric)}\n"
+                            f"{x_name}: {_fmt_bubble_val(xv, x_metric)}\n"
+                            f"{z_name}: {_fmt_bubble_val(sv, size_metric)}"
                         )
                         bubble_series.append(
                             {
@@ -3650,7 +3724,11 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         "animation": True,
                         "title": {
                             "text": f"{y_lbl} vs {x_lbl}",
-                            "subtext": f"Bubble size: {sz_lbl} (period totals)",
+                            "subtext": (
+                                f"Bubble size: {sz_lbl} (%) (period totals)"
+                                if _z_pct
+                                else f"Bubble size: {sz_lbl} (period totals)"
+                            ),
                             "left": "center",
                             "top": 6,
                             "textStyle": {"fontSize": 15, "color": "#1e293b"},
@@ -3682,7 +3760,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         "toolbox": toolbox_bubble,
                         "xAxis": {
                             "type": "value",
-                            "name": x_name,
+                            "name": (f"{x_name} (%)" if _x_pct else x_name),
                             "nameLocation": "middle",
                             "nameGap": 40,
                             "nameTextStyle": {
@@ -3690,17 +3768,26 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                                 "color": "#475569",
                                 "padding": [0, 0, 4, 0],
                             },
-                            "axisLabel": {"margin": 10},
+                            "axisLabel": (
+                                {"margin": 10, "formatter": "{value}%"}
+                                if _x_pct
+                                else {"margin": 10}
+                            ),
                             "scale": True,
                         },
                         "yAxis": {
                             "type": "value",
-                            "name": y_name,
+                            "name": (f"{y_name} (%)" if _y_pct else y_name),
                             "nameLocation": "middle",
                             "nameGap": 46,
                             "nameRotate": 90,
                             "nameTextStyle": {"fontSize": 11, "color": "#475569"},
                             "scale": True,
+                            **(
+                                {"axisLabel": {"formatter": "{value}%"}}
+                                if _y_pct
+                                else {}
+                            ),
                         },
                         "series": bubble_series,
                         "dataZoom": [
@@ -3730,8 +3817,9 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                             for p in plotted
                         ]
                     )
-                    for col in (x_lbl, y_lbl, sz_lbl):
-                        tbl_df[col] = tbl_df[col].map(_fmt_val)
+                    tbl_df[x_lbl] = tbl_df[x_lbl].map(lambda v: _fmt_bubble_val(float(v), x_metric))
+                    tbl_df[y_lbl] = tbl_df[y_lbl].map(lambda v: _fmt_bubble_val(float(v), y_metric))
+                    tbl_df[sz_lbl] = tbl_df[sz_lbl].map(lambda v: _fmt_bubble_val(float(v), size_metric))
                     st.caption(
                         "Totals used for position and bubble size "
                         "(same period as your search):"
@@ -3901,8 +3989,8 @@ def main() -> None:
                 )
 
                 am = st.session_state.available_metrics
-                # Keep widget state as the single source of truth to avoid
-                # Streamlit warnings about using both `value` and Session State.
+                # Seed ``met_*`` in session before toggles; each toggle also passes
+                # ``value=`` so new widgets default on (serde default is otherwise False).
                 for m in am:
                     mk = f"met_{m['id']}"
                     if mk not in st.session_state:
@@ -3969,8 +4057,16 @@ def main() -> None:
                                             )
                                         with csw:
                                             _mk = f"met_{metric['id']}"
+                                            # Explicit ``value`` so first-time widget serde is not False;
+                                            # keep in sync with ``st.session_state`` (see ``register_widget``).
+                                            _def_on = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
+                                                metric["id"], True
+                                            )
+                                            _cur = bool(st.session_state.get(_mk, _def_on))
+                                            st.session_state[_mk] = _cur
                                             metric["enabled"] = st.toggle(
                                                 metric["label"],
+                                                value=_cur,
                                                 key=_mk,
                                                 label_visibility="collapsed",
                                             )
@@ -4152,85 +4248,85 @@ def main() -> None:
                 )
             export_rows = []
             if len(valid) > 1:
-                with st.container(border=False, key="export_workspace_stack"):
-                    with st.container(border=False, key="export_prep_inner"):
-                        en_m = _enabled_metric_ids(st.session_state.available_metrics)
-                        order_opts_m = [
-                            "publication",
-                            "citationCount",
-                            "citationsPerPublication",
-                            "fwci",
-                            "topJournal",
-                            "hIndex",
-                            *list(COLLABORATION_SUBMETRIC_IDS),
-                            *list(ACADEMIC_CORPORATE_SUBMETRIC_IDS),
-                        ]
-                        label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
-                        opt_list_m = [i for i in order_opts_m if i in en_m]
-                        st.markdown(
-                            _export_options_heading_html(),
-                            unsafe_allow_html=True,
-                        )
-                        st.caption(
-                            "Pick authors first, then metrics and how rows are ordered. "
-                            "Export Results uses only what you set here."
-                        )
-                        st.markdown(
-                            _export_step_heading_html(1, "Author(s) to include in export"),
-                            unsafe_allow_html=True,
-                        )
-                        _prev_bundle_pick = st.session_state.get("export_bundle_scholar_pick")
-                        with st.container(border=False, key="export_scholar_shell"):
-                            for r in valid:
-                                aid = r["id"]
-                                chk_key = f"export_scholar_inc_{aid}"
-                                if chk_key not in st.session_state:
-                                    if isinstance(_prev_bundle_pick, list):
-                                        st.session_state[chk_key] = aid in _prev_bundle_pick
-                                    else:
-                                        st.session_state[chk_key] = True
-                                _nm = str(r["data"].get("authorName") or f"Author {aid}")
-                                st.checkbox(_nm, key=chk_key)
-                        picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
-                            opt_list_m,
-                            label_map_m,
-                            multiselect_label="Metrics to export",
-                            multiselect_key="export_bundle_metrics_ms",
-                            order_state_key="export_bundle_metrics_ord_state",
-                            sortable_key="export_bundle_metrics_sort",
-                            fallback_key="export_bundle_metrics_fallback",
-                            step_multiselect=2,
-                            step_order=3,
-                        )
-                        export_scholar_pick = [
-                            r["id"]
-                            for r in valid
-                            if st.session_state.get(f"export_scholar_inc_{r['id']}", True)
-                        ]
-                        if not picked_m or not export_scholar_pick:
-                            st.info(
-                                "Select at least one metric and one author before generating the export."
-                            )
-                        for r in valid:
-                            if r["id"] not in export_scholar_pick:
-                                continue
-                            d = r["data"]
-                            aid = r["id"]
-                            export_rows.append(
-                                {
-                                    "authorId": aid,
-                                    "authorName": d.get("authorName"),
-                                    "metrics": d.get("metrics"),
-                                    "dataSource": d.get("dataSource"),
-                                    "selectedMetrics": picked_m,
-                                    "metricOrder": order_pick_m,
-                                }
-                            )
+                with st.container(border=False, key="export_workspace_bundle"):
+                    en_m = _enabled_metric_ids(st.session_state.available_metrics)
+                    order_opts_m = [
+                        "publication",
+                        "citationCount",
+                        "citationsPerPublication",
+                        "fwci",
+                        "topJournal",
+                        "hIndex",
+                        *list(COLLABORATION_SUBMETRIC_IDS),
+                        *list(ACADEMIC_CORPORATE_SUBMETRIC_IDS),
+                    ]
+                    label_map_m = {x["id"]: x["label"] for x in DEFAULT_METRICS}
+                    opt_list_m = [i for i in order_opts_m if i in en_m]
                     st.markdown(
-                        '<hr class="export-workspace-split" aria-hidden="true" />',
+                        _export_options_heading_html(),
                         unsafe_allow_html=True,
                     )
-                    _render_export_results_block(export_rows, len(valid))
+                    st.caption(
+                        "Authors and metrics here must match what you want in the export file."
+                    )
+                    st.markdown(
+                        _export_step_heading_html(1, "Author(s) to include in export"),
+                        unsafe_allow_html=True,
+                    )
+                    _prev_bundle_pick = st.session_state.get("export_bundle_scholar_pick")
+                    with st.container(border=False, key="export_scholar_shell"):
+                        for r in valid:
+                            aid = r["id"]
+                            chk_key = f"export_scholar_inc_{aid}"
+                            if chk_key not in st.session_state:
+                                if isinstance(_prev_bundle_pick, list):
+                                    st.session_state[chk_key] = aid in _prev_bundle_pick
+                                else:
+                                    st.session_state[chk_key] = True
+                            _nm = str(r["data"].get("authorName") or f"Author {aid}")
+                            st.checkbox(_nm, key=chk_key)
+                    picked_m, order_pick_m = _metrics_multiselect_and_order_ui(
+                        opt_list_m,
+                        label_map_m,
+                        multiselect_label="Metrics to export",
+                        multiselect_key="export_bundle_metrics_ms",
+                        order_state_key="export_bundle_metrics_ord_state",
+                        sortable_key="export_bundle_metrics_sort",
+                        fallback_key="export_bundle_metrics_fallback",
+                        step_multiselect=2,
+                        step_order=3,
+                    )
+                    export_scholar_pick = [
+                        r["id"]
+                        for r in valid
+                        if st.session_state.get(f"export_scholar_inc_{r['id']}", True)
+                    ]
+                    if not picked_m or not export_scholar_pick:
+                        st.info(
+                            "Select at least one metric and one author before generating the export."
+                        )
+                    for r in valid:
+                        if r["id"] not in export_scholar_pick:
+                            continue
+                        d = r["data"]
+                        aid = r["id"]
+                        export_rows.append(
+                            {
+                                "authorId": aid,
+                                "authorName": d.get("authorName"),
+                                "metrics": d.get("metrics"),
+                                "dataSource": d.get("dataSource"),
+                                "selectedMetrics": picked_m,
+                                "metricOrder": order_pick_m,
+                            }
+                        )
+                    st.markdown(
+                        '<hr class="export-bundle-divider" aria-hidden="true" />',
+                        unsafe_allow_html=True,
+                    )
+                    _render_export_results_block(
+                        export_rows, len(valid), embedded_in_workspace=True
+                    )
             else:
                 for card_idx, r in enumerate(valid):
                     aid = r["id"]
@@ -4364,6 +4460,9 @@ def main() -> None:
                                     if paren_match
                                     else str(series_name_full)
                                 )
+                                _plot_is_pct = plot_metric in COLLABORATION_SUBMETRIC_IDS or plot_metric in (
+                                    ACADEMIC_CORPORATE_SUBMETRIC_IDS
+                                )
                                 metrics_payload = d.get("metrics") or {}
                                 by_year = _extract_metric_by_year(metrics_payload, plot_metric)
                                 if not by_year:
@@ -4382,6 +4481,21 @@ def main() -> None:
                                         for v in values
                                     ]
                                     x_years = [str(y) for y in years]
+                                    _yaxis_single = {
+                                        "type": "value",
+                                        "name": (
+                                            f"{series_name_short} (%)"
+                                            if _plot_is_pct
+                                            else series_name_short
+                                        ),
+                                        "nameLocation": "middle",
+                                        "nameGap": 56,
+                                        "nameRotate": 90,
+                                        "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                    }
+                                    if _plot_is_pct:
+                                        _yaxis_single["axisLabel"] = {"formatter": "{value}%"}
+                                    _single_lbl_fmt = "{c}%" if _plot_is_pct else "{c}"
                                     echarts_options = {
                                         "animation": True,
                                         "title": {
@@ -4419,14 +4533,7 @@ def main() -> None:
                                             "nameTextStyle": {"fontSize": 11, "color": "#475569"},
                                             "data": x_years,
                                         },
-                                        "yAxis": {
-                                            "type": "value",
-                                            "name": series_name_short,
-                                            "nameLocation": "middle",
-                                            "nameGap": 56,
-                                            "nameRotate": 90,
-                                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
-                                        },
+                                        "yAxis": _yaxis_single,
                                         "series": [
                                             {
                                                 "name": series_name_short,
@@ -4436,7 +4543,7 @@ def main() -> None:
                                                 "label": {
                                                     "show": True,
                                                     "position": "top",
-                                                    "formatter": "{c}",
+                                                    "formatter": _single_lbl_fmt,
                                                 },
                                             }
                                         ],
