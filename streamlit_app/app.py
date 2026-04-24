@@ -49,6 +49,40 @@ _draggable_metric_pills = components.declare_component(
     path=str(_DRAGGABLE_PILLS_DIR),
 )
 
+
+def _pill_iframe_height(row_count: int) -> int:
+    """Pixel height sent in component args; Streamlit uses it before JS calls setFrameHeight."""
+    n = max(0, int(row_count))
+    return min(920, max(220, 88 + n * 60))
+
+
+def _call_draggable_metric_pills(
+    *,
+    items: list[str],
+    labels: dict[str, str],
+    key: str,
+    default: object | None = None,
+    height: int | None = None,
+) -> object | None:
+    """Run the SortableJS iframe; warn if static assets were not deployed."""
+    idx = _DRAGGABLE_PILLS_DIR / "index.html"
+    if not idx.is_file():
+        st.warning(
+            "The draggable metric list is unavailable because `draggable_pills_component` "
+            f"is missing from this server (expected `{idx}`). "
+            "Deploy the full repository, including that folder at the project root."
+        )
+        return default
+    h = height if height is not None else _pill_iframe_height(len(items))
+    return _draggable_metric_pills(
+        items=items,
+        labels=labels,
+        key=key,
+        default=default,
+        height=h,
+    )
+
+
 HKUST_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/profiles/ust/modules/custom/hkust_signature_affiliate/assets/images/HKUST-logo.png"
 LIB_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/core/assets/library/library_logo.png_transparent_bkgd_h300.png"
 
@@ -3327,7 +3361,7 @@ def _render_pick_via_metric_order_section(
     picked = list(order_pick)
     if order_pick:
         labels_payload = {m: label_map.get(m, m) for m in opt_list}
-        pill_event = _draggable_metric_pills(
+        pill_event = _call_draggable_metric_pills(
             items=order_pick,
             labels=labels_payload,
             key=f"{sortable_key}_{_pick_sig}_dnd",
@@ -3445,7 +3479,7 @@ def _metrics_multiselect_and_order_ui(
     st.session_state[order_state_key] = order_pick
 
     labels_payload = {m: label_map.get(m, m) for m in opt_list}
-    pill_event = _draggable_metric_pills(
+    pill_event = _call_draggable_metric_pills(
         items=order_pick,
         labels=labels_payload,
         key=f"{sortable_key}_{_pick_sig}_bundle_dnd",

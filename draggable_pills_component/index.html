@@ -59,9 +59,32 @@
         postToStreamlit(SET_COMPONENT_VALUE, { value: value, dataType: "json" });
       }
 
-      function setFrameHeight() {
-        var h = document.body.scrollHeight + 24;
-        postToStreamlit(SET_FRAME_HEIGHT, { height: h });
+      /* Streamlit shrinks the iframe until setFrameHeight runs; scrollHeight is often 0 on first paint. */
+      function computeFrameHeight(rowCount) {
+        var n = typeof rowCount === "number" ? rowCount : 0;
+        var minByRows = 56 + Math.max(n, 1) * 58;
+        var measured = Math.max(
+          document.body.scrollHeight,
+          document.documentElement.scrollHeight,
+          document.body.offsetHeight,
+          document.documentElement.offsetHeight
+        );
+        return Math.max(measured + 32, minByRows, 200);
+      }
+
+      function pushFrameHeight(rowCount) {
+        postToStreamlit(SET_FRAME_HEIGHT, { height: computeFrameHeight(rowCount) });
+      }
+
+      function scheduleFrameHeight(rowCount) {
+        function go() {
+          pushFrameHeight(rowCount);
+        }
+        go();
+        setTimeout(go, 0);
+        setTimeout(go, 80);
+        setTimeout(go, 250);
+        setTimeout(go, 700);
       }
 
       var sortableInstance = null;
@@ -125,11 +148,12 @@
                 lastOrder = newOrder;
                 sendComponentValue({ action: "reorder", items: newOrder });
               }
+              scheduleFrameHeight(list.children.length);
             }
           });
         }
 
-        setFrameHeight();
+        scheduleFrameHeight(items.length);
       }
 
       function onMessage(event) {
@@ -137,6 +161,13 @@
         if (!d || !d.isStreamlitMessage) return;
         if (d.type !== RENDER) return;
         var args = d.args || {};
+        if (typeof args === "string") {
+          try {
+            args = JSON.parse(args);
+          } catch (e) {
+            args = {};
+          }
+        }
         var items = Array.isArray(args.items) ? args.items : [];
         var labels = args.labels && typeof args.labels === "object" ? args.labels : {};
         renderList(items, labels);
