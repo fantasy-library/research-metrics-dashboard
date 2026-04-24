@@ -442,7 +442,7 @@ def _inject_theme_css() -> None:
     st.markdown(
         """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap');
 
 /* Design tokens — primary actions & focus ring (Streamlit overrides use these hues) */
 :root {
@@ -1707,9 +1707,19 @@ p.metric-subtext {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.35rem 0.5rem;
+  gap: 0.75rem 1rem;
   flex: 1;
   min-width: 220px;
+}
+.dash-title-stack {
+  flex: 1;
+  min-width: 0;
+}
+.dash-title-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
 }
 .dash-icon-badge {
   width: 42px;
@@ -1725,32 +1735,40 @@ p.metric-subtext {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
 }
 .dash-title-text {
-  font-size: 1.55rem;
-  font-weight: 700;
-  line-height: 1.2;
+  font-family: "Cormorant Garamond", "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: clamp(1.85rem, 3.6vw, 2.45rem);
+  font-weight: 600;
+  line-height: 1.12;
   margin: 0;
-  background: linear-gradient(90deg, #0f172a, #475569);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  padding: 0;
+  letter-spacing: 0.04em;
+  color: #0f172a;
+  font-feature-settings: "kern" 1, "liga" 1;
 }
 .dash-badge-beta {
   display: inline-block;
-  background: linear-gradient(90deg, #f97316, #ef4444);
-  color: #fff;
-  font-size: 0.68rem;
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-size: 0.625rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35);
-  vertical-align: middle;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.28rem 0.55rem;
+  border-radius: 6px;
+  line-height: 1;
+  vertical-align: 0.15em;
+  box-shadow: none;
 }
 .dash-subtitle {
-  margin: 0.2rem 0 0;
-  font-size: 0.88rem;
+  margin: 0.45rem 0 0;
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   color: #64748b;
-  font-weight: 500;
 }
 .disclaimer-card-wrap {
   display: flex;
@@ -2517,10 +2535,12 @@ def _render_header_html() -> None:
     </div>
     <div class="dash-title-row">
       <div class="dash-icon-badge" aria-hidden="true">📊</div>
-      <div>
-        <p class="dash-title-text" style="display:inline;">Research Impact Dashboard</p>
-        <span class="dash-badge-beta">BETA</span>
-        <p class="dash-subtitle">Analyze author metrics and research impact</p>
+      <div class="dash-title-stack">
+        <div class="dash-title-line">
+          <h1 class="dash-title-text">Research Impact Dashboard</h1>
+          <span class="dash-badge-beta">Beta</span>
+        </div>
+        <p class="dash-subtitle">HKUST bibliometric analysis</p>
       </div>
     </div>
   </div>
@@ -3230,7 +3250,10 @@ def _render_export_results_block(
         else "Set the filename, then download PDF, Word, or Excel."
     )
     _shell_border = not embedded_in_workspace
-    with st.container(border=_shell_border, key="export_results_shell"):
+    _shell_key = (
+        "export_results_shell_bundle" if embedded_in_workspace else "export_results_shell"
+    )
+    with st.container(border=_shell_border, key=_shell_key):
         if embedded_in_workspace:
             st.markdown(
                 '<div class="export-downloads-section">'
@@ -3313,7 +3336,7 @@ def _render_single_author_export_workspace(
             ),
             unsafe_allow_html=True,
         )
-        with st.container(border=True, key="export_results_shell"):
+        with st.container(border=True, key="export_results_shell_single"):
             fn = st.text_input(
                 "Export filename (without extension)",
                 value="research-metrics",
@@ -3349,36 +3372,42 @@ def _render_single_author_export_workspace(
                         "metricOrder": list(_ord_final),
                     }
                 )
-            b1, b2, b3 = st.columns(3, gap="xxsmall")
-            with b1:
-                pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
-                st.download_button(
-                    "Export as PDF",
-                    pdf_b,
-                    file_name=pdf_n,
-                    mime="application/pdf",
-                    use_container_width=False,
-                    key="export_pdf_single_author_ws",
-                )
-            with b2:
-                doc_b, doc_n = export_docx_bytes(export_rows, fn)
-                st.download_button(
-                    "Export as Word",
-                    doc_b,
-                    file_name=doc_n,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=False,
-                    key="export_docx_single_author_ws",
-                )
-            with b3:
-                xl_b, xl_n = export_excel_bytes(export_rows, fn)
-                st.download_button(
-                    "Export as Excel",
-                    xl_b,
-                    file_name=xl_n,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=False,
-                    key="export_xlsx_single_author_ws",
+            if export_rows:
+                b1, b2, b3 = st.columns(3, gap="xxsmall")
+                with b1:
+                    pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
+                    st.download_button(
+                        "Export as PDF",
+                        pdf_b,
+                        file_name=pdf_n,
+                        mime="application/pdf",
+                        use_container_width=False,
+                        key="export_pdf_single_author_ws",
+                    )
+                with b2:
+                    doc_b, doc_n = export_docx_bytes(export_rows, fn)
+                    st.download_button(
+                        "Export as Word",
+                        doc_b,
+                        file_name=doc_n,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=False,
+                        key="export_docx_single_author_ws",
+                    )
+                with b3:
+                    xl_b, xl_n = export_excel_bytes(export_rows, fn)
+                    st.download_button(
+                        "Export as Excel",
+                        xl_b,
+                        file_name=xl_n,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=False,
+                        key="export_xlsx_single_author_ws",
+                    )
+            else:
+                st.caption(
+                    "Add at least one metric (use **Restore removed metric** below) "
+                    "to enable PDF, Word, and Excel export."
                 )
 
 
@@ -3575,7 +3604,7 @@ def _metrics_multiselect_and_order_ui(
     step_multiselect: int | None = None,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Export bundle: multiselect (add/remove) + drag reorder + remove (streamlit-sortables)."""
+    """Export bundle: multiselect (add/remove) + drag reorder (streamlit-sortables)."""
     if step_multiselect is not None:
         st.markdown(
             _export_step_heading_html(step_multiselect, multiselect_label or ""),
@@ -3637,33 +3666,8 @@ def _metrics_multiselect_and_order_ui(
         st.caption("Drag reorder is unavailable; order is unchanged this run.")
     st.session_state[order_state_key] = order_pick
 
-    rm_labels = [label_map.get(m, m) for m in order_pick]
-    if rm_labels:
-        inv_lbl = {label_map.get(m, m): m for m in order_pick}
-        rm_sel_key = f"{sortable_key}_{_pick_sig}_bundle_rm_sel"
-        b1, b2 = st.columns([4, 1], gap="small", vertical_alignment="bottom")
-        with b1:
-            st.selectbox(
-                "Remove a metric from the export list",
-                options=rm_labels,
-                key=rm_sel_key,
-            )
-        with b2:
-            if st.button("Remove", key=f"{sortable_key}_{_pick_sig}_bundle_rm_btn"):
-                lbl = st.session_state.get(rm_sel_key)
-                if isinstance(lbl, str) and lbl in inv_lbl:
-                    mid = inv_lbl[lbl]
-                    new_order = [m for m in order_pick if m != mid]
-                    st.session_state[order_state_key] = new_order
-                    mk = multiselect_key or ""
-                    if mk:
-                        sel = [m for m in st.session_state.get(mk, []) if m != mid]
-                        st.session_state[mk] = sel
-                    st.rerun()
-
     st.caption(
-        "Drag rows to reorder export columns. Use **Remove** to drop a metric from the export, "
-        "or change the selection in the multiselect above."
+        "Drag rows to reorder export columns. Add or remove metrics with **Metrics to export** above."
     )
 
     picked = list(st.session_state.get(multiselect_key or "", picked))
