@@ -22,6 +22,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_echarts5 import st_echarts
+from streamlit_sortables import sort_items
 from streamlit_app.api_service import (
     ACADEMIC_CORPORATE_SUBMETRIC_IDS,
     APIError,
@@ -35,8 +36,6 @@ from streamlit_app.api_service import (
 from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_API
 from streamlit_app.export_utils import export_docx_bytes, export_excel_bytes, export_pdf_bytes
 
-_DRAGGABLE_PILLS_DIR = (_ROOT / "draggable_pills_component").resolve()
-
 st.set_page_config(
     page_title="Research Metrics Dashboard",
     page_icon="📊",
@@ -44,47 +43,29 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-_draggable_metric_pills = components.declare_component(
-    "draggable_metric_pills",
-    path=str(_DRAGGABLE_PILLS_DIR),
-)
-
-
-def _pill_iframe_height(row_count: int) -> int:
-    """Pixel height sent in component args; Streamlit uses it before JS calls setFrameHeight."""
-    n = max(0, int(row_count))
-    return min(920, max(220, 88 + n * 60))
-
-
-def _call_draggable_metric_pills(
-    *,
-    items: list[str],
-    labels: dict[str, str],
-    key: str,
-    default: object | None = None,
-    height: int | None = None,
-) -> object | None:
-    """Run the SortableJS iframe; warn if static assets were not deployed."""
-    idx = _DRAGGABLE_PILLS_DIR / "index.html"
-    if not idx.is_file():
-        st.warning(
-            "The draggable metric list is unavailable because `draggable_pills_component` "
-            f"is missing from this server (expected `{idx}`). "
-            "Deploy the full repository, including that folder at the project root."
-        )
-        return default
-    h = height if height is not None else _pill_iframe_height(len(items))
-    return _draggable_metric_pills(
-        items=items,
-        labels=labels,
-        key=key,
-        default=default,
-        height=h,
-    )
-
-
 HKUST_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/profiles/ust/modules/custom/hkust_signature_affiliate/assets/images/HKUST-logo.png"
 LIB_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/core/assets/library/library_logo.png_transparent_bkgd_h300.png"
+
+_METRIC_ORDER_SORTABLE_STYLE = """
+                    .sortable-component {
+                        border: 1px solid #e5e7eb;
+                        border-radius: 10px;
+                        padding: 8px;
+                        background: #f8fafc;
+                    }
+                    .sortable-container-header {
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                        color: #1f2937;
+                    }
+                    .sortable-item, .sortable-item:hover {
+                        background: #e0ecff;
+                        border: 1px solid #bfd3ff;
+                        color: #1f2937;
+                        font-weight: 600;
+                        border-radius: 8px;
+                    }
+                    """
 
 # Defer #analyze-metrics-anchor scroll until the node exists (avoids “wrong view then jump”).
 _DEEP_LINK_ANALYZE_HTML = """
@@ -3349,7 +3330,7 @@ def _render_pick_via_metric_order_section(
     _pick_sig: str,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Display order for single-author: SortableJS pills (drag reorder + ×) via custom component."""
+    """Display order for single-author: drag-reorder list + remove control (streamlit-sortables)."""
     if step_order is not None:
         st.markdown(
             _export_step_heading_html(step_order, "Display order (top to bottom)"),
@@ -3360,26 +3341,46 @@ def _render_pick_via_metric_order_section(
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     picked = list(order_pick)
     if order_pick:
-        labels_payload = {m: label_map.get(m, m) for m in opt_list}
-        pill_event = _call_draggable_metric_pills(
-            items=order_pick,
-            labels=labels_payload,
-            key=f"{sortable_key}_{_pick_sig}_dnd",
-            default=None,
+        display_to_metric = {label_map.get(m, m): m for m in order_pick}
+        sorted_display = sort_items(
+            [label_map.get(m, m) for m in order_pick],
+            direction="vertical",
+            custom_style=_METRIC_ORDER_SORTABLE_STYLE,
+            key=f"{sortable_key}_{_pick_sig}_sc",
         )
-        if isinstance(pill_event, dict):
-            act = pill_event.get("action")
-            if act == "delete" and isinstance(pill_event.get("item"), str):
-                mid = pill_event["item"]
-                if mid in opt_list and mid in st.session_state.get(order_state_key, []):
-                    _metric_mock_row_remove(order_state_key, removed_key, mid)
-                    st.rerun()
-            elif act == "reorder" and isinstance(pill_event.get("items"), list):
-                raw = [x for x in pill_event["items"] if isinstance(x, str) and x in opt_list]
-                same_set = len(raw) == len(order_pick) and set(raw) == set(order_pick)
-                if same_set and raw != order_pick:
-                    st.session_state[order_state_key] = raw
-                    st.rerun()
+        if (
+            isinstance(sorted_display, list)
+            and sorted_display
+            and all(isinstance(s, str) for s in sorted_display)
+        ):
+            order_pick = [
+                display_to_metric[s]
+                for s in sorted_display
+                if s in display_to_metric and display_to_metric[s] in opt_list
+            ]
+        else:
+            st.caption("Drag reorder is unavailable; order is unchanged this run.")
+        st.session_state[order_state_key] = order_pick
+
+        rm_labels = [label_map.get(m, m) for m in order_pick]
+        if rm_labels:
+            inv_lbl = {label_map.get(m, m): m for m in order_pick}
+            rm_sel_key = f"{sortable_key}_{_pick_sig}_rm_sel"
+            r1, r2 = st.columns([4, 1], gap="small", vertical_alignment="bottom")
+            with r1:
+                st.selectbox(
+                    "Remove a metric from this comparison",
+                    options=rm_labels,
+                    key=rm_sel_key,
+                )
+            with r2:
+                if st.button("Remove", key=f"{sortable_key}_{_pick_sig}_rm_btn"):
+                    lbl = st.session_state.get(rm_sel_key)
+                    if isinstance(lbl, str) and lbl in inv_lbl:
+                        _metric_mock_row_remove(
+                            order_state_key, removed_key, inv_lbl[lbl]
+                        )
+                        st.rerun()
 
     removed_now = [
         m
@@ -3414,8 +3415,8 @@ def _render_pick_via_metric_order_section(
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     picked = list(order_pick)
     st.caption(
-        "Drag pills to reorder. Click × on a pill to remove that metric; "
-        'use "Restore removed metric" to add it back.'
+        "Drag rows to reorder. Pick a metric and click **Remove** to drop it from this comparison; "
+        'use **Restore removed metric** to add it back.'
     )
     if not picked:
         st.caption(
@@ -3437,7 +3438,7 @@ def _metrics_multiselect_and_order_ui(
     step_multiselect: int | None = None,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Export bundle: multiselect (add/remove) + draggable pills (reorder/remove) kept in sync."""
+    """Export bundle: multiselect (add/remove) + drag reorder + remove (streamlit-sortables)."""
     if step_multiselect is not None:
         st.markdown(
             _export_step_heading_html(step_multiselect, multiselect_label or ""),
@@ -3478,36 +3479,54 @@ def _metrics_multiselect_and_order_ui(
     order_pick = [m for m in order_pick if m in picked_norm]
     st.session_state[order_state_key] = order_pick
 
-    labels_payload = {m: label_map.get(m, m) for m in opt_list}
-    pill_event = _call_draggable_metric_pills(
-        items=order_pick,
-        labels=labels_payload,
-        key=f"{sortable_key}_{_pick_sig}_bundle_dnd",
-        default=None,
+    display_to_metric = {label_map.get(m, m): m for m in order_pick}
+    sorted_display = sort_items(
+        [label_map.get(m, m) for m in order_pick],
+        direction="vertical",
+        custom_style=_METRIC_ORDER_SORTABLE_STYLE,
+        key=f"{sortable_key}_{_pick_sig}_bundle_sc",
     )
-    if isinstance(pill_event, dict):
-        act = pill_event.get("action")
-        if act == "delete" and isinstance(pill_event.get("item"), str):
-            mid = pill_event["item"]
-            cur_ord = list(st.session_state.get(order_state_key, []))
-            if mid in opt_list and mid in cur_ord:
-                new_order = [m for m in cur_ord if m != mid]
-                st.session_state[order_state_key] = new_order
-                mk = multiselect_key or ""
-                if mk:
-                    sel = [m for m in st.session_state.get(mk, []) if m != mid]
-                    st.session_state[mk] = sel
-                st.rerun()
-        elif act == "reorder" and isinstance(pill_event.get("items"), list):
-            raw = [x for x in pill_event["items"] if isinstance(x, str) and x in opt_list]
-            same_set = len(raw) == len(order_pick) and set(raw) == set(order_pick)
-            if same_set and raw != order_pick:
-                st.session_state[order_state_key] = raw
-                st.rerun()
+    if (
+        isinstance(sorted_display, list)
+        and sorted_display
+        and all(isinstance(s, str) for s in sorted_display)
+    ):
+        order_pick = [
+            display_to_metric[s]
+            for s in sorted_display
+            if s in display_to_metric and display_to_metric[s] in picked_norm
+        ]
+    else:
+        st.caption("Drag reorder is unavailable; order is unchanged this run.")
+    st.session_state[order_state_key] = order_pick
+
+    rm_labels = [label_map.get(m, m) for m in order_pick]
+    if rm_labels:
+        inv_lbl = {label_map.get(m, m): m for m in order_pick}
+        rm_sel_key = f"{sortable_key}_{_pick_sig}_bundle_rm_sel"
+        b1, b2 = st.columns([4, 1], gap="small", vertical_alignment="bottom")
+        with b1:
+            st.selectbox(
+                "Remove a metric from the export list",
+                options=rm_labels,
+                key=rm_sel_key,
+            )
+        with b2:
+            if st.button("Remove", key=f"{sortable_key}_{_pick_sig}_bundle_rm_btn"):
+                lbl = st.session_state.get(rm_sel_key)
+                if isinstance(lbl, str) and lbl in inv_lbl:
+                    mid = inv_lbl[lbl]
+                    new_order = [m for m in order_pick if m != mid]
+                    st.session_state[order_state_key] = new_order
+                    mk = multiselect_key or ""
+                    if mk:
+                        sel = [m for m in st.session_state.get(mk, []) if m != mid]
+                        st.session_state[mk] = sel
+                    st.rerun()
 
     st.caption(
-        "Drag pills to reorder export columns. Click × on a pill to remove that metric "
-        "from the export, or change the selection in the list above."
+        "Drag rows to reorder export columns. Use **Remove** to drop a metric from the export, "
+        "or change the selection in the multiselect above."
     )
 
     picked = list(st.session_state.get(multiselect_key or "", picked))
