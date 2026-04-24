@@ -6,7 +6,6 @@ Run from repository root:  streamlit run streamlit_app/app.py
 from __future__ import annotations
 
 import base64
-from contextlib import nullcontext
 import hashlib
 import html
 import re
@@ -184,8 +183,14 @@ _EXPORT_WORKSPACE_ICON = (
 _EXPORT_OPTIONS_ICON_PATH = Path(__file__).resolve().parent / "assets" / "export-options-icon.png"
 
 
-def _export_options_heading_html() -> str:
-    """Bundle export card title with custom download/export icon (PNG in ``assets/``)."""
+def _export_options_heading_html(*, subtitle: str | None = None) -> str:
+    """Export card title with icon; ``subtitle`` defaults to the multi-author bundle hint."""
+    _sub = (
+        subtitle
+        if subtitle is not None
+        else "Choose authors and metrics, then download PDF, Word, or Excel below."
+    )
+    _sub_esc = html.escape(_sub, quote=True)
     img_inner: str
     try:
         if _EXPORT_OPTIONS_ICON_PATH.is_file():
@@ -211,9 +216,7 @@ def _export_options_heading_html() -> str:
         f"{img_inner}</div>"
         '<p class="prepare-export-heading">Export Options</p>'
         "</div>"
-        "<p class=\"prepare-export-module-sub\">"
-        "Choose authors and metrics, then download PDF, Word, or Excel below."
-        "</p>"
+        f'<p class="prepare-export-module-sub">{_sub_esc}</p>'
         "</div>"
     )
 
@@ -1970,6 +1973,13 @@ hr.export-bundle-divider {
   line-height: 1.45 !important;
   max-width: 46rem !important;
 }
+.export-metric-order-kicker {
+  margin: 0.65rem 0 0.45rem 0 !important;
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  line-height: 1.4 !important;
+}
 :is([class*="st-key-export_workspace_stack"], [class*="st-key-export_workspace_bundle"])::before {
   content: "";
   position: absolute;
@@ -3277,6 +3287,101 @@ def _render_export_results_block(
             )
 
 
+def _render_single_author_export_workspace(
+    export_rows: list,
+    *,
+    opt_list: list[str],
+    label_map: dict[str, str],
+    order_state_key: str,
+    sortable_key: str,
+    removed_key: str,
+    pick_sig: str,
+    author_id: str,
+    author_name: object,
+    metrics: object,
+    data_source: object,
+) -> None:
+    """One workspace: bundle-style Export Options + filename + metric order + PDF/Word/Excel."""
+    with st.container(border=False, key="export_workspace_stack"):
+        st.markdown(
+            '<div id="export-downloads-anchor"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            _export_options_heading_html(
+                subtitle="Set the filename, then download PDF, Word, or Excel."
+            ),
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True, key="export_results_shell"):
+            fn = st.text_input(
+                "Export filename (without extension)",
+                value="research-metrics",
+                key="export_fn_single_author_workspace",
+            )
+            st.markdown(
+                '<p class="export-metric-order-kicker">'
+                "Display order (top to bottom)</p>",
+                unsafe_allow_html=True,
+            )
+            _render_pick_via_metric_order_section(
+                opt_list,
+                label_map,
+                order_state_key=order_state_key,
+                sortable_key=sortable_key,
+                removed_key=removed_key,
+                _pick_sig=pick_sig,
+                step_order=None,
+                embed_in_export_workspace=True,
+            )
+            _ord_final = [
+                m for m in st.session_state.get(order_state_key, []) if m in opt_list
+            ]
+            export_rows.clear()
+            if _ord_final:
+                export_rows.append(
+                    {
+                        "authorId": author_id,
+                        "authorName": author_name,
+                        "metrics": metrics,
+                        "dataSource": data_source,
+                        "selectedMetrics": list(_ord_final),
+                        "metricOrder": list(_ord_final),
+                    }
+                )
+            b1, b2, b3 = st.columns(3, gap="xxsmall")
+            with b1:
+                pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
+                st.download_button(
+                    "Export as PDF",
+                    pdf_b,
+                    file_name=pdf_n,
+                    mime="application/pdf",
+                    use_container_width=False,
+                    key="export_pdf_single_author_ws",
+                )
+            with b2:
+                doc_b, doc_n = export_docx_bytes(export_rows, fn)
+                st.download_button(
+                    "Export as Word",
+                    doc_b,
+                    file_name=doc_n,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=False,
+                    key="export_docx_single_author_ws",
+                )
+            with b3:
+                xl_b, xl_n = export_excel_bytes(export_rows, fn)
+                st.download_button(
+                    "Export as Excel",
+                    xl_b,
+                    file_name=xl_n,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=False,
+                    key="export_xlsx_single_author_ws",
+                )
+
+
 def _metric_mock_row_remove(
     order_state_key: str, removed_key: str, mid: str
 ) -> None:
@@ -3343,7 +3448,7 @@ def _metric_order_pill_cell_html(label: str) -> str:
     return (
         f'<div style="text-align:center;background:#e0ecff;border:1px solid #bfd3ff;'
         f'color:#1f2937;font-weight:600;border-radius:8px;padding:10px 14px;'
-        f'margin:2px 0 8px 0;">{esc}</div>'
+        f'margin:2px 0;">{esc}</div>'
     )
 
 
@@ -3356,121 +3461,107 @@ def _render_pick_via_metric_order_section(
     removed_key: str,
     _pick_sig: str,
     step_order: int | None = None,
+    embed_in_export_workspace: bool = False,
 ) -> tuple[list[str], list[str]]:
-    """Display order for single-author: pill rows with inline reorder (↑↓) and remove (✕)."""
-    _in_export_options = step_order is None
-    _section = (
-        st.expander(
-            "Export Options",
-            expanded=True,
-            key=f"{sortable_key}_{_pick_sig}_export_opts",
+    """Metric order: pill row + ↑↓✕; headings omitted when embedded in Export Options."""
+    if embed_in_export_workspace:
+        pass
+    elif step_order is not None:
+        st.markdown(
+            _export_step_heading_html(step_order, "Display order (top to bottom)"),
+            unsafe_allow_html=True,
         )
-        if _in_export_options
-        else nullcontext()
-    )
-    with _section:
-        if step_order is not None:
-            st.markdown(
-                _export_step_heading_html(step_order, "Display order (top to bottom)"),
-                unsafe_allow_html=True,
-            )
-        elif _in_export_options:
-            st.markdown("##### Display order (top to bottom)")
-        else:
-            st.markdown("Display order (top to bottom)")
-        order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
-        picked = list(order_pick)
-        if order_pick:
-            with st.container(border=True):
-                for _i, _mid in enumerate(order_pick):
-                    _lbl = label_map.get(_mid, _mid)
+    else:
+        st.markdown("##### Display order (top to bottom)")
+    order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
+    picked = list(order_pick)
+    if order_pick:
+        _inner_border = not embed_in_export_workspace
+        with st.container(border=_inner_border):
+            for _i, _mid in enumerate(order_pick):
+                _lbl = label_map.get(_mid, _mid)
+                _c_pill, _c_up, _c_dn, _c_x = st.columns(
+                    [18, 1, 1, 1], gap="small", vertical_alignment="center"
+                )
+                with _c_pill:
                     st.markdown(
                         _metric_order_pill_cell_html(_lbl),
                         unsafe_allow_html=True,
                     )
-                    _sp_l, _c_up, _c_dn, _c_x, _sp_r = st.columns(
-                        [3, 1, 1, 1, 3], gap="small", vertical_alignment="center"
-                    )
-                    with _sp_l:
-                        st.empty()
-                    with _c_up:
-                        if st.button(
-                            "↑",
-                            key=f"{sortable_key}_{_pick_sig}_up_{_mid}",
-                            disabled=_i == 0,
-                            help="Move up",
-                            type="secondary",
-                            use_container_width=True,
-                        ):
-                            _metric_order_swap_neighbor(order_state_key, _mid, "up")
-                    with _c_dn:
-                        if st.button(
-                            "↓",
-                            key=f"{sortable_key}_{_pick_sig}_dn_{_mid}",
-                            disabled=_i >= len(order_pick) - 1,
-                            help="Move down",
-                            type="secondary",
-                            use_container_width=True,
-                        ):
-                            _metric_order_swap_neighbor(order_state_key, _mid, "down")
-                    with _c_x:
-                        if st.button(
-                            "✕",
-                            key=f"{sortable_key}_{_pick_sig}_rmx_{_mid}",
-                            help=f"Remove «{_lbl}»",
-                            type="secondary",
-                            use_container_width=True,
-                        ):
-                            _metric_mock_row_remove(order_state_key, removed_key, _mid)
-                            st.rerun()
-                    with _sp_r:
-                        st.empty()
+                with _c_up:
+                    if st.button(
+                        "↑",
+                        key=f"{sortable_key}_{_pick_sig}_up_{_mid}",
+                        disabled=_i == 0,
+                        help="Move up",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        _metric_order_swap_neighbor(order_state_key, _mid, "up")
+                with _c_dn:
+                    if st.button(
+                        "↓",
+                        key=f"{sortable_key}_{_pick_sig}_dn_{_mid}",
+                        disabled=_i >= len(order_pick) - 1,
+                        help="Move down",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        _metric_order_swap_neighbor(order_state_key, _mid, "down")
+                with _c_x:
+                    if st.button(
+                        "✕",
+                        key=f"{sortable_key}_{_pick_sig}_rmx_{_mid}",
+                        help=f"Remove «{_lbl}»",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        _metric_mock_row_remove(order_state_key, removed_key, _mid)
+                        st.rerun()
 
-        removed_now = [
-            m
-            for m in st.session_state.get(removed_key, [])
-            if m in opt_list and m not in st.session_state.get(order_state_key, [])
-        ]
-        st.session_state[removed_key] = removed_now
-        can_add = [
-            m for m in opt_list if m not in st.session_state.get(order_state_key, [])
-        ]
-        if can_add:
-            c_a1, c_a2 = st.columns([3, 1], gap="small", vertical_alignment="bottom")
-            with c_a1:
-                to_add = st.selectbox(
-                    "Restore removed metric",
-                    options=can_add,
-                    index=0,
-                    format_func=lambda i: label_map.get(i, i),
-                    key=f"{sortable_key}_{_pick_sig}_restore_sel",
-                )
-            with c_a2:
-                if st.button("Add", key=f"{sortable_key}_{_pick_sig}_restore_btn"):
-                    od = list(st.session_state.get(order_state_key, []))
-                    if to_add in opt_list and to_add not in od:
-                        st.session_state[order_state_key] = od + [to_add]
-                        rm = [
-                            m
-                            for m in st.session_state.get(removed_key, [])
-                            if m != to_add
-                        ]
-                        st.session_state[removed_key] = rm
-                    st.rerun()
-
-        order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
-        picked = list(order_pick)
-        st.caption(
-            "Use **↑** / **↓** to change order. Click **✕** to remove a metric from this comparison; "
-            "use **Restore removed metric** to add it back."
-        )
-        if not picked:
-            st.caption(
-                "Add at least one metric with **Restore removed metric** to show it in the comparison."
+    removed_now = [
+        m
+        for m in st.session_state.get(removed_key, [])
+        if m in opt_list and m not in st.session_state.get(order_state_key, [])
+    ]
+    st.session_state[removed_key] = removed_now
+    can_add = [m for m in opt_list if m not in st.session_state.get(order_state_key, [])]
+    if can_add:
+        c_a1, c_a2 = st.columns([3, 1], gap="small", vertical_alignment="bottom")
+        with c_a1:
+            to_add = st.selectbox(
+                "Restore removed metric",
+                options=can_add,
+                index=0,
+                format_func=lambda i: label_map.get(i, i),
+                key=f"{sortable_key}_{_pick_sig}_restore_sel",
             )
-            return [], []
-        st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
-        return picked, order_pick
+        with c_a2:
+            if st.button("Add", key=f"{sortable_key}_{_pick_sig}_restore_btn"):
+                od = list(st.session_state.get(order_state_key, []))
+                if to_add in opt_list and to_add not in od:
+                    st.session_state[order_state_key] = od + [to_add]
+                    rm = [
+                        m
+                        for m in st.session_state.get(removed_key, [])
+                        if m != to_add
+                    ]
+                    st.session_state[removed_key] = rm
+                st.rerun()
+
+    order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
+    picked = list(order_pick)
+    st.caption(
+        "Use **↑** / **↓** to change order. Click **✕** to remove a metric from this comparison; "
+        "use **Restore removed metric** to add it back."
+    )
+    if not picked:
+        st.caption(
+            "Add at least one metric with **Restore removed metric** to show it in the comparison."
+        )
+        return [], []
+    st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
+    return picked, order_pick
 
 
 def _metrics_multiselect_and_order_ui(
@@ -4814,22 +4905,20 @@ def main() -> None:
                         except Exception:
                             st.caption("Could not build Word/Excel file for this author.")
 
-                    _render_pick_via_metric_order_section(
-                        opt_list,
-                        label_map,
-                        order_state_key=order_state_key,
-                        sortable_key=sortable_key,
-                        removed_key=removed_key,
-                        _pick_sig=pick_sig,
-                        step_order=None,
-                    )
-
-                    if _picked0:
-                        export_rows.append(author_export_payload)
-
-            if len(valid) == 1:
-                with st.container(border=False, key="export_workspace_stack"):
-                    _render_export_results_block(export_rows, len(valid))
+                    if len(valid) == 1:
+                        _render_single_author_export_workspace(
+                            export_rows,
+                            opt_list=opt_list,
+                            label_map=label_map,
+                            order_state_key=order_state_key,
+                            sortable_key=sortable_key,
+                            removed_key=removed_key,
+                            pick_sig=pick_sig,
+                            author_id=aid,
+                            author_name=d.get("authorName"),
+                            metrics=d.get("metrics"),
+                            data_source=d.get("dataSource"),
+                        )
 
     elif results:
         for r in results:
