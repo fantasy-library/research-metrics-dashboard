@@ -36,16 +36,17 @@ from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_A
 from streamlit_app.export_utils import export_docx_bytes, export_excel_bytes, export_pdf_bytes
 
 _DRAGGABLE_PILLS_DIR = (_ROOT / "draggable_pills_component").resolve()
-_draggable_metric_pills = components.declare_component(
-    "draggable_metric_pills",
-    path=str(_DRAGGABLE_PILLS_DIR),
-)
 
 st.set_page_config(
     page_title="Research Metrics Dashboard",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
+)
+
+_draggable_metric_pills = components.declare_component(
+    "draggable_metric_pills",
+    path=str(_DRAGGABLE_PILLS_DIR),
 )
 
 HKUST_LOGO = "https://library.hkust.edu.hk/wp-content/themes/hkustlib/hkust_alignment/profiles/ust/modules/custom/hkust_signature_affiliate/assets/images/HKUST-logo.png"
@@ -3454,8 +3455,9 @@ def _metrics_multiselect_and_order_ui(
         act = pill_event.get("action")
         if act == "delete" and isinstance(pill_event.get("item"), str):
             mid = pill_event["item"]
-            if mid in opt_list and mid in order_pick:
-                new_order = [m for m in order_pick if m != mid]
+            cur_ord = list(st.session_state.get(order_state_key, []))
+            if mid in opt_list and mid in cur_ord:
+                new_order = [m for m in cur_ord if m != mid]
                 st.session_state[order_state_key] = new_order
                 mk = multiselect_key or ""
                 if mk:

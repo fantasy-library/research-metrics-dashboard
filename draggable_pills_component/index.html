@@ -35,10 +35,12 @@
       flex-shrink: 0;
     }
     .delete-btn:hover { color: #ff4b4b; }
+    #metric-warn { color: #b45309; font-size: 0.85rem; padding: 0 0 8px; margin: 0; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </head>
 <body>
+  <p id="metric-warn" role="status" aria-live="polite"></p>
   <ul id="metric-list"></ul>
 
   <script>
@@ -74,7 +76,9 @@
 
       function renderList(items, labels) {
         destroySortable();
+        var warnEl = document.getElementById("metric-warn");
         var list = document.getElementById("metric-list");
+        if (warnEl) warnEl.textContent = "";
         list.innerHTML = "";
 
         items.forEach(function (metricId) {
@@ -103,12 +107,19 @@
 
         lastOrder = items.slice();
 
-        if (items.length > 0) {
+        if (items.length > 0 && typeof Sortable === "undefined" && warnEl) {
+          warnEl.textContent =
+            "Drag-and-drop unavailable (SortableJS did not load). × still works; check network or refresh.";
+        }
+
+        if (items.length > 0 && typeof Sortable !== "undefined") {
           sortableInstance = new Sortable(list, {
             animation: 150,
             onEnd: function () {
-              var newOrder = Array.prototype.map.call(list.children, function (li) {
-                return li.getAttribute("data-id");
+              var newOrder = [];
+              Array.prototype.forEach.call(list.children, function (li) {
+                var id = li.getAttribute("data-id");
+                if (id) newOrder.push(id);
               });
               if (JSON.stringify(newOrder) !== JSON.stringify(lastOrder)) {
                 lastOrder = newOrder;
