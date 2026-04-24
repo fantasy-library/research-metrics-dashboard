@@ -145,6 +145,14 @@ _FILTER_ICON_FUNNEL = (
     'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>'
 )
+# Year filter label — compact info circle (matches line-art filter icons)
+_FILTER_ICON_INFO_SMALL = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" '
+    'aria-hidden="true" focusable="false">'
+    "<circle cx=\"12\" cy=\"12\" r=\"10\"/>"
+    '<path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+)
 # Export workspace strip — “outputs” glyph (separate from analysis / charts)
 _EXPORT_WORKSPACE_ICON = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" '
@@ -180,7 +188,7 @@ def _export_options_heading_html() -> str:
         '<div class="prepare-export-heading-row">'
         '<div class="prepare-export-heading-icon" aria-hidden="true">'
         f"{img_inner}</div>"
-        '<p class="prepare-export-heading">Export</p>'
+        '<p class="prepare-export-heading">Export Options</p>'
         "</div>"
         "<p class=\"prepare-export-module-sub\">"
         "Choose authors and metrics, then download PDF, Word, or Excel below."
@@ -1029,13 +1037,17 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   width: 1.15rem;
   height: 1.15rem;
   border-radius: 50%;
-  font-size: 0.68rem;
-  font-weight: 800;
-  line-height: 1;
+  line-height: 0;
   color: #4b5563;
   background: #e5e7eb;
   border: 1px solid #d1d5db;
   cursor: help;
+}
+.year-filter-tip-marker svg {
+  display: block;
+  width: 0.7rem;
+  height: 0.7rem;
+  flex-shrink: 0;
 }
 .year-filter-tip:hover .year-filter-tip-marker,
 .year-filter-tip:focus .year-filter-tip-marker,
@@ -1919,13 +1931,15 @@ hr.export-bundle-divider {
   margin: 0 0 0.35rem 0 !important;
   padding: 0 !important;
 }
+/* Same typography as export step labels, e.g. "Metrics to export" */
 .export-downloads-kicker {
-  margin: 0 0 0.2rem 0 !important;
-  font-size: 0.68rem !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.11em !important;
-  text-transform: uppercase !important;
-  color: #0f766e !important;
+  margin: 0 0 0.35rem 0 !important;
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  line-height: 1.4 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
 }
 .export-downloads-hint {
   margin: 0 0 0.55rem 0 !important;
@@ -2772,7 +2786,7 @@ YEAR_SELECT_HELP = {
     ),
 }
 
-# Year “?” tooltip — short summary of what the year window can include.
+# Year filter info tooltip — short summary of what the year window can include.
 YEAR_FILTER_LABEL_TOOLTIP_HTML = (
     "<strong>Year range:</strong><br />"
     "• Completed calendar years<br />"
@@ -3202,7 +3216,7 @@ def _render_export_results_block(
                 f"{_FILTER_ICON_DOCUMENT}"
                 "</div>"
                 '<div class="export-results-head-text">'
-                '<p class="export-results-title">Export</p>'
+                '<p class="export-results-title">Export Options</p>'
                 '<p class="export-results-sub">'
                 f"{html.escape(export_body_sub)}"
                 "</p>"
@@ -3411,8 +3425,10 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                 label_visibility="collapsed",
             )
         line_short = _metric_short_label(label_map, line_metric)
-        _line_is_pct = line_metric in COLLABORATION_SUBMETRIC_IDS or line_metric in (
-            ACADEMIC_CORPORATE_SUBMETRIC_IDS
+        _line_is_pct = (
+            line_metric == "topJournal"
+            or line_metric in COLLABORATION_SUBMETRIC_IDS
+            or line_metric in ACADEMIC_CORPORATE_SUBMETRIC_IDS
         )
 
         with col_chart:
@@ -3672,8 +3688,10 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                 else:
 
                     def _bubble_pct_metric(mid: str) -> bool:
-                        return mid in COLLABORATION_SUBMETRIC_IDS or mid in (
-                            ACADEMIC_CORPORATE_SUBMETRIC_IDS
+                        return (
+                            mid == "topJournal"
+                            or mid in COLLABORATION_SUBMETRIC_IDS
+                            or mid in ACADEMIC_CORPORATE_SUBMETRIC_IDS
                         )
 
                     def _fmt_bubble_val(v: float, mid: str) -> str:
@@ -3923,8 +3941,8 @@ def main() -> None:
                     '<span class="year-filter-label-with-tip">'
                     "<span>Year</span>"
                     '<span class="year-filter-tip" tabindex="0" role="button" '
-                    'aria-label="Year range options, details in tooltip">'
-                    '<span class="year-filter-tip-marker" aria-hidden="true">?</span>'
+                    'aria-label="Year range information, details in tooltip">'
+                    f'<span class="year-filter-tip-marker" aria-hidden="true">{_FILTER_ICON_INFO_SMALL}</span>'
                     '<span class="year-filter-tip-popup" role="tooltip" '
                     'id="year-range-options-tooltip">'
                     f"{YEAR_FILTER_LABEL_TOOLTIP_HTML}"
@@ -4460,8 +4478,10 @@ def main() -> None:
                                     if paren_match
                                     else str(series_name_full)
                                 )
-                                _plot_is_pct = plot_metric in COLLABORATION_SUBMETRIC_IDS or plot_metric in (
-                                    ACADEMIC_CORPORATE_SUBMETRIC_IDS
+                                _plot_is_pct = (
+                                    plot_metric == "topJournal"
+                                    or plot_metric in COLLABORATION_SUBMETRIC_IDS
+                                    or plot_metric in ACADEMIC_CORPORATE_SUBMETRIC_IDS
                                 )
                                 metrics_payload = d.get("metrics") or {}
                                 by_year = _extract_metric_by_year(metrics_payload, plot_metric)

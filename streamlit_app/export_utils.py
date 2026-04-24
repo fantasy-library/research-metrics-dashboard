@@ -238,7 +238,7 @@ def _cell_year(
     v = by_year.get(year)
     if v is None:
         return "N/A"
-    if is_collab:
+    if is_collab or metric_id == "topJournal":
         return f"{int(v)}%" if v % 1 == 0 else f"{float(v):.2f}%"
     if metric_id in ("fwci", "citationsPerPublication"):
         return f"{float(v):.2f}"
@@ -456,7 +456,7 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
                 for y in years:
                     v = (d.get("byYear") or {}).get(y)
                     if v is not None:
-                        if metric.get("isCollaboration"):
+                        if metric.get("isCollaboration") or mid == "topJournal":
                             cells.append(
                                 f"{int(v)}%"
                                 if isinstance(v, (int, float)) and v % 1 == 0
@@ -470,13 +470,13 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
                         cells.append("N/A")
                 tot = d.get("total")
                 if isinstance(tot, (int, float)):
-                    if metric.get("isCollaboration"):
+                    if metric.get("isCollaboration") or mid == "topJournal":
                         cells.append(
                             f"{int(tot)}%"
                             if tot % 1 == 0
                             else f"{float(tot):.2f}%"
                         )
-                    elif mid in ("fwci", "citationsPerPublication", "topJournal"):
+                    elif mid in ("fwci", "citationsPerPublication"):
                         cells.append(f"{float(tot):.2f}")
                     else:
                         cells.append(str(round(tot)))
@@ -486,8 +486,14 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
                 tot = d.get("total")
                 cells = [metric["label"]] + ["N/A"] * len(years)
                 if isinstance(tot, (int, float)):
-                    if mid in ("fwci", "citationsPerPublication", "topJournal"):
+                    if mid in ("fwci", "citationsPerPublication"):
                         cells.append(f"{float(tot):.2f}")
+                    elif mid == "topJournal":
+                        cells.append(
+                            f"{int(tot)}%"
+                            if tot % 1 == 0
+                            else f"{float(tot):.2f}%"
+                        )
                     else:
                         cells.append(str(round(tot)))
                 else:
@@ -568,7 +574,7 @@ def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research
                 for y in years:
                     v = (d.get("byYear") or {}).get(y)
                     if v is not None:
-                        if metric.get("isCollaboration"):
+                        if metric.get("isCollaboration") or mid == "topJournal":
                             cells.append(
                                 f"{int(v)}%"
                                 if isinstance(v, (int, float)) and v % 1 == 0
@@ -582,13 +588,13 @@ def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research
                         cells.append("N/A")
                 tot = d.get("total")
                 if isinstance(tot, (int, float)):
-                    if metric.get("isCollaboration"):
+                    if metric.get("isCollaboration") or mid == "topJournal":
                         cells.append(
                             f"{int(tot)}%"
                             if tot % 1 == 0
                             else f"{float(tot):.2f}%"
                         )
-                    elif mid in ("fwci", "citationsPerPublication", "topJournal"):
+                    elif mid in ("fwci", "citationsPerPublication"):
                         cells.append(f"{float(tot):.2f}")
                     else:
                         cells.append(str(round(tot)))
@@ -598,8 +604,14 @@ def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research
                 tot = d.get("total")
                 cells = [metric["label"]] + ["N/A"] * len(years)
                 if isinstance(tot, (int, float)):
-                    if mid in ("fwci", "citationsPerPublication", "topJournal"):
+                    if mid in ("fwci", "citationsPerPublication"):
                         cells.append(f"{float(tot):.2f}")
+                    elif mid == "topJournal":
+                        cells.append(
+                            f"{int(tot)}%"
+                            if tot % 1 == 0
+                            else f"{float(tot):.2f}%"
+                        )
                     else:
                         cells.append(str(round(tot)))
                 else:
