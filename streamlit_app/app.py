@@ -3320,6 +3320,32 @@ def _sync_pick_via_metric_order_session(
     return picked, order_pick, removed_key, _pick_sig
 
 
+def _metric_order_swap_neighbor(
+    order_state_key: str, metric_id: str, direction: str
+) -> None:
+    od = [m for m in st.session_state.get(order_state_key, []) if m]
+    if metric_id not in od:
+        return
+    i = od.index(metric_id)
+    if direction == "up" and i > 0:
+        od[i - 1], od[i] = od[i], od[i - 1]
+    elif direction == "down" and i < len(od) - 1:
+        od[i], od[i + 1] = od[i + 1], od[i]
+    else:
+        return
+    st.session_state[order_state_key] = od
+    st.rerun()
+
+
+def _metric_order_pill_cell_html(label: str) -> str:
+    esc = html.escape(label, quote=True)
+    return (
+        f'<div style="text-align:center;background:#e0ecff;border:1px solid #bfd3ff;'
+        f'color:#1f2937;font-weight:600;border-radius:8px;padding:10px 14px;'
+        f'margin:2px 0;">{esc}</div>'
+    )
+
+
 def _render_pick_via_metric_order_section(
     opt_list: list[str],
     label_map: dict[str, str],
@@ -3330,7 +3356,7 @@ def _render_pick_via_metric_order_section(
     _pick_sig: str,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Display order for single-author: drag-reorder list + remove control (streamlit-sortables)."""
+    """Display order for single-author: pill rows with inline reorder (↑↓) and remove (✕)."""
     if step_order is not None:
         st.markdown(
             _export_step_heading_html(step_order, "Display order (top to bottom)"),
@@ -3341,46 +3367,38 @@ def _render_pick_via_metric_order_section(
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     picked = list(order_pick)
     if order_pick:
-        display_to_metric = {label_map.get(m, m): m for m in order_pick}
-        sorted_display = sort_items(
-            [label_map.get(m, m) for m in order_pick],
-            direction="vertical",
-            custom_style=_METRIC_ORDER_SORTABLE_STYLE,
-            key=f"{sortable_key}_{_pick_sig}_sc",
-        )
-        if (
-            isinstance(sorted_display, list)
-            and sorted_display
-            and all(isinstance(s, str) for s in sorted_display)
-        ):
-            order_pick = [
-                display_to_metric[s]
-                for s in sorted_display
-                if s in display_to_metric and display_to_metric[s] in opt_list
-            ]
-        else:
-            st.caption("Drag reorder is unavailable; order is unchanged this run.")
-        st.session_state[order_state_key] = order_pick
-
-        st.caption("Remove from comparison (✕):")
-        _per_wrap = 6
-        for _row_start in range(0, len(order_pick), _per_wrap):
-            _chunk = order_pick[_row_start : _row_start + _per_wrap]
-            _rm_cols = st.columns(len(_chunk))
-            for _col, _mid in zip(_rm_cols, _chunk):
-                with _col:
-                    _lbl_rm = label_map.get(_mid, _mid)
-                    _short = (
-                        _lbl_rm
-                        if len(_lbl_rm) <= 20
-                        else (_lbl_rm[:17] + "…")
+        with st.container(border=True):
+            for _i, _mid in enumerate(order_pick):
+                _lbl = label_map.get(_mid, _mid)
+                _c_pill, _c_up, _c_dn, _c_x = st.columns(
+                    [22, 1, 1, 1], gap="small", vertical_alignment="center"
+                )
+                with _c_pill:
+                    st.markdown(
+                        _metric_order_pill_cell_html(_lbl),
+                        unsafe_allow_html=True,
                     )
-                    st.caption(_short)
+                with _c_up:
+                    if st.button(
+                        "↑",
+                        key=f"{sortable_key}_{_pick_sig}_up_{_mid}",
+                        disabled=_i == 0,
+                        help="Move up",
+                    ):
+                        _metric_order_swap_neighbor(order_state_key, _mid, "up")
+                with _c_dn:
+                    if st.button(
+                        "↓",
+                        key=f"{sortable_key}_{_pick_sig}_dn_{_mid}",
+                        disabled=_i >= len(order_pick) - 1,
+                        help="Move down",
+                    ):
+                        _metric_order_swap_neighbor(order_state_key, _mid, "down")
+                with _c_x:
                     if st.button(
                         "✕",
                         key=f"{sortable_key}_{_pick_sig}_rmx_{_mid}",
-                        help=f"Remove «{_lbl_rm}»",
-                        type="secondary",
+                        help=f"Remove «{_lbl}»",
                     ):
                         _metric_mock_row_remove(order_state_key, removed_key, _mid)
                         st.rerun()
@@ -3418,7 +3436,7 @@ def _render_pick_via_metric_order_section(
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     picked = list(order_pick)
     st.caption(
-        "Drag rows to reorder. Click **✕** under a metric to remove it from this comparison; "
+        "Use **↑** / **↓** to change order. Click **✕** to remove a metric from this comparison; "
         "use **Restore removed metric** to add it back."
     )
     if not picked:
