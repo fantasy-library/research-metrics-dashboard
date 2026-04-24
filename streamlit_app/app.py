@@ -3362,24 +3362,27 @@ def _render_pick_via_metric_order_section(
             st.caption("Drag reorder is unavailable; order is unchanged this run.")
         st.session_state[order_state_key] = order_pick
 
-        rm_labels = [label_map.get(m, m) for m in order_pick]
-        if rm_labels:
-            inv_lbl = {label_map.get(m, m): m for m in order_pick}
-            rm_sel_key = f"{sortable_key}_{_pick_sig}_rm_sel"
-            r1, r2 = st.columns([4, 1], gap="small", vertical_alignment="bottom")
-            with r1:
-                st.selectbox(
-                    "Remove a metric from this comparison",
-                    options=rm_labels,
-                    key=rm_sel_key,
-                )
-            with r2:
-                if st.button("Remove", key=f"{sortable_key}_{_pick_sig}_rm_btn"):
-                    lbl = st.session_state.get(rm_sel_key)
-                    if isinstance(lbl, str) and lbl in inv_lbl:
-                        _metric_mock_row_remove(
-                            order_state_key, removed_key, inv_lbl[lbl]
-                        )
+        st.caption("Remove from comparison (✕):")
+        _per_wrap = 6
+        for _row_start in range(0, len(order_pick), _per_wrap):
+            _chunk = order_pick[_row_start : _row_start + _per_wrap]
+            _rm_cols = st.columns(len(_chunk))
+            for _col, _mid in zip(_rm_cols, _chunk):
+                with _col:
+                    _lbl_rm = label_map.get(_mid, _mid)
+                    _short = (
+                        _lbl_rm
+                        if len(_lbl_rm) <= 20
+                        else (_lbl_rm[:17] + "…")
+                    )
+                    st.caption(_short)
+                    if st.button(
+                        "✕",
+                        key=f"{sortable_key}_{_pick_sig}_rmx_{_mid}",
+                        help=f"Remove «{_lbl_rm}»",
+                        type="secondary",
+                    ):
+                        _metric_mock_row_remove(order_state_key, removed_key, _mid)
                         st.rerun()
 
     removed_now = [
@@ -3415,8 +3418,8 @@ def _render_pick_via_metric_order_section(
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     picked = list(order_pick)
     st.caption(
-        "Drag rows to reorder. Pick a metric and click **Remove** to drop it from this comparison; "
-        'use **Restore removed metric** to add it back.'
+        "Drag rows to reorder. Click **✕** under a metric to remove it from this comparison; "
+        "use **Restore removed metric** to add it back."
     )
     if not picked:
         st.caption(
@@ -4584,16 +4587,6 @@ def main() -> None:
                     if not chart_options:
                         chart_options = list(_picked0) or list(opt_list)
 
-                    picked, order_pick = _render_pick_via_metric_order_section(
-                        opt_list,
-                        label_map,
-                        order_state_key=order_state_key,
-                        sortable_key=sortable_key,
-                        removed_key=removed_key,
-                        _pick_sig=pick_sig,
-                        step_order=None,
-                    )
-
                     if years and chart_options:
                         c_filters, c_chart = st.columns([1, 3], vertical_alignment="top")
                         with c_filters:
@@ -4734,14 +4727,14 @@ def main() -> None:
                         "authorName": d.get("authorName"),
                         "metrics": d.get("metrics"),
                         "dataSource": d.get("dataSource"),
-                        "selectedMetrics": picked,
-                        "metricOrder": order_pick,
+                        "selectedMetrics": _picked0,
+                        "metricOrder": _order0,
                     }
                     col_names, table_rows = _build_metrics_table_rows(
                         d.get("metrics") or {},
                         ds,
-                        picked,
-                        order_pick,
+                        _picked0,
+                        _order0,
                     )
 
                     if table_rows:
@@ -4778,7 +4771,17 @@ def main() -> None:
                         except Exception:
                             st.caption("Could not build Word/Excel file for this author.")
 
-                    if picked:
+                    _render_pick_via_metric_order_section(
+                        opt_list,
+                        label_map,
+                        order_state_key=order_state_key,
+                        sortable_key=sortable_key,
+                        removed_key=removed_key,
+                        _pick_sig=pick_sig,
+                        step_order=None,
+                    )
+
+                    if _picked0:
                         export_rows.append(author_export_payload)
 
             if len(valid) == 1:
