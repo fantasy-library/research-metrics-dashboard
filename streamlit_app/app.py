@@ -4584,6 +4584,16 @@ def main() -> None:
                     if not chart_options:
                         chart_options = list(_picked0) or list(opt_list)
 
+                    picked, order_pick = _render_pick_via_metric_order_section(
+                        opt_list,
+                        label_map,
+                        order_state_key=order_state_key,
+                        sortable_key=sortable_key,
+                        removed_key=removed_key,
+                        _pick_sig=pick_sig,
+                        step_order=None,
+                    )
+
                     if years and chart_options:
                         c_filters, c_chart = st.columns([1, 3], vertical_alignment="top")
                         with c_filters:
@@ -4719,15 +4729,6 @@ def main() -> None:
                                     key=f"echarts_{aid}_{plot_metric}",
                                 )
 
-                    picked, order_pick = _render_pick_via_metric_order_section(
-                        opt_list,
-                        label_map,
-                        order_state_key=order_state_key,
-                        sortable_key=sortable_key,
-                        removed_key=removed_key,
-                        _pick_sig=pick_sig,
-                        step_order=None,
-                    )
                     author_export_payload = {
                         "authorId": aid,
                         "authorName": d.get("authorName"),
