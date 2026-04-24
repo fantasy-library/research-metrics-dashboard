@@ -22,8 +22,6 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_echarts5 import st_echarts
-from streamlit_sortables import sort_items
-
 from streamlit_app.api_service import (
     ACADEMIC_CORPORATE_SUBMETRIC_IDS,
     APIError,
@@ -3256,6 +3254,27 @@ def _render_export_results_block(
             )
 
 
+def _metric_order_swap_row(order_state_key: str, mid: str, delta: int) -> None:
+    cur = list(st.session_state.get(order_state_key, []))
+    if mid not in cur:
+        return
+    i = cur.index(mid)
+    j = i + delta
+    if j < 0 or j >= len(cur):
+        return
+    cur[i], cur[j] = cur[j], cur[i]
+    st.session_state[order_state_key] = cur
+
+
+def _metric_order_remove_row(
+    multiselect_key: str, order_state_key: str, mid: str
+) -> None:
+    ms = list(st.session_state.get(multiselect_key, []))
+    st.session_state[multiselect_key] = [x for x in ms if x != mid]
+    od = list(st.session_state.get(order_state_key, []))
+    st.session_state[order_state_key] = [x for x in od if x != mid]
+
+
 def _metrics_multiselect_and_order_ui(
     opt_list: list[str],
     label_map: dict[str, str],
@@ -3264,11 +3283,10 @@ def _metrics_multiselect_and_order_ui(
     multiselect_key: str,
     order_state_key: str,
     sortable_key: str,
-    fallback_key: str,
     step_multiselect: int | None = None,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Pick metrics and drag-to-order rows. Returns ``(picked, order_pick)``."""
+    """Pick metrics, reorder rows (▲▼), and remove rows (×). Returns ``(picked, order_pick)``."""
     if step_multiselect is not None:
         st.markdown(
             _export_step_heading_html(step_multiselect, multiselect_label),
@@ -3294,8 +3312,7 @@ def _metrics_multiselect_and_order_ui(
     st.session_state[order_state_key] = existing_order
     order_pick = existing_order
 
-    # Remount sortables when the multiselect set changes so removed metrics drop
-    # from the list (streamlit-sortables can otherwise keep stale items).
+    # Tie row widget keys to the current multiselect set so keys stay unique when selection changes.
     _pick_sig = hashlib.md5(",".join(sorted(picked)).encode()).hexdigest()[:12]
 
     if step_order is not None:
@@ -3305,59 +3322,73 @@ def _metrics_multiselect_and_order_ui(
         )
     else:
         st.markdown("Display order (top to bottom)")
-    display_to_metric = {label_map.get(m, m): m for m in order_pick}
-    sortable_style = """
-                    .sortable-component {
-                        border: 1px solid #e5e7eb;
-                        border-radius: 10px;
-                        padding: 8px;
-                        background: #f8fafc;
-                    }
-                    .sortable-container-header {
-                        display: none;
-                    }
-                    .sortable-item, .sortable-item:hover {
-                        background: #e0ecff;
-                        border: 1px solid #bfd3ff;
-                        color: #1f2937;
-                        font-weight: 600;
-                        border-radius: 8px;
-                    }
-                    """
-    sorted_display = sort_items(
-        list(display_to_metric.keys()),
-        direction="vertical",
-        custom_style=sortable_style,
-        key=f"{sortable_key}_{_pick_sig}",
-    )
-    if (
-        isinstance(sorted_display, list)
-        and sorted_display
-        and all(isinstance(s, str) for s in sorted_display)
-    ):
-        order_pick = [
-            display_to_metric[s]
-            for s in sorted_display
-            if s in display_to_metric and display_to_metric[s] in picked
-        ]
-    else:
-        st.caption("Drag area unavailable for this card. Use fallback selector below.")
-        fallback_display = st.multiselect(
-            "Fallback order",
-            options=list(display_to_metric.keys()),
-            default=list(display_to_metric.keys()),
-            key=f"{fallback_key}_{_pick_sig}",
-            label_visibility="collapsed",
-        )
-        if fallback_display:
-            order_pick = [
-                display_to_metric[s]
-                for s in fallback_display
-                if s in display_to_metric and display_to_metric[s] in picked
-            ]
-        else:
-            order_pick = [m for m in existing_order if m in picked]
     order_pick = [m for m in order_pick if m in picked]
+    st.session_state[order_state_key] = order_pick
+    st.caption(
+        "Reorder with ▲ and ▼. × removes the metric from this comparison "
+        "(select it again in the list above to show it again)."
+    )
+    st.markdown(
+        """
+        <style>
+        div.metric-order-row-label {
+          text-align: center;
+          font-weight: 600;
+          color: #1f2937;
+          background: #e0ecff;
+          border: 1px solid #bfd3ff;
+          border-radius: 8px;
+          padding: 10px 12px;
+          min-height: 2.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    for idx, mid in enumerate(order_pick):
+        label = label_map.get(mid, mid)
+        cu, cd, cl, cx = st.columns(
+            [0.65, 0.65, 12, 0.75], gap="small", vertical_alignment="center"
+        )
+        with cu:
+            if st.button(
+                "▲",
+                key=f"{sortable_key}_{_pick_sig}_up_{mid}",
+                disabled=idx == 0,
+                help="Move up",
+            ):
+                _metric_order_swap_row(order_state_key, mid, -1)
+                st.rerun()
+        with cd:
+            if st.button(
+                "▼",
+                key=f"{sortable_key}_{_pick_sig}_dn_{mid}",
+                disabled=idx == len(order_pick) - 1,
+                help="Move down",
+            ):
+                _metric_order_swap_row(order_state_key, mid, 1)
+                st.rerun()
+        with cl:
+            st.markdown(
+                f'<div class="metric-order-row-label">{html.escape(label)}</div>',
+                unsafe_allow_html=True,
+            )
+        with cx:
+            if st.button(
+                "×",
+                key=f"{sortable_key}_{_pick_sig}_rm_{mid}",
+                help="Remove from this comparison",
+            ):
+                _metric_order_remove_row(multiselect_key, order_state_key, mid)
+                st.rerun()
+    picked = list(st.session_state.get(multiselect_key, picked))
+    if not picked:
+        st.caption("Select at least one metric row to display.")
+        return [], []
+    order_pick = [m for m in st.session_state.get(order_state_key, []) if m in picked]
     st.session_state[order_state_key] = order_pick
     st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
     return picked, order_pick
@@ -4310,7 +4341,6 @@ def main() -> None:
                         multiselect_key="export_bundle_metrics_ms",
                         order_state_key="export_bundle_metrics_ord_state",
                         sortable_key="export_bundle_metrics_sort",
-                        fallback_key="export_bundle_metrics_fallback",
                         step_multiselect=2,
                         step_order=3,
                     )
@@ -4388,7 +4418,6 @@ def main() -> None:
                         multiselect_key=f"multisel_{aid}",
                         order_state_key=f"multiord_state_{aid}_{card_idx}",
                         sortable_key=f"multiord_sort_{aid}_{card_idx}",
-                        fallback_key=f"multiord_fallback_{aid}_{card_idx}",
                     )
 
                     author_export_payload = {
@@ -4405,6 +4434,145 @@ def main() -> None:
                         picked,
                         order_pick,
                     )
+                    years: list[int] = []
+                    for c in col_names[1:-1]:
+                        try:
+                            years.append(int(float(c)))
+                        except Exception:
+                            continue
+                    if years and picked:
+                        c_filters, c_chart = st.columns([1, 3], vertical_alignment="top")
+                        with c_filters:
+                            st.markdown("#### Chart filters")
+                            default_plot_metric = (
+                                "publication" if "publication" in picked else picked[0]
+                            )
+                            plot_metric = st.selectbox(
+                                "Metric",
+                                options=picked,
+                                index=picked.index(default_plot_metric),
+                                format_func=lambda i: label_map.get(i, i),
+                                key=f"chart_metric_{aid}",
+                            )
+                            chart_type = st.radio(
+                                "Type",
+                                options=["Bar", "Line"],
+                                horizontal=False,
+                                index=0,
+                                key=f"chart_type_{aid}",
+                            )
+                            st.caption("Axis is fixed: Year on X, Metric value on Y.")
+
+                        with c_chart:
+                            series_name_full = label_map.get(plot_metric, plot_metric)
+                            # ECharts doesn't always handle long metric names well; use acronym
+                            # (e.g. "Field-Weighted Citation Impact (FWCI)" -> "FWCI") for labels.
+                            paren_match = re.search(r"\(([^)]+)\)", str(series_name_full))
+                            series_name_short = (
+                                paren_match.group(1).strip()
+                                if paren_match
+                                else str(series_name_full)
+                            )
+                            _plot_is_pct = (
+                                plot_metric == "topJournal"
+                                or plot_metric in COLLABORATION_SUBMETRIC_IDS
+                                or plot_metric in ACADEMIC_CORPORATE_SUBMETRIC_IDS
+                            )
+                            metrics_payload = d.get("metrics") or {}
+                            by_year = _extract_metric_by_year(metrics_payload, plot_metric)
+                            if not by_year:
+                                st.caption(
+                                    "Chart is not available for this metric row (for example, H-Index)."
+                                )
+                            else:
+                                values = [by_year.get(str(y)) for y in years]
+                                values = [
+                                    None
+                                    if (
+                                        v is None
+                                        or (isinstance(v, (int, float)) and pd.isna(v))
+                                    )
+                                    else v
+                                    for v in values
+                                ]
+                                x_years = [str(y) for y in years]
+                                _yaxis_single = {
+                                    "type": "value",
+                                    "name": (
+                                        f"{series_name_short} (%)"
+                                        if _plot_is_pct
+                                        else series_name_short
+                                    ),
+                                    "nameLocation": "middle",
+                                    "nameGap": 56,
+                                    "nameRotate": 90,
+                                    "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                }
+                                if _plot_is_pct:
+                                    _yaxis_single["axisLabel"] = {"formatter": "{value}%"}
+                                _single_lbl_fmt = "{c}%" if _plot_is_pct else "{c}"
+                                echarts_options = {
+                                    "animation": True,
+                                    "title": {
+                                        "text": f"{series_name_short} over Years",
+                                        "left": "center",
+                                        "top": 8,
+                                        "textStyle": {"fontSize": 15},
+                                    },
+                                    "tooltip": {"trigger": "axis"},
+                                    # Single-series chart: hide legend to prevent duplicate
+                                    # label text colliding with the title area.
+                                    "legend": {"show": False},
+                                    "toolbox": {
+                                        "show": True,
+                                        "top": 8,
+                                        "right": 10,
+                                        "feature": {
+                                            "saveAsImage": {"show": True, "title": "Download"},
+                                            "restore": {"show": True},
+                                            "dataZoom": {"show": True},
+                                        },
+                                    },
+                                    "grid": {
+                                        "left": "6%",
+                                        "right": "5%",
+                                        "top": 84,
+                                        "bottom": 74,
+                                        "containLabel": True,
+                                    },
+                                    "xAxis": {
+                                        "type": "category",
+                                        "name": "Year",
+                                        "nameLocation": "middle",
+                                        "nameGap": 28,
+                                        "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                        "data": x_years,
+                                    },
+                                    "yAxis": _yaxis_single,
+                                    "series": [
+                                        {
+                                            "name": series_name_short,
+                                            "type": chart_type.lower(),
+                                            "data": values,
+                                            "smooth": chart_type == "Line",
+                                            "label": {
+                                                "show": True,
+                                                "position": "top",
+                                                "formatter": _single_lbl_fmt,
+                                            },
+                                        }
+                                    ],
+                                    "dataZoom": [
+                                        {"type": "inside"},
+                                        {"type": "slider", "height": 18},
+                                    ],
+                                }
+                                st_echarts(
+                                    options=echarts_options,
+                                    height="460px",
+                                    key=f"echarts_{aid}_{plot_metric}",
+                                )
+
                     if table_rows:
                         df = pd.DataFrame(table_rows, columns=col_names)
                         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -4438,146 +4606,7 @@ def main() -> None:
                                 )
                         except Exception:
                             st.caption("Could not build Word/Excel file for this author.")
-    
-                        years = []
-                        for c in col_names[1:-1]:
-                            try:
-                                years.append(int(float(c)))
-                            except Exception:
-                                continue
-                        if years:
-                            c_filters, c_chart = st.columns([1, 3], vertical_alignment="top")
-                            with c_filters:
-                                st.markdown("#### Chart filters")
-                                default_plot_metric = (
-                                    "publication" if "publication" in picked else picked[0]
-                                )
-                                plot_metric = st.selectbox(
-                                    "Metric",
-                                    options=picked,
-                                    index=picked.index(default_plot_metric),
-                                    format_func=lambda i: label_map.get(i, i),
-                                    key=f"chart_metric_{aid}",
-                                )
-                                chart_type = st.radio(
-                                    "Type",
-                                    options=["Bar", "Line"],
-                                    horizontal=False,
-                                    index=0,
-                                    key=f"chart_type_{aid}",
-                                )
-                                st.caption("Axis is fixed: Year on X, Metric value on Y.")
-    
-                            with c_chart:
-                                series_name_full = label_map.get(plot_metric, plot_metric)
-                                # ECharts doesn't always handle long metric names well; use acronym
-                                # (e.g. "Field-Weighted Citation Impact (FWCI)" -> "FWCI") for labels.
-                                paren_match = re.search(r"\(([^)]+)\)", str(series_name_full))
-                                series_name_short = (
-                                    paren_match.group(1).strip()
-                                    if paren_match
-                                    else str(series_name_full)
-                                )
-                                _plot_is_pct = (
-                                    plot_metric == "topJournal"
-                                    or plot_metric in COLLABORATION_SUBMETRIC_IDS
-                                    or plot_metric in ACADEMIC_CORPORATE_SUBMETRIC_IDS
-                                )
-                                metrics_payload = d.get("metrics") or {}
-                                by_year = _extract_metric_by_year(metrics_payload, plot_metric)
-                                if not by_year:
-                                    st.caption(
-                                        "Chart is not available for this metric row (for example, H-Index)."
-                                    )
-                                else:
-                                    values = [by_year.get(str(y)) for y in years]
-                                    values = [
-                                        None
-                                        if (
-                                            v is None
-                                            or (isinstance(v, (int, float)) and pd.isna(v))
-                                        )
-                                        else v
-                                        for v in values
-                                    ]
-                                    x_years = [str(y) for y in years]
-                                    _yaxis_single = {
-                                        "type": "value",
-                                        "name": (
-                                            f"{series_name_short} (%)"
-                                            if _plot_is_pct
-                                            else series_name_short
-                                        ),
-                                        "nameLocation": "middle",
-                                        "nameGap": 56,
-                                        "nameRotate": 90,
-                                        "nameTextStyle": {"fontSize": 11, "color": "#475569"},
-                                    }
-                                    if _plot_is_pct:
-                                        _yaxis_single["axisLabel"] = {"formatter": "{value}%"}
-                                    _single_lbl_fmt = "{c}%" if _plot_is_pct else "{c}"
-                                    echarts_options = {
-                                        "animation": True,
-                                        "title": {
-                                            "text": f"{series_name_short} over Years",
-                                            "left": "center",
-                                            "top": 8,
-                                            "textStyle": {"fontSize": 15},
-                                        },
-                                        "tooltip": {"trigger": "axis"},
-                                        # Single-series chart: hide legend to prevent duplicate
-                                        # label text colliding with the title area.
-                                        "legend": {"show": False},
-                                        "toolbox": {
-                                            "show": True,
-                                            "top": 8,
-                                            "right": 10,
-                                            "feature": {
-                                                "saveAsImage": {"show": True, "title": "Download"},
-                                                "restore": {"show": True},
-                                                "dataZoom": {"show": True},
-                                            },
-                                        },
-                                        "grid": {
-                                            "left": "6%",
-                                            "right": "5%",
-                                            "top": 84,
-                                            "bottom": 74,
-                                            "containLabel": True,
-                                        },
-                                        "xAxis": {
-                                            "type": "category",
-                                            "name": "Year",
-                                            "nameLocation": "middle",
-                                            "nameGap": 28,
-                                            "nameTextStyle": {"fontSize": 11, "color": "#475569"},
-                                            "data": x_years,
-                                        },
-                                        "yAxis": _yaxis_single,
-                                        "series": [
-                                            {
-                                                "name": series_name_short,
-                                                "type": chart_type.lower(),
-                                                "data": values,
-                                                "smooth": chart_type == "Line",
-                                                "label": {
-                                                    "show": True,
-                                                    "position": "top",
-                                                    "formatter": _single_lbl_fmt,
-                                                },
-                                            }
-                                        ],
-                                        "dataZoom": [
-                                            {"type": "inside"},
-                                            {"type": "slider", "height": 18},
-                                        ],
-                                    }
-                                    st_echarts(
-                                        options=echarts_options,
-                                        height="460px",
-                                        key=f"echarts_{aid}_{plot_metric}",
-                                    )
-    
+
                     export_rows.append(author_export_payload)
 
             if len(valid) == 1:
