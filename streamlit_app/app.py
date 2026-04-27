@@ -6,6 +6,7 @@ Run from repository root:  streamlit run streamlit_app/app.py
 from __future__ import annotations
 
 import base64
+import hashlib
 import html
 import re
 import sys
@@ -239,8 +240,8 @@ def _inject_export_download_styles() -> None:
     st.markdown(
         f"""
 <style>
-/* Compact export row: PDF + Word + Excel */
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] {{
+/* Compact export row: PDF + Word + Excel (scoped — do not match Step 1/2 columns) */
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] {{
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: wrap !important;
@@ -249,7 +250,7 @@ def _inject_export_download_styles() -> None:
   column-gap: 0.35rem !important;
   justify-content: flex-start !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
   flex: 0 0 auto !important;
   flex-grow: 0 !important;
   width: auto !important;
@@ -259,23 +260,23 @@ def _inject_export_download_styles() -> None:
   padding-right: 0 !important;
   margin: 0 !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {{
   gap: 0 !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] .block-container {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] .block-container {{
   padding-left: 0 !important;
   padding-right: 0 !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] [data-testid="stDownloadButton"],
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] .stDownloadButton {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] [data-testid="stDownloadButton"],
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] .stDownloadButton {{
   width: auto !important;
   min-width: 0 !important;
 }}
 
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button,
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) .stDownloadButton > button,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) .stDownloadButton > button {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(1) .stDownloadButton > button,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(1) .stDownloadButton > button {{
   width: auto !important;
   min-height: 2.25rem !important;
   height: auto !important;
@@ -295,13 +296,13 @@ def _inject_export_download_styles() -> None:
   background: linear-gradient(145deg, #fca5a5 0%, #f87171 40%, #ef4444 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.12) !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button:hover,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button:hover {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button:hover,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button:hover {{
   filter: brightness(1.05) saturate(1.05);
   box-shadow: 0 3px 16px rgba(239, 68, 68, 0.4) !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button::before,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::before {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button::before,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::before {{
   content: "" !important;
   display: block !important;
   width: 1.05rem !important;
@@ -309,8 +310,8 @@ def _inject_export_download_styles() -> None:
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_pdf}") center / contain no-repeat !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button::after,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::after {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stDownloadButton"] button::after,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(1) [data-testid="stDownloadButton"] button::after {{
   content: "" !important;
   display: block !important;
   width: 0.9rem !important;
@@ -319,10 +320,10 @@ def _inject_export_download_styles() -> None:
   background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
 }}
 
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button,
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) .stDownloadButton > button,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) .stDownloadButton > button {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(2) .stDownloadButton > button,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(2) .stDownloadButton > button {{
   width: auto !important;
   min-height: 2.25rem !important;
   height: auto !important;
@@ -342,13 +343,13 @@ def _inject_export_download_styles() -> None:
   background: linear-gradient(145deg, #dbeafe 0%, #93c5fd 42%, #3b82f6 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.12) !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button:hover,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button:hover {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button:hover,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button:hover {{
   filter: brightness(1.05) saturate(1.05);
   box-shadow: 0 3px 16px rgba(37, 99, 235, 0.4) !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::before,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::before {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::before,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::before {{
   content: "" !important;
   display: block !important;
   width: 1.05rem !important;
@@ -356,8 +357,8 @@ def _inject_export_download_styles() -> None:
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_doc}") center / contain no-repeat !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::after,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::after {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button::after,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(2) [data-testid="stDownloadButton"] button::after {{
   content: "" !important;
   display: block !important;
   width: 0.9rem !important;
@@ -366,10 +367,10 @@ def _inject_export_download_styles() -> None:
   background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
 }}
 
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button,
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) .stDownloadButton > button,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) .stDownloadButton > button {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(3) .stDownloadButton > button,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(3) .stDownloadButton > button {{
   width: auto !important;
   min-height: 2.25rem !important;
   height: auto !important;
@@ -389,13 +390,13 @@ def _inject_export_download_styles() -> None:
   background: linear-gradient(145deg, #d1fae5 0%, #86efac 45%, #22c55e 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button:hover,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button:hover {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button:hover,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button:hover {{
   filter: brightness(1.05) saturate(1.05);
   box-shadow: 0 3px 16px rgba(22, 163, 74, 0.36) !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button::before,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button::before {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button::before,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button::before {{
   content: "" !important;
   display: block !important;
   width: 1.05rem !important;
@@ -403,14 +404,19 @@ def _inject_export_download_styles() -> None:
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_xls}") center / contain no-repeat !important;
 }}
-[class*="st-key-export_results_shell"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button::after,
-[class*="st-key-export_results_shell"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button::after {{
+[class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button::after,
+[class*="st-key-export_download_row"] div[data-testid="column"]:nth-of-type(3) [data-testid="stDownloadButton"] button::after {{
   content: "" !important;
   display: block !important;
   width: 0.9rem !important;
   height: 0.9rem !important;
   flex-shrink: 0 !important;
   background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
+}}
+[class*="st-key-export_download_row"] {{
+  display: block !important;
+  width: 100% !important;
+  clear: both !important;
 }}
 </style>
         """,
@@ -2401,6 +2407,9 @@ footer.site-footer .site-footer-copy {
 }
 [class*="st-key-export_results_shell"] [data-testid="stTextInput"] {
   margin-bottom: 0.65rem !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: min(100%, 28rem) !important;
 }
 /* Filename field: clear bordered box (Streamlit BaseWeb + plain input) */
 [class*="st-key-export_results_shell"] [data-testid="stTextInput"] div[data-baseweb="input"] {
@@ -3222,11 +3231,12 @@ def _render_export_results_block(
         '<div id="export-downloads-anchor"></div>',
         unsafe_allow_html=True,
     )
+    export_dl_hint = "Set the filename, then download PDF, Word, or Excel."
     export_body_sub = (
-        "Set the filename, then download PDF, Word, or Excel. "
+        f"{export_dl_hint} "
         "The file uses authors from (1) and metric rows plus order from (2)–(3)."
         if n_valid > 1
-        else "Set the filename, then download PDF, Word, or Excel."
+        else export_dl_hint
     )
     _shell_border = not embedded_in_workspace
     _shell_key = (
@@ -3237,7 +3247,6 @@ def _render_export_results_block(
             st.markdown(
                 '<div class="export-downloads-section">'
                 '<p class="export-downloads-kicker">Downloads</p>'
-                f'<p class="export-downloads-hint">{html.escape(export_body_sub)}</p>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -3259,34 +3268,36 @@ def _render_export_results_block(
         fn = st.text_input(
             "Export filename (without extension)", value="research-metrics"
         )
-        b1, b2, b3 = st.columns(3, gap="xxsmall")
-        with b1:
-            pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
-            st.download_button(
-                "Export as PDF",
-                pdf_b,
-                file_name=pdf_n,
-                mime="application/pdf",
-                use_container_width=False,
-            )
-        with b2:
-            doc_b, doc_n = export_docx_bytes(export_rows, fn)
-            st.download_button(
-                "Export as Word",
-                doc_b,
-                file_name=doc_n,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=False,
-            )
-        with b3:
-            xl_b, xl_n = export_excel_bytes(export_rows, fn)
-            st.download_button(
-                "Export as Excel",
-                xl_b,
-                file_name=xl_n,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=False,
-            )
+        st.caption(export_body_sub)
+        with st.container(border=False, key="export_download_row"):
+            b1, b2, b3 = st.columns(3, gap="xxsmall")
+            with b1:
+                pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
+                st.download_button(
+                    "Export as PDF",
+                    pdf_b,
+                    file_name=pdf_n,
+                    mime="application/pdf",
+                    use_container_width=False,
+                )
+            with b2:
+                doc_b, doc_n = export_docx_bytes(export_rows, fn)
+                st.download_button(
+                    "Export as Word",
+                    doc_b,
+                    file_name=doc_n,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=False,
+                )
+            with b3:
+                xl_b, xl_n = export_excel_bytes(export_rows, fn)
+                st.download_button(
+                    "Export as Excel",
+                    xl_b,
+                    file_name=xl_n,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=False,
+                )
 
 
 def _render_single_author_export_workspace(
@@ -3310,16 +3321,11 @@ def _render_single_author_export_workspace(
         )
         st.markdown(
             _export_options_heading_html(
-                subtitle="Set the filename, then download PDF, Word, or Excel."
+                subtitle="Choose display order below."
             ),
             unsafe_allow_html=True,
         )
         with st.container(border=True, key="export_results_shell_single"):
-            fn = st.text_input(
-                "Export filename (without extension)",
-                value="research-metrics",
-                key="export_fn_single_author_workspace",
-            )
             st.markdown(
                 '<p class="export-metric-order-kicker">'
                 "Display order (top to bottom)</p>",
@@ -3349,38 +3355,45 @@ def _render_single_author_export_workspace(
                         "metricOrder": list(_ord_final),
                     }
                 )
+            fn = st.text_input(
+                "Export filename (without extension)",
+                value="research-metrics",
+                key="export_fn_single_author_workspace",
+            )
             if export_rows:
-                b1, b2, b3 = st.columns(3, gap="xxsmall")
-                with b1:
-                    pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
-                    st.download_button(
-                        "Export as PDF",
-                        pdf_b,
-                        file_name=pdf_n,
-                        mime="application/pdf",
-                        use_container_width=False,
-                        key="export_pdf_single_author_ws",
-                    )
-                with b2:
-                    doc_b, doc_n = export_docx_bytes(export_rows, fn)
-                    st.download_button(
-                        "Export as Word",
-                        doc_b,
-                        file_name=doc_n,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=False,
-                        key="export_docx_single_author_ws",
-                    )
-                with b3:
-                    xl_b, xl_n = export_excel_bytes(export_rows, fn)
-                    st.download_button(
-                        "Export as Excel",
-                        xl_b,
-                        file_name=xl_n,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=False,
-                        key="export_xlsx_single_author_ws",
-                    )
+                st.caption("Set the filename, then download PDF, Word, or Excel.")
+                with st.container(border=False, key="export_download_row"):
+                    b1, b2, b3 = st.columns(3, gap="xxsmall")
+                    with b1:
+                        pdf_b, pdf_n = export_pdf_bytes(export_rows, fn)
+                        st.download_button(
+                            "Export as PDF",
+                            pdf_b,
+                            file_name=pdf_n,
+                            mime="application/pdf",
+                            use_container_width=False,
+                            key="export_pdf_single_author_ws",
+                        )
+                    with b2:
+                        doc_b, doc_n = export_docx_bytes(export_rows, fn)
+                        st.download_button(
+                            "Export as Word",
+                            doc_b,
+                            file_name=doc_n,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=False,
+                            key="export_docx_single_author_ws",
+                        )
+                    with b3:
+                        xl_b, xl_n = export_excel_bytes(export_rows, fn)
+                        st.download_button(
+                            "Export as Excel",
+                            xl_b,
+                            file_name=xl_n,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=False,
+                            key="export_xlsx_single_author_ws",
+                        )
             else:
                 st.caption("Choose at least one metric in **Step 1** to export.")
 
@@ -3486,6 +3499,9 @@ def _render_metric_visibility_controls(
     order_state_key: str,
     removed_key: str,
     sortable_key: str,
+    pick_heading_markdown: str | None = "**Step 1. Pick metrics**",
+    multiselect_label: str = "Metrics to display",
+    show_all_visible_caption: bool = True,
 ) -> list[str]:
     active_ids = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     # Only seed defaults when session has never set this list. If the user clears
@@ -3494,9 +3510,10 @@ def _render_metric_visibility_controls(
     if order_state_key not in st.session_state:
         active_ids = [m for m in opt_list if m not in st.session_state.get(removed_key, [])]
 
-    st.markdown("**Step 1. Pick metrics**")
+    if pick_heading_markdown:
+        st.markdown(pick_heading_markdown)
     selected_ids = st.multiselect(
-        "Metrics to display",
+        multiselect_label,
         options=opt_list,
         default=active_ids,
         format_func=lambda i: label_map.get(i, i),
@@ -3519,7 +3536,8 @@ def _render_metric_visibility_controls(
     panel_key = f"{sortable_key}_restore_hidden_open"
     if n_hidden == 0:
         st.session_state.pop(panel_key, None)
-        st.caption("All metrics shown.")
+        if show_all_visible_caption:
+            st.caption("All metrics shown.")
     else:
         cap_col, btn_col = st.columns([3, 1], vertical_alignment="center")
         with cap_col:
@@ -3577,20 +3595,26 @@ def _render_metric_sort_order(
         st.session_state[order_state_key] = active_ids
         return active_ids
 
+    # Include the selected set in the key so removing a chip in Step 1 remounts the
+    # sortable; otherwise streamlit-sortables keeps stale items for a stable key.
+    _set_sig = hashlib.md5(",".join(sorted(active_ids)).encode()).hexdigest()[:12]
     id_to_label, label_to_id = _metric_sortable_label_maps(active_ids, label_map)
     sorted_labels = sort_items(
         [id_to_label[mid] for mid in active_ids],
         header=header,
         direction="vertical",
         custom_style=_METRIC_SORTABLE_STYLE,
-        key=f"{sortable_key}_sort",
+        key=f"{sortable_key}_sort_{_set_sig}",
     )
     if isinstance(sorted_labels, list):
-        active_ids = [
+        ordered = [
             label_to_id[item]
             for item in sorted_labels
             if item in label_to_id
         ]
+        _seen = set(ordered)
+        ordered.extend(m for m in active_ids if m not in _seen)
+        active_ids = ordered
 
     st.session_state[order_state_key] = active_ids
     return active_ids
@@ -3646,37 +3670,30 @@ def _metrics_multiselect_and_order_ui(
     order_state_key: str,
     sortable_key: str,
     multiselect_label: str,
-    multiselect_key: str,
     step_multiselect: int | None = None,
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Export bundle split into metric selection and drag/drop ordering."""
+    """Export bundle: metric chips with hidden restore panel + drag/drop ordering."""
     if step_multiselect is not None:
         st.markdown(
             _export_step_heading_html(step_multiselect, multiselect_label or ""),
             unsafe_allow_html=True,
         )
-    picked = st.multiselect(
-        multiselect_label or "",
-        options=opt_list,
-        default=opt_list,
-        format_func=lambda i: label_map.get(i, i),
-        key=multiselect_key or "",
-        label_visibility="collapsed" if step_multiselect is not None else "visible",
+    removed_key = f"{order_state_key}__removed"
+    picked_norm = _render_metric_visibility_controls(
+        opt_list=opt_list,
+        label_map=label_map,
+        order_state_key=order_state_key,
+        removed_key=removed_key,
+        sortable_key=sortable_key,
+        pick_heading_markdown=None,
+        multiselect_label=multiselect_label or "Metrics to export",
     )
-    if not picked:
+    if not picked_norm:
         st.caption("Select at least one metric.")
         return [], []
 
-    picked_norm = [m for m in picked if m in opt_list]
-    # Reconcile ordered export list with multiselect: keep order for kept ids, drop deselected, append new picks at the end.
-    existing_order = list(st.session_state.get(order_state_key, picked_norm.copy()))
-    existing_order = [m for m in existing_order if m in picked_norm]
-    for m in picked_norm:
-        if m not in existing_order:
-            existing_order.append(m)
-    st.session_state[order_state_key] = existing_order
-    order_pick = existing_order
+    order_pick = list(picked_norm)
 
     if step_order is not None:
         st.markdown(
@@ -3697,7 +3714,6 @@ def _metrics_multiselect_and_order_ui(
         sortable_key=sortable_key,
         header="Sort metrics",
     )
-    st.caption("Use **Metrics to export** above, then **drag** here to set column order.")
 
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     picked = list(order_pick)
@@ -4638,9 +4654,6 @@ def main() -> None:
                         _export_options_heading_html(),
                         unsafe_allow_html=True,
                     )
-                    st.caption(
-                        "Authors and metrics here must match what you want in the export file."
-                    )
                     st.markdown(
                         _export_step_heading_html(1, "Author(s) to include in export"),
                         unsafe_allow_html=True,
@@ -4663,7 +4676,6 @@ def main() -> None:
                         order_state_key="export_bundle_metrics_ord_state",
                         sortable_key="export_bundle_metrics_sort",
                         multiselect_label="Metrics to export",
-                        multiselect_key="export_bundle_metrics_ms",
                         step_multiselect=2,
                         step_order=3,
                     )
