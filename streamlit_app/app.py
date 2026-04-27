@@ -3480,7 +3480,10 @@ def _render_metric_visibility_controls(
     pick_sig: str,
 ) -> list[str]:
     active_ids = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
-    if not active_ids:
+    # Only seed defaults when session has never set this list. If the user clears
+    # all chips, order_state_key is [] and must stay empty (otherwise removing the
+    # last chip repopulates all metrics and feels like a “double delete”).
+    if order_state_key not in st.session_state:
         active_ids = [m for m in opt_list if m not in st.session_state.get(removed_key, [])]
 
     st.markdown("**Step 1. Pick metrics**")
