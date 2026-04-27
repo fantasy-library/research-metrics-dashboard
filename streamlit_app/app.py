@@ -1496,12 +1496,15 @@ a.minimal-go-analyze-btn:focus-visible,
   flex: 1 1 auto !important;
   margin-bottom: 0 !important;
   min-height: 3.35rem !important;
+  overflow: visible !important;
 }
 [class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:first-child {
   flex: 1 1 auto !important;
   min-width: 0 !important;
   display: flex !important;
   align-items: flex-start !important;
+  /* Allow (i) tooltips to extend past the flex column; min-width:0 otherwise clips overflow. */
+  overflow: visible !important;
 }
 [class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child {
   flex: 0 0 auto !important;
@@ -1540,6 +1543,7 @@ p.metric-compact-title {
 }
 [class*="st-key-metric_cell_"] p.metric-compact-title--with-info {
   max-width: 100% !important;
+  overflow: visible !important;
 }
 [class*="st-key-metric_cell_"] p.metric-compact-title--with-info .metric-title-text {
   word-break: break-word !important;
@@ -1581,8 +1585,11 @@ p.metric-compact-title {
 .metric-info-panel {
   display: none !important;
   position: absolute !important;
-  z-index: 80 !important;
-  right: 0 !important;
+  z-index: 400 !important;
+  /* Anchor to start of (i) wrap and expand right — right:0 made the panel grow leftward
+     and get clipped off-screen for metrics in the first grid columns (e.g. Publication). */
+  left: 0 !important;
+  right: auto !important;
   top: calc(100% + 6px) !important;
   width: min(19.5rem, calc(100vw - 2rem)) !important;
   max-height: min(70vh, 22rem) !important;
