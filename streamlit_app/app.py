@@ -2325,23 +2325,18 @@ footer.site-footer .site-footer-copy {
   align-items: center !important;
 }
 
-/* Select metrics: title + caption on one line */
-.metrics-panel-head-group {
+/* Select metrics: force single-line heading + helper text */
+.metrics-panel-heading-inline {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
-  gap: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  white-space: nowrap;
   margin: 0 0 0.35rem 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
-.metrics-panel-head-group .metrics-panel-heading {
-  margin: 0 !important;
-}
-.metrics-panel-head-group .metrics-panel-head-caption {
-  text-align: left;
-  margin: 0 !important;
-  padding: 0;
-}
-.metrics-panel-head-caption {
+.metrics-panel-head-caption-inline {
   font-size: 0.8rem;
   font-weight: 400;
   color: #64748b;
@@ -3390,10 +3385,7 @@ def _render_single_author_export_workspace(
                         key="export_xlsx_single_author_ws",
                     )
             else:
-                st.caption(
-                    "Select at least one metric in **Step 1** "
-                    "to enable PDF, Word, and Excel export."
-                )
+                st.caption("Choose at least one metric in **Step 1** to export.")
 
 
 def _sync_pick_via_metric_order_session(
@@ -3491,7 +3483,7 @@ def _render_metric_visibility_controls(
     if not active_ids:
         active_ids = [m for m in opt_list if m not in st.session_state.get(removed_key, [])]
 
-    st.markdown("**Step 1. Metrics to display**")
+    st.markdown("**Step 1. Pick metrics**")
     selected_ids = st.multiselect(
         "Metrics to display",
         options=opt_list,
@@ -3499,6 +3491,7 @@ def _render_metric_visibility_controls(
         format_func=lambda i: label_map.get(i, i),
         key=f"{sortable_key}_{pick_sig}_visible_ms",
         label_visibility="collapsed",
+        help="Remove a chip to hide. Open the list to add it back.",
     )
     selected_ids = [m for m in selected_ids if m in opt_list]
     # Keep the user's existing display order for selected metrics, then append
@@ -3508,6 +3501,13 @@ def _render_metric_visibility_controls(
         m for m in opt_list if m in selected_ids and m not in ordered_selected
     )
     removed_ids = [m for m in opt_list if m not in ordered_selected]
+    n_hidden = len(removed_ids)
+    if n_hidden:
+        st.caption(
+            f"**{n_hidden} hidden** — open the list below to add back."
+        )
+    else:
+        st.caption("All metrics shown.")
 
     st.session_state[order_state_key] = ordered_selected
     st.session_state[removed_key] = removed_ids
@@ -3525,13 +3525,11 @@ def _render_metric_sort_order(
 ) -> list[str]:
     active_ids = [m for m in metric_ids if m]
     if not active_ids:
-        st.info("No metrics selected for sorting.")
+        st.info("No metrics to sort.")
         st.session_state[order_state_key] = []
         return []
     if sort_items is None:
-        st.warning(
-            "Install dependencies from requirements.txt to enable drag-and-drop ordering."
-        )
+        st.warning("Install `streamlit-sortables` (see requirements.txt) to drag-sort.")
         st.session_state[order_state_key] = active_ids
         return active_ids
 
@@ -3584,7 +3582,7 @@ def _render_pick_via_metric_order_section(
         removed_key=removed_key,
         pick_sig=_pick_sig,
     )
-    st.markdown("**Step 2. Sort displayed metrics**")
+    st.markdown("**Step 2. Order**")
     order_pick = _render_metric_sort_order(
         metric_ids=order_pick,
         label_map=label_map,
@@ -3594,14 +3592,9 @@ def _render_pick_via_metric_order_section(
         header="Sort metrics",
     )
     picked = list(order_pick)
-    st.caption(
-        "Use Step 1 chips to choose which metrics stay visible. Use Step 2 to drag displayed metrics "
-        "into the order you want."
-    )
+    st.caption("**Step 1:** show/hide. **Step 2:** drag to order.")
     if not picked:
-        st.caption(
-            "Select at least one metric in Step 1 to show it in the comparison."
-        )
+        st.caption("Pick at least one metric in **Step 1**.")
         return [], []
     st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
     return picked, order_pick
@@ -3633,7 +3626,7 @@ def _metrics_multiselect_and_order_ui(
         label_visibility="collapsed" if step_multiselect is not None else "visible",
     )
     if not picked:
-        st.caption("Select at least one metric row to display.")
+        st.caption("Select at least one metric.")
         return [], []
 
     picked_norm = [m for m in picked if m in opt_list]
@@ -3667,16 +3660,13 @@ def _metrics_multiselect_and_order_ui(
         pick_sig=_pick_sig,
         header="Sort metrics",
     )
-    st.caption(
-        "Use **Metrics to export** above to choose metrics. Drag items here "
-        "only to change export column order."
-    )
+    st.caption("Use **Metrics to export** above, then **drag** here to set column order.")
 
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     picked = list(order_pick)
     st.session_state[order_state_key] = order_pick
     if not picked:
-        st.caption("Select at least one metric row to display.")
+        st.caption("Select at least one metric.")
         return [], []
     st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
     return picked, order_pick
@@ -4332,10 +4322,10 @@ def main() -> None:
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    '<div class="metrics-panel-head-group">'
-                    '<p class="metrics-panel-heading">Select Metrics to Include</p>'
-                    '<span class="metrics-panel-head-caption">(Toggle metrics on or off.)</span>'
-                    "</div>",
+                    '<p class="metrics-panel-heading metrics-panel-heading-inline">'
+                    '<span>Select Metrics to Include</span>'
+                    '<span class="metrics-panel-head-caption-inline">(Toggle metrics on/off)</span>'
+                    "</p>",
                     unsafe_allow_html=True,
                 )
 
@@ -4486,11 +4476,9 @@ def main() -> None:
                 1 for m in st.session_state.available_metrics if m.get("enabled")
             )
             if not ids:
-                st.warning("Enter at least one Scopus Author ID.")
+                st.warning("Enter at least one author ID.")
             elif selected_metric_count == 0:
-                st.warning(
-                    f"Select at least one metric before analyzing ({selected_metric_count} of {len(st.session_state.available_metrics)} metrics selected)."
-                )
+                st.warning("Turn on at least one metric (all are off).")
             elif len(ids) > MAX_AUTHORS_PER_RUN:
                 st.warning(
                     f"Please limit to {MAX_AUTHORS_PER_RUN} Scopus Author IDs per run."
@@ -4501,10 +4489,7 @@ def main() -> None:
                 try:
                     with st.spinner("Fetching metrics…"):
                         if USE_DIRECT_API:
-                            st.caption(
-                                "SciVal uses several requests in sequence; slow Elsevier responses "
-                                "can take up to about a minute. If it stops with a timeout message, try again shortly."
-                            )
+                            st.caption("SciVal can take up to ~1 min; retry on timeout.")
                         resolved_ids, resolution_warnings = (
                             resolve_author_ids_for_metrics_safe(
                                 ids, api_key_effective
@@ -4652,9 +4637,7 @@ def main() -> None:
                         if st.session_state.get(f"export_scholar_inc_{r['id']}", True)
                     ]
                     if not picked_m or not export_scholar_pick:
-                        st.info(
-                            "Select at least one metric and one author before generating the export."
-                        )
+                        st.info("Pick at least one metric and one author.")
                     for r in valid:
                         if r["id"] not in export_scholar_pick:
                             continue
