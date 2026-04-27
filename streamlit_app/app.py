@@ -2511,9 +2511,9 @@ def _render_header_html() -> None:
 DEFAULT_METRICS = [
     {
         "id": "publication",
-        "label": "Scholarly Output",
+        "label": "Publication",
         "description": (
-            "Scholarly output: count of Scopus-indexed publications in the selected window."
+            "Publication count (SciVal scholarly output): Scopus-indexed items in the selected window."
         ),
         "enabled": True,
     },
@@ -2528,7 +2528,7 @@ DEFAULT_METRICS = [
     },
     {
         "id": "topJournal",
-        "label": "Publications in Top 10% Journals (%)",
+        "label": "Publications in Top 10% Journals",
         "description": (
             "Share of publications in journals SciVal ranks in the top tenth by CiteScore percentile."
         ),
@@ -2601,8 +2601,9 @@ DEFAULT_METRICS = [
 # Metric info (i) panels: ``{Topic}: …`` lead line, then detail; collaboration types use bullets.
 METRIC_INFO_TEXT: dict[str, str] = {
     "publication": (
-        "Scholarly output: count of this entity’s Scopus-indexed publications in the selected "
-        "document-type and year window. Year values are grouped by publication year."
+        "Publication count (SciVal scholarly output): count of this entity’s Scopus-indexed "
+        "publications in the selected document-type and year window. Year values are grouped by "
+        "publication year."
     ),
     "fwci": (
         "FWCI: citations on this entity’s papers vs the average for similar papers worldwide "
@@ -2896,7 +2897,7 @@ def _build_metrics_table_rows(
     years = _resolve_year_columns(m, ds)
 
     row_defs = [
-        ("publication", "Scholarly Output", lambda x: x["scholarlyOutput"], True, False),
+        ("publication", "Publication", lambda x: x["scholarlyOutput"], True, False),
         ("citationCount", "Citation Count", lambda x: x["citationCount"], True, False),
         (
             "citationsPerPublication",
@@ -3100,9 +3101,22 @@ def _scalar_metric_total(metrics_payload: dict, metric_id: str) -> float | None:
 
 
 def _metric_short_label(label_map: dict, metric_id: str) -> str:
-    full = label_map.get(metric_id, metric_id)
-    paren_match = re.search(r"\(([^)]+)\)", str(full))
-    return paren_match.group(1).strip() if paren_match else str(full)
+    """Prefer a real acronym in parentheses (e.g. ``(FWCI)``).
+
+    Labels that end with a literal ``(%)`` placeholder are not acronyms; stripping
+    them avoids chart titles like ``% (%)`` or duplicated ``(%)`` when the axis
+    already adds a percent unit.
+    """
+    full = str(label_map.get(metric_id, metric_id))
+    matches = list(re.finditer(r"\(([^)]*)\)", full))
+    if not matches:
+        return full
+    for m in reversed(matches):
+        inner = (m.group(1) or "").strip()
+        if inner and inner != "%":
+            return inner
+    cleaned = re.sub(r"(\s*\(%\))+$", "", full).strip()
+    return cleaned or full
 
 
 def _bubble_symbol_sizes(raw: list[float | None]) -> list[float]:
@@ -3922,20 +3936,34 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
     )
     bubble_metric_opts = [i for i in order_opts if i in en]
 
-    def _bubble_pick_idx(metric_id: str, default: str) -> int:
-        try:
-            return bubble_metric_opts.index(metric_id)
-        except ValueError:
-            try:
-                return bubble_metric_opts.index(default)
-            except ValueError:
-                return 0
+    def _bubble_default_axis_indices(opts: list[str]) -> tuple[int, int, int]:
+        """Defaults for X, Y, bubble size: prefer FWCI on X when enabled, all three distinct."""
+        if len(opts) < 3:
+            return (0, min(1, len(opts) - 1), min(2, len(opts) - 1))
+        prefer = [
+            "fwci",
+            "topJournal",
+            "publication",
+            "citationCount",
+            "citationsPerPublication",
+            "hIndex",
+        ]
+        x_id = next((p for p in prefer if p in opts), opts[0])
+        y_id = next((p for p in prefer if p in opts and p != x_id), None)
+        if y_id is None:
+            y_id = next((p for p in opts if p != x_id), opts[0])
+        z_id = next((p for p in prefer if p in opts and p not in (x_id, y_id)), None)
+        if z_id is None:
+            z_id = next((p for p in opts if p not in (x_id, y_id)), opts[0])
+        return (opts.index(x_id), opts.index(y_id), opts.index(z_id))
 
     if len(bubble_metric_opts) < 3:
         st.caption(
             "Enable at least three metrics in Settings to map X, Y, and bubble size."
         )
         return
+
+    _ix, _iy, _iz = _bubble_default_axis_indices(bubble_metric_opts)
 
     with st.container(border=False, key="compare_bubble_row"):
         col_bfilt, col_bchart = st.columns(
@@ -3949,9 +3977,9 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
             x_metric = st.selectbox(
                 "X-axis",
                 options=bubble_metric_opts,
-                index=_bubble_pick_idx("fwci", "publication"),
+                index=_ix,
                 format_func=lambda i: label_map.get(i, i),
-                key="compare_bubble_x_v2",
+                key="compare_bubble_x_v3",
                 label_visibility="collapsed",
             )
             st.markdown(
@@ -3961,9 +3989,9 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
             y_metric = st.selectbox(
                 "Y-axis",
                 options=bubble_metric_opts,
-                index=_bubble_pick_idx("topJournal", "fwci"),
+                index=_iy,
                 format_func=lambda i: label_map.get(i, i),
-                key="compare_bubble_y_v2",
+                key="compare_bubble_y_v3",
                 label_visibility="collapsed",
             )
             st.markdown(
@@ -3973,9 +4001,9 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
             size_metric = st.selectbox(
                 "Bubble size",
                 options=bubble_metric_opts,
-                index=_bubble_pick_idx("publication", "citationCount"),
+                index=_iz,
                 format_func=lambda i: label_map.get(i, i),
-                key="compare_bubble_size_v2",
+                key="compare_bubble_size_v3",
                 label_visibility="collapsed",
             )
 
@@ -4755,14 +4783,8 @@ def main() -> None:
                             st.caption("Axis is fixed: publication year on X, metric value on Y.")
 
                         with c_chart:
-                            series_name_full = label_map.get(plot_metric, plot_metric)
-                            # ECharts doesn't always handle long metric names well; use acronym
-                            # (e.g. "Field-Weighted Citation Impact (FWCI)" -> "FWCI") for labels.
-                            paren_match = re.search(r"\(([^)]+)\)", str(series_name_full))
-                            series_name_short = (
-                                paren_match.group(1).strip()
-                                if paren_match
-                                else str(series_name_full)
+                            series_name_short = _metric_short_label(
+                                label_map, plot_metric
                             )
                             _plot_is_pct = (
                                 plot_metric == "topJournal"

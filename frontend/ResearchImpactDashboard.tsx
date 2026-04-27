@@ -28,9 +28,9 @@ type MetricDef = {
 const METRICS: MetricDef[] = [
   {
     id: "publication",
-    title: "Scholarly Output",
+    title: "Publication",
     description:
-      "Scholarly output: count of Scopus-indexed publications in the selected window.",
+      "Publication count (SciVal scholarly output): Scopus-indexed items in the selected window.",
     group: "core",
   },
   {
@@ -42,7 +42,7 @@ const METRICS: MetricDef[] = [
   },
   {
     id: "topJournal",
-    title: "Publications in Top 10% Journals (%)",
+    title: "Publications in Top 10% Journals",
     description:
       "Share of publications in journals SciVal ranks in the top tenth by CiteScore percentile.",
     group: "core",

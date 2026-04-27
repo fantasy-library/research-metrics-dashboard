@@ -78,7 +78,7 @@ def _validate_export_data(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 METRIC_DEFS: List[Dict[str, Any]] = [
     {
         "id": "publication",
-        "label": "Scholarly Output",
+        "label": "Publication",
         "getData": lambda m: m["scholarlyOutput"],
         "isYearBased": True,
     },
