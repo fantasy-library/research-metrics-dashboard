@@ -221,9 +221,10 @@ def _format_export_value(
     if value == "N/A" or value is None:
         return "N/A"
     if isinstance(value, (int, float)):
-        if metric_id in ("fwci", "citationsPerPublication", "topJournal"):
-            return f"{float(value):.2f}{suffix}"
         if suffix == "%":
+            fv = float(value)
+            return f"{int(fv)}%" if fv.is_integer() else f"{fv:.2f}%"
+        if metric_id in ("fwci", "citationsPerPublication", "topJournal"):
             return f"{float(value):.2f}{suffix}"
         return f"{round(value)}{suffix}"
     return f"{value}{suffix}"

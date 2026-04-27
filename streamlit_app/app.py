@@ -2904,6 +2904,10 @@ def _build_metrics_table_rows(
     ds = data_source or {}
     years = _resolve_year_columns(m, ds)
 
+    def _fmt_pct(v: float | int) -> str:
+        fv = float(v)
+        return f"{int(fv)}%" if fv.is_integer() else f"{fv:.2f}%"
+
     row_defs = [
         ("publication", "Publication", lambda x: x["scholarlyOutput"], True, False),
         ("citationCount", "Citation Count", lambda x: x["citationCount"], True, False),
@@ -2988,9 +2992,7 @@ def _build_metrics_table_rows(
                 if v is None:
                     cells.append("N/A")
                 elif is_pct or mid == "topJournal":
-                    cells.append(
-                        f"{int(v)}%" if isinstance(v, (int, float)) and v % 1 == 0 else f"{float(v):.2f}%"
-                    )
+                    cells.append(_fmt_pct(v))
                 elif mid in ("fwci", "citationsPerPublication"):
                     cells.append(f"{float(v):.2f}")
                 else:
@@ -2998,7 +3000,7 @@ def _build_metrics_table_rows(
             if isinstance(tot, (int, float)):
                 if mid in ("fwci", "citationsPerPublication", "topJournal") or is_pct:
                     cells.append(
-                        f"{tot:.2f}%" if is_pct or mid == "topJournal" else f"{tot:.2f}"
+                        _fmt_pct(tot) if is_pct or mid == "topJournal" else f"{tot:.2f}"
                     )
                 else:
                     cells.append(str(round(tot)))
@@ -3389,7 +3391,7 @@ def _render_single_author_export_workspace(
                     )
             else:
                 st.caption(
-                    "Restore at least one metric in **Step 1** "
+                    "Select at least one metric in **Step 1** "
                     "to enable PDF, Word, and Excel export."
                 )
 
@@ -3454,14 +3456,6 @@ _METRIC_SORTABLE_STYLE = """
   margin: 0.25rem 0;
   padding: 0.65rem 0.8rem;
 }
-.sortable-item::before {
-  content: "Drag ";
-  color: #64748b;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
 .sortable-item.dragging {
   cursor: grabbing;
 }
@@ -3494,65 +3488,30 @@ def _render_metric_visibility_controls(
     pick_sig: str,
 ) -> list[str]:
     active_ids = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
-    removed_ids = [
-        m
-        for m in st.session_state.get(removed_key, [])
-        if m in opt_list and m not in active_ids
-    ]
-    for mid in opt_list:
-        if mid not in active_ids and mid not in removed_ids:
-            removed_ids.append(mid)
+    if not active_ids:
+        active_ids = [m for m in opt_list if m not in st.session_state.get(removed_key, [])]
 
-    st.markdown("**Step 1. Delete or restore metrics**")
-    c_remove, c_restore = st.columns(2, gap="small")
-    with c_remove:
-        if active_ids:
-            remove_choice = st.selectbox(
-                "Delete metric",
-                options=active_ids,
-                format_func=lambda i: label_map.get(i, i),
-                key=f"{sortable_key}_{pick_sig}_remove_sel",
-            )
-            if st.button(
-                "Delete selected metric",
-                key=f"{sortable_key}_{pick_sig}_remove_btn",
-                type="secondary",
-                use_container_width=True,
-            ):
-                active_ids = [m for m in active_ids if m != remove_choice]
-                if remove_choice not in removed_ids:
-                    removed_ids.append(remove_choice)
-                st.session_state[order_state_key] = active_ids
-                st.session_state[removed_key] = removed_ids
-                st.rerun()
-        else:
-            st.caption("No displayed metrics to delete.")
-    with c_restore:
-        if removed_ids:
-            restore_choice = st.selectbox(
-                "Restore metric",
-                options=removed_ids,
-                format_func=lambda i: label_map.get(i, i),
-                key=f"{sortable_key}_{pick_sig}_restore_sel",
-            )
-            if st.button(
-                "Restore selected metric",
-                key=f"{sortable_key}_{pick_sig}_restore_btn",
-                type="secondary",
-                use_container_width=True,
-            ):
-                if restore_choice not in active_ids:
-                    active_ids.append(restore_choice)
-                removed_ids = [m for m in removed_ids if m != restore_choice]
-                st.session_state[order_state_key] = active_ids
-                st.session_state[removed_key] = removed_ids
-                st.rerun()
-        else:
-            st.caption("No removed metrics to restore.")
+    st.markdown("**Step 1. Metrics to display**")
+    selected_ids = st.multiselect(
+        "Metrics to display",
+        options=opt_list,
+        default=active_ids,
+        format_func=lambda i: label_map.get(i, i),
+        key=f"{sortable_key}_{pick_sig}_visible_ms",
+        label_visibility="collapsed",
+    )
+    selected_ids = [m for m in selected_ids if m in opt_list]
+    # Keep the user's existing display order for selected metrics, then append
+    # any newly restored chips in the canonical option order.
+    ordered_selected = [m for m in active_ids if m in selected_ids]
+    ordered_selected.extend(
+        m for m in opt_list if m in selected_ids and m not in ordered_selected
+    )
+    removed_ids = [m for m in opt_list if m not in ordered_selected]
 
-    st.session_state[order_state_key] = active_ids
+    st.session_state[order_state_key] = ordered_selected
     st.session_state[removed_key] = removed_ids
-    return active_ids
+    return ordered_selected
 
 
 def _render_metric_sort_order(
@@ -3606,7 +3565,7 @@ def _render_pick_via_metric_order_section(
     step_order: int | None = None,
     embed_in_export_workspace: bool = False,
 ) -> tuple[list[str], list[str]]:
-    """Metric controls split deletion/restoration from drag-and-drop ordering."""
+    """Metric controls use chips for visibility and drag-and-drop for ordering."""
     if embed_in_export_workspace:
         pass
     elif step_order is not None:
@@ -3632,16 +3591,16 @@ def _render_pick_via_metric_order_section(
         order_state_key=order_state_key,
         sortable_key=sortable_key,
         pick_sig=_pick_sig,
-        header="Displayed metrics - drag to reorder",
+        header="Sort metrics",
     )
     picked = list(order_pick)
     st.caption(
-        "Use Step 1 to delete or restore metrics. Use Step 2 to drag displayed metrics "
+        "Use Step 1 chips to choose which metrics stay visible. Use Step 2 to drag displayed metrics "
         "into the order you want."
     )
     if not picked:
         st.caption(
-            "Restore at least one metric in Step 1 to show it in the comparison."
+            "Select at least one metric in Step 1 to show it in the comparison."
         )
         return [], []
     st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
@@ -3706,10 +3665,10 @@ def _metrics_multiselect_and_order_ui(
         order_state_key=order_state_key,
         sortable_key=sortable_key,
         pick_sig=_pick_sig,
-        header="Exported metrics - drag to reorder",
+        header="Sort metrics",
     )
     st.caption(
-        "Use **Metrics to export** above to delete or restore metrics. Drag items here "
+        "Use **Metrics to export** above to choose metrics. Drag items here "
         "only to change export column order."
     )
 
@@ -4783,7 +4742,7 @@ def main() -> None:
                     if years and chart_options:
                         c_filters, c_chart = st.columns([1, 3], vertical_alignment="top")
                         with c_filters:
-                            st.markdown("#### Chart filters")
+                            st.markdown("#### Metric by Year")
                             default_plot_metric = (
                                 "publication"
                                 if "publication" in chart_options
