@@ -28,9 +28,9 @@ type MetricDef = {
 const METRICS: MetricDef[] = [
   {
     id: "publication",
-    title: "Publication",
+    title: "Scholarly Output",
     description:
-      "Publication (Scholarly output): Scopus-indexed count, usually by publication year.",
+      "Scholarly output: count of Scopus-indexed publications in the selected window.",
     group: "core",
   },
   {
@@ -42,15 +42,15 @@ const METRICS: MetricDef[] = [
   },
   {
     id: "topJournal",
-    title: "Top 10% Journal Percentile",
+    title: "Publications in Top 10% Journals (%)",
     description:
-      "Top 10% journals: share in journals SciVal ranks in the top tenth by CiteScore, SNIP, or SJR.",
+      "Share of publications in journals SciVal ranks in the top tenth by CiteScore percentile.",
     group: "core",
   },
   {
     id: "citationCount",
     title: "Citation Count",
-    description: "Citation count: total citations; chart years are publication years.",
+    description: "Citation count: citations received by the selected publications, grouped by publication year.",
     group: "core",
   },
   {
@@ -60,23 +60,23 @@ const METRICS: MetricDef[] = [
     group: "core",
   },
   {
-    id: "cpp",
+    id: "citationsPerPublication",
     title: "Citations Per Publication",
     description:
-      "Citations per publication: total citations divided by publication count in the window.",
+      "Citations per publication: average citations received per publication in the selected window.",
     group: "core",
   },
   {
-    id: "collab",
+    id: "collaborationInternational",
     title: "Collaboration",
-    description: "SciVal collaboration-type splits (institutional / national / international / single author).",
+    description: "SciVal collaboration-type percentages: institutional, national, international, and single author.",
     group: "collab",
   },
   {
-    id: "acc",
-    title: "Academic Corporate Collaboration",
+    id: "academicCorporateWith",
+    title: "Academic–Corporate Collaboration",
     description:
-      "Academic–corporate: papers with academic and corporate SciVal sectors on the same article.",
+      "Share of publications SciVal classifies as involving both academic and corporate affiliations.",
     group: "collab",
   },
 ];
@@ -277,7 +277,7 @@ export function ResearchImpactDashboard() {
                   <p className="text-[10px] font-bold uppercase tracking-wide text-orange-800">
                     Self-citations
                   </p>
-                  <p className="font-bold text-slate-900">Self-Citations Filter</p>
+                  <p className="font-bold text-slate-900">Self-Citations for Citation Metrics</p>
                   <p className="text-xs text-slate-600">
                     Include or exclude an author’s citations to their own work.
                   </p>
@@ -306,8 +306,8 @@ export function ResearchImpactDashboard() {
                 </label>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-orange-900/90">
-                Self-citations are citations where an author cites their own
-                previous work.
+                Self-citation handling applies to citation-based metrics where
+                SciVal supports it.
               </p>
             </div>
           </div>

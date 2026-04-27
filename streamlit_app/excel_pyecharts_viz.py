@@ -162,8 +162,13 @@ def main() -> None:
     st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
     metric_options = metrics_df["Metric"].tolist()
-    selected_metric = st.selectbox("Metric (rows in the Excel)", options=metric_options, index=metric_options.index("Publication") if "Publication" in metric_options else 0)
-    st.caption("Tip: pick `Publication` to match your requested axis meaning.")
+    default_metric = "Scholarly Output" if "Scholarly Output" in metric_options else "Publication"
+    selected_metric = st.selectbox(
+        "Metric (rows in the Excel)",
+        options=metric_options,
+        index=metric_options.index(default_metric) if default_metric in metric_options else 0,
+    )
+    st.caption("Tip: pick `Scholarly Output` to review publication counts by year.")
 
     chart_type = st.radio("Chart type", options=["Bar", "Line"], horizontal=True, index=0)
     invert_axes = st.checkbox("Invert axes (metric value on X, year on Y)", value=False)
@@ -185,7 +190,7 @@ def main() -> None:
     components.html(html, height=460, scrolling=True)
 
     st.caption(
-        "Note: in this Excel export, `Publication` is a metric row and years are columns, so the default chart plots Year (X) vs Publication value (Y)."
+        "Note: in this Excel export, `Scholarly Output` is a metric row and years are columns, so the default chart plots publication year (X) vs publication count (Y)."
     )
 
 

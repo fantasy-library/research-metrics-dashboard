@@ -2511,9 +2511,9 @@ def _render_header_html() -> None:
 DEFAULT_METRICS = [
     {
         "id": "publication",
-        "label": "Publication",
+        "label": "Scholarly Output",
         "description": (
-            "Publication (Scholarly output): Scopus-indexed count, usually by publication year."
+            "Scholarly output: count of Scopus-indexed publications in the selected window."
         ),
         "enabled": True,
     },
@@ -2528,16 +2528,16 @@ DEFAULT_METRICS = [
     },
     {
         "id": "topJournal",
-        "label": "Top 10% Journal Percentile",
+        "label": "Publications in Top 10% Journals (%)",
         "description": (
-            "Top 10% journals: share in journals SciVal ranks in the top tenth by CiteScore, SNIP, or SJR."
+            "Share of publications in journals SciVal ranks in the top tenth by CiteScore percentile."
         ),
         "enabled": True,
     },
     {
         "id": "citationCount",
         "label": "Citation Count",
-        "description": "Citation count: total citations; chart years are publication years.",
+        "description": "Citation count: citations received by the selected publications, grouped by publication year.",
         "enabled": True,
     },
     {
@@ -2549,7 +2549,7 @@ DEFAULT_METRICS = [
     {
         "id": "citationsPerPublication",
         "label": "Citations Per Publication",
-        "description": "Citations per publication: total citations divided by publication count in the window.",
+        "description": "Citations per publication: average citations received per publication in the selected window.",
         "enabled": True,
     },
     {
@@ -2586,14 +2586,14 @@ DEFAULT_METRICS = [
         "id": "academicCorporateWith",
         "label": "Academic–corporate collaboration",
         "description": (
-            "Share of papers SciVal tags with academic and corporate sectors on the same article."
+            "Share of publications SciVal classifies as involving both academic and corporate affiliations."
         ),
         "enabled": True,
     },
     {
         "id": "academicCorporateWithout",
         "label": "No academic–corporate collaboration",
-        "description": "Share of papers SciVal does not tag as academic–corporate (complement).",
+        "description": "Share of publications not classified by SciVal as academic–corporate collaboration.",
         "enabled": True,
     },
 ]
@@ -2601,16 +2601,17 @@ DEFAULT_METRICS = [
 # Metric info (i) panels: ``{Topic}: …`` lead line, then detail; collaboration types use bullets.
 METRIC_INFO_TEXT: dict[str, str] = {
     "publication": (
-        "Publication (Scholarly output): count of this entity’s Scopus-indexed documents. "
-        "Usually shown by publication year."
+        "Scholarly output: count of this entity’s Scopus-indexed publications in the selected "
+        "document-type and year window. Year values are grouped by publication year."
     ),
     "fwci": (
         "FWCI: citations on this entity’s papers vs the average for similar papers worldwide "
         "(field, document type, age). 1.0 matches that peer-group average; small samples move easily."
     ),
     "topJournal": (
-        "Top 10% journal percentile: share of papers in journals SciVal ranks in the top tenth "
-        "by CiteScore, SNIP, or SJR. Items without those journal metrics (e.g. many books) are out of scope."
+        "Publications in top 10% journals: share of publications in journals SciVal ranks in the "
+        "top tenth by CiteScore percentile. Items without CiteScore journal metrics "
+        "(e.g. many books) are out of scope."
     ),
     "citationCount": (
         "Citation count: total citations received on the entity’s publications. "
@@ -2621,7 +2622,8 @@ METRIC_INFO_TEXT: dict[str, str] = {
         "Combines how many qualifying papers you have with how often they are cited."
     ),
     "citationsPerPublication": (
-        "Citations per publication: total citations divided by publication count in the selected window."
+        "Citations per publication: average citations received per publication in the selected "
+        "document-type and year window. The self-citation setting applies where SciVal supports it."
     ),
     "collaborationInternational": (
         "International collaboration:\n"
@@ -2631,26 +2633,26 @@ METRIC_INFO_TEXT: dict[str, str] = {
     "collaborationNational": (
         "National collaboration:\n"
         "• More than one author\n"
-        "• One country/Region on the publication\n"
+        "• One country/region on the publication\n"
         "• Affiliations map to two or more SciVal institutions in that country/region"
     ),
     "collaborationInstitutional": (
         "Institutional collaboration:\n"
         "• More than one author\n"
-        "• One country/Region on the publication\n"
+        "• One country/region on the publication\n"
         "• Every affiliation maps to the same SciVal institution"
     ),
     "collaborationSingleAuthorship": (
         "Single authorship: exactly one author; no co-authors on the publication."
     ),
     "academicCorporateWith": (
-        "Academic–corporate collaboration: share of publications with multiple authors where SciVal "
-        "maps at least one affiliation to an academic organization and at least one to a corporate "
-        "(industrial) organization—any co-author may supply the corporate tie."
+        "Academic–corporate collaboration: share of publications where SciVal maps at least one "
+        "affiliation to an academic organization and at least one affiliation to a corporate "
+        "(industrial) organization."
     ),
     "academicCorporateWithout": (
-        "No academic–corporate collaboration: share SciVal assigns outside the academic–corporate class—"
-        "the complement of Academic–corporate collaboration."
+        "No academic–corporate collaboration: share of publications not classified by SciVal as "
+        "academic–corporate collaboration."
     ),
 }
 
@@ -2804,7 +2806,8 @@ YEAR_FILTER_LABEL_TOOLTIP_HTML = (
 )
 
 SELF_CIT_HELP = (
-    "Self-citations are citations where an author cites their own previous work."
+    "Self-citations are citations where an author cites their own previous work. "
+    "This setting applies to citation-based metrics where SciVal supports self-citation handling."
 )
 
 DOCS_SELECTION_CAPTION = "Include all types matching your selection above."
@@ -2893,7 +2896,7 @@ def _build_metrics_table_rows(
     years = _resolve_year_columns(m, ds)
 
     row_defs = [
-        ("publication", "Publication", lambda x: x["scholarlyOutput"], True, False),
+        ("publication", "Scholarly Output", lambda x: x["scholarlyOutput"], True, False),
         ("citationCount", "Citation Count", lambda x: x["citationCount"], True, False),
         (
             "citationsPerPublication",
@@ -2903,7 +2906,7 @@ def _build_metrics_table_rows(
             False,
         ),
         ("fwci", "FWCI", lambda x: x["fwci"], True, False),
-        ("topJournal", "Top 10 Journal %", lambda x: x["topJournal"], True, True),
+        ("topJournal", "Publications in Top 10% Journals", lambda x: x["topJournal"], True, True),
         (
             "hIndex",
             "H-Index",
@@ -2963,7 +2966,7 @@ def _build_metrics_table_rows(
     by_id = {r[0]: r for r in row_defs}
     ordered = [by_id[i] for i in order if i in by_id and i in selected_ids]
 
-    cols = ["Metric"] + [str(y) for y in years] + ["Total"]
+    cols = ["Metric"] + [str(y) for y in years] + ["Total / Avg"]
     rows = []
     for mid, label, getter, is_year_based, is_pct in ordered:
         d = getter(m)
@@ -4159,8 +4162,8 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     tbl_df[y_lbl] = tbl_df[y_lbl].map(lambda v: _fmt_bubble_val(float(v), y_metric))
                     tbl_df[sz_lbl] = tbl_df[sz_lbl].map(lambda v: _fmt_bubble_val(float(v), size_metric))
                     st.caption(
-                        "Totals used for position and bubble size "
-                        "(same period as your search):"
+                        "Period totals or averages used for position and bubble size "
+                        "(same search window as your results):"
                     )
                     st.dataframe(
                         tbl_df, use_container_width=True, hide_index=True
@@ -4299,11 +4302,11 @@ def main() -> None:
                 st.markdown(
                     '<div class="minimal-filter-label">'
                     f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--funnel" '
-                    f'aria-hidden="true">{_FILTER_ICON_FUNNEL}</span><span>Self-Citation</span></div>',
+                    f'aria-hidden="true">{_FILTER_ICON_FUNNEL}</span><span>Self-citations for citation metrics</span></div>',
                     unsafe_allow_html=True,
                 )
                 st.radio(
-                    "Self-citation mode",
+                    "Self-citation handling for supported citation metrics",
                     options=["include", "exclude"],
                     format_func=lambda k: SELF_CIT_RADIO_LABELS[k],
                     horizontal=True,
@@ -4749,7 +4752,7 @@ def main() -> None:
                                 index=0,
                                 key=f"chart_type_{aid}",
                             )
-                            st.caption("Axis is fixed: Year on X, Metric value on Y.")
+                            st.caption("Axis is fixed: publication year on X, metric value on Y.")
 
                         with c_chart:
                             series_name_full = label_map.get(plot_metric, plot_metric)

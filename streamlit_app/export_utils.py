@@ -78,7 +78,7 @@ def _validate_export_data(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 METRIC_DEFS: List[Dict[str, Any]] = [
     {
         "id": "publication",
-        "label": "Publication",
+        "label": "Scholarly Output",
         "getData": lambda m: m["scholarlyOutput"],
         "isYearBased": True,
     },
@@ -90,7 +90,7 @@ METRIC_DEFS: List[Dict[str, Any]] = [
     },
     {
         "id": "topJournal",
-        "label": "Top 10 Journal %",
+        "label": "Publications in Top 10% Journals",
         "getData": lambda m: m["topJournal"],
         "isYearBased": True,
         "suffix": "%",
@@ -344,7 +344,7 @@ def export_pdf_bytes(data: List[Dict[str, Any]], filename_base: str = "research-
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_fill_color(59, 130, 246)
         pdf.set_text_color(255, 255, 255)
-        headers = ["Metric"] + years + ["Total"]
+        headers = ["Metric"] + years + ["Total / Avg"]
         for i, h in enumerate(headers):
             pdf.cell(col_w[i], 7, _pdf_safe(str(h)), border=1, fill=True)
         pdf.ln()
@@ -441,7 +441,7 @@ def export_excel_bytes(data: List[Dict[str, Any]], filename_base: str = "researc
             ws.cell(row, 1, "No metrics selected for export")
             continue
 
-        headers = ["Metric"] + years + ["Total"]
+        headers = ["Metric"] + years + ["Total / Avg"]
         for c, h in enumerate(headers, 1):
             cell = ws.cell(row, c, h)
             cell.font = Font(bold=True)
@@ -554,7 +554,7 @@ def export_docx_bytes(data: List[Dict[str, Any]], filename_base: str = "research
             doc.add_paragraph("No metrics selected for export")
             continue
 
-        headers = ["Metric"] + years + ["Total"]
+        headers = ["Metric"] + years + ["Total / Avg"]
         ncols = len(headers)
         table = doc.add_table(rows=1, cols=ncols)
         table.style = "Table Grid"
