@@ -316,21 +316,21 @@ export function ResearchImpactDashboard() {
         {/* Metrics */}
         <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-6 shadow-md ring-1 ring-violet-100">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl" aria-hidden>
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="text-xl shrink-0" aria-hidden>
                 🔽
               </span>
               <h2 className="text-lg font-bold text-violet-950">
                 Select Metrics to Include
+                <span className="ml-2 text-sm font-normal text-violet-900/75">
+                  (Toggle metrics on or off.)
+                </span>
               </h2>
             </div>
             <span className="rounded-full border border-violet-200 bg-white px-4 py-1.5 text-sm font-bold text-violet-800 shadow-sm">
               {selectedCount} of {METRICS.length} metrics selected
             </span>
           </div>
-          <p className="mb-4 text-sm text-violet-900/80">
-            Toggle metrics on or off.
-          </p>
           <div className="mb-4 flex flex-wrap justify-end gap-2">
             <button
               type="button"
