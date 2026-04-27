@@ -6,7 +6,6 @@ Run from repository root:  streamlit run streamlit_app/app.py
 from __future__ import annotations
 
 import base64
-import hashlib
 import html
 import re
 import sys
@@ -3298,7 +3297,6 @@ def _render_single_author_export_workspace(
     order_state_key: str,
     sortable_key: str,
     removed_key: str,
-    pick_sig: str,
     author_id: str,
     author_name: object,
     metrics: object,
@@ -3333,7 +3331,6 @@ def _render_single_author_export_workspace(
                 order_state_key=order_state_key,
                 sortable_key=sortable_key,
                 removed_key=removed_key,
-                _pick_sig=pick_sig,
                 step_order=None,
                 embed_in_export_workspace=True,
             )
@@ -3390,7 +3387,7 @@ def _render_single_author_export_workspace(
 
 def _sync_pick_via_metric_order_session(
     opt_list: list[str], order_state_key: str
-) -> tuple[list[str], list[str], str, str]:
+) -> tuple[list[str], list[str], str]:
     """Seed session state for single-author metric order; no widgets."""
     removed_key = f"{order_state_key}__removed"
     raw_shown = st.session_state.get(order_state_key)
@@ -3412,8 +3409,7 @@ def _sync_pick_via_metric_order_session(
     st.session_state[removed_key] = removed
     order_pick = list(shown)
     picked = list(order_pick)
-    _pick_sig = hashlib.md5(",".join(sorted(order_pick)).encode()).hexdigest()[:12]
-    return picked, order_pick, removed_key, _pick_sig
+    return picked, order_pick, removed_key
 
 
 _METRIC_SORTABLE_STYLE = """
@@ -3470,6 +3466,19 @@ def _metric_sortable_label_maps(
     return id_to_label, label_to_id
 
 
+def _restore_metric_to_multiselect(sortable_key: str, metric_id: str) -> None:
+    """Append one metric id to the Step 1 multiselect widget session value."""
+    wkey = f"{sortable_key}_visible_ms"
+    cur = list(st.session_state.get(wkey, []))
+    if metric_id not in cur:
+        cur.append(metric_id)
+    st.session_state[wkey] = cur
+
+
+def _toggle_session_bool_key(key: str) -> None:
+    st.session_state[key] = not bool(st.session_state.get(key, False))
+
+
 def _render_metric_visibility_controls(
     *,
     opt_list: list[str],
@@ -3477,7 +3486,6 @@ def _render_metric_visibility_controls(
     order_state_key: str,
     removed_key: str,
     sortable_key: str,
-    pick_sig: str,
 ) -> list[str]:
     active_ids = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
     # Only seed defaults when session has never set this list. If the user clears
@@ -3492,7 +3500,10 @@ def _render_metric_visibility_controls(
         options=opt_list,
         default=active_ids,
         format_func=lambda i: label_map.get(i, i),
-        key=f"{sortable_key}_{pick_sig}_visible_ms",
+        # Stable key: do not embed the selected set in the key — changing keys
+        # remounts the widget and Streamlit reapplies default=, which often
+        # needs a second click to persist chip removal.
+        key=f"{sortable_key}_visible_ms",
         label_visibility="collapsed",
         help="Remove a chip to hide. Open the list to add it back.",
     )
@@ -3505,12 +3516,43 @@ def _render_metric_visibility_controls(
     )
     removed_ids = [m for m in opt_list if m not in ordered_selected]
     n_hidden = len(removed_ids)
-    if n_hidden:
-        st.caption(
-            f"**{n_hidden} hidden** — open the list below to add back."
-        )
-    else:
+    panel_key = f"{sortable_key}_restore_hidden_open"
+    if n_hidden == 0:
+        st.session_state.pop(panel_key, None)
         st.caption("All metrics shown.")
+    else:
+        cap_col, btn_col = st.columns([3, 1], vertical_alignment="center")
+        with cap_col:
+            st.caption(
+                f"**{n_hidden} hidden** — use the metric picker above, or **Show hidden metrics**."
+            )
+        with btn_col:
+            open_panel = bool(st.session_state.get(panel_key))
+            st.button(
+                "Hide list" if open_panel else "Show hidden metrics",
+                key=f"{sortable_key}_toggle_restore_hidden",
+                help="Expand a list of hidden metrics and restore them with one click.",
+                on_click=_toggle_session_bool_key,
+                args=(panel_key,),
+            )
+        if st.session_state.get(panel_key):
+            with st.container(border=True):
+                st.caption(
+                    "**Hidden metrics** — each row is currently off your table; "
+                    "click **Restore** to add it back."
+                )
+                for mid in removed_ids:
+                    lbl = label_map.get(mid, mid)
+                    row_l, row_r = st.columns([4, 1], vertical_alignment="center")
+                    with row_l:
+                        st.text(str(lbl))
+                    with row_r:
+                        st.button(
+                            "Restore",
+                            key=f"{sortable_key}_restore_btn_{mid}",
+                            on_click=_restore_metric_to_multiselect,
+                            args=(sortable_key, mid),
+                        )
 
     st.session_state[order_state_key] = ordered_selected
     st.session_state[removed_key] = removed_ids
@@ -3523,7 +3565,6 @@ def _render_metric_sort_order(
     label_map: dict[str, str],
     order_state_key: str,
     sortable_key: str,
-    pick_sig: str,
     header: str,
 ) -> list[str]:
     active_ids = [m for m in metric_ids if m]
@@ -3542,7 +3583,7 @@ def _render_metric_sort_order(
         header=header,
         direction="vertical",
         custom_style=_METRIC_SORTABLE_STYLE,
-        key=f"{sortable_key}_{pick_sig}_sort",
+        key=f"{sortable_key}_sort",
     )
     if isinstance(sorted_labels, list):
         active_ids = [
@@ -3562,7 +3603,6 @@ def _render_pick_via_metric_order_section(
     order_state_key: str,
     sortable_key: str,
     removed_key: str,
-    _pick_sig: str,
     step_order: int | None = None,
     embed_in_export_workspace: bool = False,
 ) -> tuple[list[str], list[str]]:
@@ -3583,7 +3623,6 @@ def _render_pick_via_metric_order_section(
         order_state_key=order_state_key,
         sortable_key=sortable_key,
         removed_key=removed_key,
-        pick_sig=_pick_sig,
     )
     st.markdown("**Step 2. Order**")
     order_pick = _render_metric_sort_order(
@@ -3591,15 +3630,12 @@ def _render_pick_via_metric_order_section(
         label_map=label_map,
         order_state_key=order_state_key,
         sortable_key=sortable_key,
-        pick_sig=_pick_sig,
         header="Sort metrics",
     )
     picked = list(order_pick)
-    st.caption("**Step 1:** show/hide. **Step 2:** drag to order.")
     if not picked:
         st.caption("Pick at least one metric in **Step 1**.")
         return [], []
-    st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
     return picked, order_pick
 
 
@@ -3641,7 +3677,6 @@ def _metrics_multiselect_and_order_ui(
             existing_order.append(m)
     st.session_state[order_state_key] = existing_order
     order_pick = existing_order
-    _pick_sig = hashlib.md5(",".join(sorted(picked_norm)).encode()).hexdigest()[:12]
 
     if step_order is not None:
         st.markdown(
@@ -3660,7 +3695,6 @@ def _metrics_multiselect_and_order_ui(
         label_map=label_map,
         order_state_key=order_state_key,
         sortable_key=sortable_key,
-        pick_sig=_pick_sig,
         header="Sort metrics",
     )
     st.caption("Use **Metrics to export** above, then **drag** here to set column order.")
@@ -3671,7 +3705,6 @@ def _metrics_multiselect_and_order_ui(
     if not picked:
         st.caption("Select at least one metric.")
         return [], []
-    st.caption("Current order: " + " -> ".join(label_map.get(i, i) for i in order_pick))
     return picked, order_pick
 
 
@@ -4701,7 +4734,7 @@ def main() -> None:
 
                     order_state_key = f"multiord_state_{aid}_{card_idx}"
                     sortable_key = f"multiord_sort_{aid}_{card_idx}"
-                    _picked0, _order0, removed_key, pick_sig = (
+                    _picked0, _order0, removed_key = (
                         _sync_pick_via_metric_order_session(opt_list, order_state_key)
                     )
 
@@ -4911,7 +4944,6 @@ def main() -> None:
                             order_state_key=order_state_key,
                             sortable_key=sortable_key,
                             removed_key=removed_key,
-                            pick_sig=pick_sig,
                             author_id=aid,
                             author_name=d.get("authorName"),
                             metrics=d.get("metrics"),
