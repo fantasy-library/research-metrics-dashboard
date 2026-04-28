@@ -1486,6 +1486,8 @@ a.minimal-go-analyze-btn:focus-visible,
   background: #ffffff !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
   overflow: visible !important;
+  container-type: inline-size !important;
+  container-name: metric-cell !important;
 }
 [class*="st-key-metric_cell_"] > div[data-testid="stVerticalBlock"] {
   gap: 0 !important;
@@ -1586,12 +1588,13 @@ p.metric-compact-title {
   display: none !important;
   position: absolute !important;
   z-index: 9999 !important;
-  /* Anchor to start of (i) wrap and expand right — right:0 made the panel grow leftward
-     and get clipped off-screen for metrics in the first grid columns (e.g. Publication). */
+  /* Default: anchor to left of (i), grow right (works for columns 1–2). */
   left: 0 !important;
   right: auto !important;
   top: calc(100% + 6px) !important;
   width: min(22rem, calc(100vw - 1.25rem)) !important;
+  max-width: min(22rem, calc(100vw - 1.25rem), 100cqw) !important;
+  box-sizing: border-box !important;
   max-height: min(88vh, 28rem) !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
@@ -1601,6 +1604,12 @@ p.metric-compact-title {
   border-radius: 10px !important;
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18) !important;
   text-align: left !important;
+}
+/* Columns 3–4: (i) near outer edge — anchor panel to right of (i) so it grows leftward (avoids horizontal clip). */
+[class*="st-key-metrics_grid_shell"] [class*="st-key-metrics_grid_row"] [data-testid="column"]:nth-child(3) .metric-info-panel,
+[class*="st-key-metrics_grid_shell"] [class*="st-key-metrics_grid_row"] [data-testid="column"]:nth-child(4) .metric-info-panel {
+  left: auto !important;
+  right: 0 !important;
 }
 .metric-info-wrap:hover .metric-info-panel,
 .metric-info-wrap:focus-within .metric-info-panel {
@@ -1612,6 +1621,8 @@ p.metric-compact-title {
   line-height: 1.45 !important;
   color: #334155 !important;
   white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
   scrollbar-width: thin !important;
   scrollbar-color: #cbd5e1 #f8fafc !important;
 }
