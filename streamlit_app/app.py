@@ -4208,7 +4208,9 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                                 if _x_pct
                                 else {"margin": 10}
                             ),
-                            "scale": True,
+                            # ECharts default scale=True zooms positive-only data and often omits 0 — OK for FWCI-style axes,
+                            # but percentage metrics read better with a true 0% baseline.
+                            **({"min": 0, "scale": False} if _x_pct else {"scale": True}),
                         },
                         "yAxis": {
                             "type": "value",
@@ -4217,12 +4219,12 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                             "nameGap": 46,
                             "nameRotate": 90,
                             "nameTextStyle": {"fontSize": 11, "color": "#475569"},
-                            "scale": True,
                             **(
                                 {"axisLabel": {"formatter": "{value}%"}}
                                 if _y_pct
                                 else {}
                             ),
+                            **({"min": 0, "scale": False} if _y_pct else {"scale": True}),
                         },
                         "series": bubble_series,
                         "dataZoom": [
