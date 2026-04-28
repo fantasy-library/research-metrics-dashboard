@@ -3193,10 +3193,24 @@ def _bubble_symbol_sizes(raw: list[float | None]) -> list[float]:
 def _compare_toolbox() -> dict:
     # Only export-as-image — restore/dataZoom toolbox buttons rarely work in embedded
     # Streamlit ECharts and confuse users.
+    # Larger icon + accent stroke so Download reads as a primary control (vs faint grey default).
     return {
         "show": True,
+        "itemSize": 22,
+        "iconStyle": {
+            "borderColor": "#7c3aed",
+            "borderWidth": 1.75,
+        },
+        "emphasis": {
+            "iconStyle": {
+                "borderColor": "#5b21b6",
+                "borderWidth": 2.25,
+                "shadowBlur": 8,
+                "shadowColor": "rgba(124, 58, 237, 0.35)",
+            },
+        },
         "feature": {
-            "saveAsImage": {"show": True, "title": "Download"},
+            "saveAsImage": {"show": True, "title": "Download", "pixelRatio": 2},
         },
     }
 
@@ -4894,12 +4908,9 @@ def main() -> None:
                                     # label text colliding with the title area.
                                     "legend": {"show": False},
                                     "toolbox": {
-                                        "show": True,
+                                        **_compare_toolbox(),
                                         "top": 8,
                                         "right": 10,
-                                        "feature": {
-                                            "saveAsImage": {"show": True, "title": "Download"},
-                                        },
                                     },
                                     "grid": {
                                         "left": "6%",
