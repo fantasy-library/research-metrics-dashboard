@@ -1585,15 +1585,16 @@ p.metric-compact-title {
 .metric-info-panel {
   display: none !important;
   position: absolute !important;
-  z-index: 400 !important;
+  z-index: 9999 !important;
   /* Anchor to start of (i) wrap and expand right — right:0 made the panel grow leftward
      and get clipped off-screen for metrics in the first grid columns (e.g. Publication). */
   left: 0 !important;
   right: auto !important;
   top: calc(100% + 6px) !important;
-  width: min(19.5rem, calc(100vw - 2rem)) !important;
-  max-height: min(70vh, 22rem) !important;
+  width: min(22rem, calc(100vw - 1.25rem)) !important;
+  max-height: min(88vh, 28rem) !important;
   overflow-y: auto !important;
+  overscroll-behavior: contain !important;
   padding: 0.65rem 0.75rem !important;
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
@@ -1611,6 +1612,8 @@ p.metric-compact-title {
   line-height: 1.45 !important;
   color: #334155 !important;
   white-space: pre-wrap !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 #f8fafc !important;
 }
 [class*="st-key-metric_cell_"]:has([role="switch"][aria-checked="true"]) {
   box-shadow: 0 1px 4px rgba(124, 58, 237, 0.12) !important;
@@ -2267,6 +2270,27 @@ footer.site-footer .site-footer-copy {
 [class*="st-key-collab_metrics_shell"] {
   background: transparent !important;
   border: none !important;
+  overflow: visible !important;
+}
+
+/* Metrics grid + st.html: (i) panels use position:absolute and must escape ancestor clip */
+[class*="st-key-search_shell"],
+[class*="st-key-metrics_panel_shell"],
+[class*="st-key-metrics_grid_shell"],
+[class*="st-key-metrics_grid_row"] {
+  overflow: visible !important;
+}
+[class*="st-key-metrics_grid_shell"] [data-testid="element-container"],
+[class*="st-key-metrics_grid_row"] [data-testid="element-container"],
+[class*="st-key-metric_cell_"] [data-testid="element-container"] {
+  overflow: visible !important;
+}
+[class*="st-key-metrics_grid_shell"] [data-testid="column"],
+[class*="st-key-metrics_grid_row"] [data-testid="column"] {
+  overflow: visible !important;
+}
+[class*="st-key-metric_cell_"] [data-testid="stHtml"],
+[class*="st-key-metric_cell_"] [data-testid="element-container"]:has([data-testid="stHtml"]) {
   overflow: visible !important;
 }
 
@@ -3764,7 +3788,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                 return 0
 
     # --- Line chart (multi-author): metric + chart type left, chart right ---
-    st.markdown("##### Metrics by year")
+    st.markdown("##### Metrics by Year")
     with st.container(border=False, key="compare_trends_row"):
         col_filt, col_chart = st.columns([1, 3.5], gap="small", vertical_alignment="top")
         with col_filt:
@@ -3858,7 +3882,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     line_opts = {
                         "animation": True,
                         "title": {
-                            "text": "Metrics by year",
+                            "text": "Metrics by Year",
                             "subtext": line_short,
                             "left": "center",
                             "top": 8,
