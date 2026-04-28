@@ -298,17 +298,11 @@ def export_pdf_bytes(data: List[Dict[str, Any]], filename_base: str = "research-
         ds = author_data.get("dataSource")
         if ds:
             wrap_w = _pdf_wrap_width(pdf)
-            # Use multi_cell so long sourceName / labels wrap; plain cell() truncates at page edge.
-            pdf.set_font("Helvetica", "B", 9)
-            _pdf_reset_x_margin(pdf)
-            pdf.multi_cell(wrap_w, 5, _pdf_safe("Source"))
-            _pdf_reset_x_margin(pdf)
+            # Single line "Source: …" (matches Excel/Word); multi_cell still wraps if very long.
             pdf.set_font("Helvetica", "", 9)
-            pdf.multi_cell(
-                wrap_w,
-                5,
-                _pdf_safe(str(ds.get("sourceName", "") or "—")),
-            )
+            _pdf_reset_x_margin(pdf)
+            sn = str(ds.get("sourceName", "") or "—")
+            pdf.multi_cell(wrap_w, 5, _pdf_safe(f"Source: {sn}"))
             _pdf_reset_x_margin(pdf)
             pdf.multi_cell(
                 wrap_w,

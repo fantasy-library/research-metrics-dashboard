@@ -3191,12 +3191,12 @@ def _bubble_symbol_sizes(raw: list[float | None]) -> list[float]:
 
 
 def _compare_toolbox() -> dict:
+    # Only export-as-image — restore/dataZoom toolbox buttons rarely work in embedded
+    # Streamlit ECharts and confuse users.
     return {
         "show": True,
         "feature": {
             "saveAsImage": {"show": True, "title": "Download"},
-            "restore": {"show": True},
-            "dataZoom": {"show": True},
         },
     }
 
@@ -4899,8 +4899,6 @@ def main() -> None:
                                         "right": 10,
                                         "feature": {
                                             "saveAsImage": {"show": True, "title": "Download"},
-                                            "restore": {"show": True},
-                                            "dataZoom": {"show": True},
                                         },
                                     },
                                     "grid": {
