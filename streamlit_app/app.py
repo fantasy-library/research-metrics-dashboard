@@ -34,6 +34,7 @@ from streamlit_app.api_service import (
     get_api_service,
     is_missing_scival_api_key_error,
     is_scival_authentication_error,
+    lookup_scopus_id_from_orcid,
     resolve_author_ids_for_metrics_safe,
 )
 from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_API
@@ -128,32 +129,49 @@ _DEEP_LINK_ANALYZE_HTML = """
 </script>
 """
 
-# Filter card header icons — line-art SVG on white circular badge
+# Filter / shell icons — unified stroke (1.75), viewBox 24×24; sized via CSS badges below.
 _FILTER_ICON_CALENDAR = (
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>'
-    '<line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'
 )
 _FILTER_ICON_DOCUMENT = (
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
-    '<polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>'
-    '<line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>'
+    '<polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>'
 )
 _FILTER_ICON_FUNNEL = (
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>'
 )
-# Year filter label — compact info circle (matches line-art filter icons)
-_FILTER_ICON_INFO_SMALL = (
-    '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" '
+_FILTER_ICON_PERSON = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
     'aria-hidden="true" focusable="false">'
-    "<circle cx=\"12\" cy=\"12\" r=\"10\"/>"
-    '<path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+    '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+)
+_FILTER_ICON_USERS = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
+    'aria-hidden="true" focusable="false">'
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+    '<circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>'
+    '<path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+)
+_FILTER_ICON_METRICS_MENU = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
+    'aria-hidden="true" focusable="false">'
+    '<path d="m6 9 6 6 6-6"/></svg>'
+)
+# Year filter tooltip trigger — same badge family, compact size
+_FILTER_ICON_INFO_SMALL = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
+    'aria-hidden="true" focusable="false">'
+    '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
 )
 # Export workspace strip — “outputs” glyph (separate from analysis / charts)
 _EXPORT_WORKSPACE_ICON = (
@@ -995,14 +1013,15 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 .metrics-count-bar {
   display: inline-flex;
   align-items: center;
-  padding: 0.5rem 1.1rem;
-  background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
-  border: 1px solid #ddd6fe;
+  padding: 0.32rem 0.72rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 999px;
-  font-weight: 800;
-  font-size: 0.88rem;
-  color: #5b21b6;
-  box-shadow: 0 3px 14px rgba(124, 58, 237, 0.15), inset 0 1px 0 #fff;
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: #64748b;
+  letter-spacing: 0.01em;
+  box-shadow: none;
 }
 
 /* —— Search configuration (shell + widgets: final shell tokens live in “Stable key-based” block) —— */
@@ -1014,6 +1033,48 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   letter-spacing: 0.055em !important;
   text-transform: uppercase !important;
   color: #111827 !important;
+}
+[class*="st-key-find_scopus_help_panel"] {
+  margin: 0 0 1rem 0 !important;
+  padding: 1rem 1.05rem !important;
+  border-radius: 14px !important;
+  border: 1px solid #bbf7d0 !important;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 55%, #f8fafc 100%) !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06) !important;
+}
+[class*="st-key-find_scopus_help_panel"] .find-scopus-banner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  margin: 0 0 0.85rem 0 !important;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: #14532d !important;
+  letter-spacing: -0.02em !important;
+}
+[class*="st-key-find_scopus_help_panel"] .find-scopus-banner-badge {
+  flex-shrink: 0 !important;
+}
+[class*="st-key-find_scopus_help_panel"] .find-scopus-about {
+  margin-top: 0.85rem !important;
+  padding: 0.65rem 0.75rem !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid #e2e8f0 !important;
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+  color: #334155 !important;
+}
+[class*="st-key-find_scopus_help_panel"] .find-scopus-about ul {
+  margin: 0.35rem 0 0 1rem !important;
+  padding: 0 !important;
+}
+[class*="st-key-find_scopus_help_panel"] .find-scopus-about li {
+  margin-bottom: 0.25rem !important;
+}
+[class*="st-key-find_scopus_help_panel"] .find-scopus-about a {
+  font-weight: 600 !important;
+  color: #2563eb !important;
 }
 .minimal-filter-label {
   display: flex;
@@ -1041,31 +1102,22 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   align-items: center;
   outline: none;
 }
-.year-filter-tip-marker {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 50%;
-  line-height: 0;
-  color: #4b5563;
-  background: #e5e7eb;
-  border: 1px solid #d1d5db;
-  cursor: help;
+.year-filter-tip-marker.minimal-filter-icon-badge {
+  cursor: help !important;
 }
 .year-filter-tip-marker svg {
   display: block;
-  width: 0.7rem;
-  height: 0.7rem;
+  width: 100%;
+  height: 100%;
   flex-shrink: 0;
 }
 .year-filter-tip:hover .year-filter-tip-marker,
 .year-filter-tip:focus .year-filter-tip-marker,
 .year-filter-tip:focus-within .year-filter-tip-marker {
-  background: #ede7f6;
-  border-color: #b39ddb;
-  color: #5e35b1;
+  border-color: #93c5fd !important;
+  box-shadow:
+    0 4px 14px rgba(37, 99, 235, 0.14),
+    0 1px 3px rgba(15, 23, 42, 0.06) !important;
 }
 .year-filter-tip-popup {
   position: absolute;
@@ -1095,34 +1147,60 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   visibility: visible;
   pointer-events: auto;
 }
-/* Circular “FAB” badge: white disc, hairline border, soft shadow (filter row icons) */
+/* Circular badge: white disc, soft shadow — shared by filters, Find Scopus, metrics heading */
 .minimal-filter-icon-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.55rem;
-  height: 2.55rem;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  border: 1px solid #e8ecf1 !important;
   box-shadow:
-    0 4px 14px rgba(15, 23, 42, 0.1),
-    0 1px 3px rgba(15, 23, 42, 0.08);
-  flex-shrink: 0;
+    0 4px 14px rgba(15, 23, 42, 0.09),
+    0 1px 3px rgba(15, 23, 42, 0.06) !important;
+  flex-shrink: 0 !important;
+  line-height: 0 !important;
+  box-sizing: border-box !important;
+}
+.minimal-filter-icon-badge--compact {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  border-radius: 50% !important;
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, 0.08),
+    0 1px 2px rgba(15, 23, 42, 0.05) !important;
 }
 .minimal-filter-icon-badge svg {
-  width: 1.28rem;
-  height: 1.28rem;
-  flex-shrink: 0;
+  width: 1.2rem !important;
+  height: 1.2rem !important;
+  flex-shrink: 0 !important;
+}
+.minimal-filter-icon-badge--compact svg {
+  width: 0.88rem !important;
+  height: 0.88rem !important;
 }
 .minimal-filter-icon-badge--calendar svg {
   color: #2563eb !important;
 }
 .minimal-filter-icon-badge--document svg {
-  color: #0d9488 !important;
+  color: #0f766e !important;
 }
 .minimal-filter-icon-badge--funnel svg {
-  color: #9c4121 !important;
+  color: #9c4221 !important;
+}
+.minimal-filter-icon-badge--person svg {
+  color: #15803d !important;
+}
+.minimal-filter-icon-badge--users svg {
+  color: #2563eb !important;
+}
+.minimal-filter-icon-badge--metrics svg {
+  color: #6d28d9 !important;
+}
+.minimal-filter-icon-badge--info svg {
+  color: #2563eb !important;
 }
 [class*="st-key-search_shell"] [data-testid="stSelectbox"] {
   margin-top: 0.05rem !important;
@@ -1151,13 +1229,14 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 }
 [class*="st-key-search_shell"] .author-limit-hint {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.52rem;
   margin: 0.35rem 0 0.1rem 0;
   padding: 0.5rem 0.65rem;
   border-radius: 10px;
   font-size: 0.84rem;
   line-height: 1.35;
+  overflow: visible;
 }
 [class*="st-key-search_shell"] .author-limit-hint--ok {
   background: #eff6ff;
@@ -1169,9 +1248,10 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   border: 1px solid #fed7aa;
   color: #9a3412;
 }
-[class*="st-key-search_shell"] .author-limit-icon {
-  font-size: 0.95rem;
-  line-height: 1.2;
+[class*="st-key-search_shell"] .author-limit-icon.minimal-filter-icon-badge {
+  align-self: center !important;
+  margin-top: 0 !important;
+  flex-shrink: 0 !important;
 }
 [class*="st-key-search_shell"] .author-limit-count {
   font-weight: 700;
@@ -1195,8 +1275,78 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   margin: 0 !important;
   flex: 1 1 220px;
   min-width: min(100%, 14rem);
-  padding: 0.35rem 0.55rem !important;
+  align-items: center !important;
+  padding: 0.52rem 0.65rem !important;
   font-size: 0.8rem !important;
+  line-height: 1.4 !important;
+  overflow: visible !important;
+}
+[class*="st-key-search_shell"]
+  [data-testid="stMarkdownContainer"]:has(.author-limit-hint-inline) {
+  overflow: visible !important;
+}
+/* Find Scopus toggle: light-green pill; icon + label centered (avoid svg clip) */
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"],
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] {
+  gap: 0.55rem !important;
+  column-gap: 0.55rem !important;
+  background: #ecfdf5 !important;
+  background-image: none !important;
+  border: 1px solid #a7f3d0 !important;
+  color: #14532d !important;
+  min-height: 2.65rem !important;
+  padding-top: 0.42rem !important;
+  padding-bottom: 0.42rem !important;
+  padding-left: 0.65rem !important;
+  padding-right: 0.65rem !important;
+  overflow: visible !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 1px 2px rgba(20, 83, 45, 0.06) !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"]:hover,
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"]:hover {
+  background: #d1fae5 !important;
+  border-color: #6ee7b7 !important;
+  color: #052e16 !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"]:focus-visible,
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"]:focus-visible {
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.32) !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] > div,
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] > div {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.55rem !important;
+  line-height: 1 !important;
+  overflow: visible !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] p,
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] p {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+  line-height: 1.28 !important;
+  margin: 0 !important;
+  padding-top: 0.06rem !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] svg,
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] svg {
+  flex-shrink: 0 !important;
+  width: 1.38rem !important;
+  height: 1.38rem !important;
+  min-width: 1.38rem !important;
+  min-height: 1.38rem !important;
+  color: #15803d !important;
+  -webkit-text-fill-color: #15803d !important;
+  overflow: visible !important;
+  display: block !important;
+  vertical-align: middle !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] [data-testid="element-container"],
+[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] .stButton {
+  overflow: visible !important;
 }
 .minimal-section-divider {
   border-top: 1px solid #E5E7EB;
@@ -1239,24 +1389,24 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 }
 [class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked),
 [class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] {
-  background: #ede9fe !important;
-  border-color: #ddd6fe !important;
-  color: #5b21b6 !important;
-  -webkit-text-fill-color: #5b21b6 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  color: #374151 !important;
+  -webkit-text-fill-color: #374151 !important;
   box-shadow: none !important;
 }
-/* Nested Streamlit text must match light chip (dark violet, not white) */
+/* Nested Streamlit text — neutral (no purple chip) */
 [class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked) p,
 [class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked) span,
 [class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] p,
 [class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] span {
-  color: #5b21b6 !important;
-  -webkit-text-fill-color: #5b21b6 !important;
+  color: #374151 !important;
+  -webkit-text-fill-color: #374151 !important;
 }
 [class*="st-key-search_shell"] [data-testid="stRadio"] label:has(input:checked) div,
 [class*="st-key-search_shell"] [data-testid="stRadio"] label[aria-checked="true"] div {
-  color: #5b21b6 !important;
-  -webkit-text-fill-color: #5b21b6 !important;
+  color: #374151 !important;
+  -webkit-text-fill-color: #374151 !important;
 }
 [class*="st-key-search_shell"] .stRadio input[type="radio"] {
   width: 1.05rem !important;
@@ -1442,14 +1592,98 @@ a.minimal-go-analyze-btn:focus-visible,
   min-height: 2.7em !important;
   margin-top: 0.05rem !important;
 }
-/* Minimal 2×4 metrics grid (Select Metrics to Include) */
+/* Minimal metrics grid: 3 columns per row (Select Metrics to Include) */
 [class*="st-key-metrics_toolbar_shell"] {
+  /* Space below heading row so button chrome/icons clear any divider / tight baseline */
+  margin-top: 0.45rem !important;
+  padding-top: 0.2rem !important;
   margin-bottom: 0.5rem !important;
   padding-bottom: 0 !important;
+}
+/* Select All / Clear All: breathing room between Material icon and label */
+[class*="st-key-metrics_toolbar_shell"] button[data-testid="stBaseButton-secondary"],
+[class*="st-key-metrics_toolbar_shell"] button[data-testid="baseButton-secondary"] {
+  gap: 0.65rem !important;
+  column-gap: 0.65rem !important;
+}
+[class*="st-key-metrics_toolbar_shell"] button[data-testid="stBaseButton-secondary"] > div,
+[class*="st-key-metrics_toolbar_shell"] button[data-testid="baseButton-secondary"] > div {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.65rem !important;
+}
+[class*="st-key-metrics_toolbar_shell"] button[data-testid="stBaseButton-secondary"] svg,
+[class*="st-key-metrics_toolbar_shell"] button[data-testid="baseButton-secondary"] svg {
+  flex-shrink: 0 !important;
+  margin-inline-end: 0.25rem !important;
 }
 [class*="st-key-metrics_grid_shell"] {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
+}
+/* Metric category accordions: bold headers; allow (i) tooltips to escape expander clip */
+[class*="st-key-metrics_grid_shell"] details[data-testid="stExpander"] {
+  margin-bottom: 0.65rem !important;
+  overflow: visible !important;
+}
+[class*="st-key-metrics_grid_shell"] details[data-testid="stExpander"]:last-child {
+  margin-bottom: 0 !important;
+}
+[class*="st-key-metrics_grid_shell"] details[data-testid="stExpander"] summary {
+  font-weight: 700 !important;
+  font-size: 1.02rem !important;
+  color: #1e1b4b !important;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+}
+/* Unified glyph box for :material/analytics: and :material/hub: */
+[class*="st-key-metrics_grid_shell"] details[data-testid="stExpander"] summary svg {
+  width: 1.125rem !important;
+  height: 1.125rem !important;
+  min-width: 1.125rem !important;
+  min-height: 1.125rem !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+}
+[class*="st-key-metrics_grid_shell"] details[data-testid="stExpander"] summary img {
+  width: 1.125rem !important;
+  height: 1.125rem !important;
+  min-width: 1.125rem !important;
+  min-height: 1.125rem !important;
+  flex-shrink: 0 !important;
+  object-fit: contain !important;
+}
+/* Core Research Metrics — slightly larger analytics glyph */
+[class*="st-key-metrics_grid_shell"]
+  details[data-testid="stExpander"]:first-of-type
+  summary
+  svg,
+[class*="st-key-metrics_grid_shell"]
+  details[data-testid="stExpander"]:first-of-type
+  summary
+  img {
+  width: 1.38rem !important;
+  height: 1.38rem !important;
+  min-width: 1.38rem !important;
+  min-height: 1.38rem !important;
+}
+/* Hub glyph reads slightly larger than analytics — nudge Collaboration only */
+[class*="st-key-metrics_grid_shell"]
+  details[data-testid="stExpander"]:last-of-type
+  summary
+  svg,
+[class*="st-key-metrics_grid_shell"]
+  details[data-testid="stExpander"]:last-of-type
+  summary
+  img {
+  width: 1rem !important;
+  height: 1rem !important;
+  min-width: 1rem !important;
+  min-height: 1rem !important;
 }
 [class*="st-key-metrics_grid_row"] {
   margin-bottom: 0.75rem !important;
@@ -1475,9 +1709,9 @@ a.minimal-go-analyze-btn:focus-visible,
 [class*="st-key-metric_cell_"] {
   border: 1px solid #e5e7eb !important;
   border-radius: 0.5rem !important;
-  padding: 0.45rem 0.55rem !important;
+  padding: 0.32rem 0.5rem !important;
   margin: 0 !important;
-  min-height: 5.5rem !important;
+  min-height: 4.6rem !important;
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
@@ -1497,26 +1731,31 @@ a.minimal-go-analyze-btn:focus-visible,
   align-items: stretch !important;
   flex: 1 1 auto !important;
   margin-bottom: 0 !important;
-  min-height: 3.35rem !important;
+  min-height: 2.85rem !important;
   overflow: visible !important;
 }
+/* Toggle column first (left), title + (i) second — matches reference metric cards */
 [class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:first-child {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  display: flex !important;
-  align-items: flex-start !important;
-  /* Allow (i) tooltips to extend past the flex column; min-width:0 otherwise clips overflow. */
-  overflow: visible !important;
-}
-[class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child {
   flex: 0 0 auto !important;
   width: auto !important;
   display: flex !important;
   align-items: flex-start !important;
-  justify-content: flex-end !important;
+  justify-content: flex-start !important;
+}
+[class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:first-child [data-testid="stVerticalBlock"] {
+  align-items: flex-start !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+}
+[class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  overflow: visible !important;
 }
 [class*="st-key-metric_cell_"] [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child [data-testid="stVerticalBlock"] {
-  align-items: flex-end !important;
+  align-items: flex-start !important;
   display: flex !important;
   justify-content: flex-start !important;
 }
@@ -1530,8 +1769,8 @@ a.minimal-go-analyze-btn:focus-visible,
 }
 [class*="st-key-metric_cell_"] [data-baseweb="switch"] {
   margin: 0 !important;
-  transform: scale(0.92);
-  transform-origin: top right !important;
+  transform: scale(0.86);
+  transform-origin: top left !important;
 }
 p.metric-compact-title {
   margin: 0 !important;
@@ -1605,9 +1844,9 @@ p.metric-compact-title {
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18) !important;
   text-align: left !important;
 }
-/* Columns 3–4: (i) near outer edge — anchor panel to right of (i) so it grows leftward (avoids horizontal clip). */
-[class*="st-key-metrics_grid_shell"] [class*="st-key-metrics_grid_row"] [data-testid="column"]:nth-child(3) .metric-info-panel,
-[class*="st-key-metrics_grid_shell"] [class*="st-key-metrics_grid_row"] [data-testid="column"]:nth-child(4) .metric-info-panel {
+/* Columns 2–3: (i) toward outer edge — anchor panel to right of (i) (avoids horizontal clip). */
+[class*="st-key-metrics_grid_shell"] [class*="st-key-metrics_grid_row"] [data-testid="column"]:nth-child(2) .metric-info-panel,
+[class*="st-key-metrics_grid_shell"] [class*="st-key-metrics_grid_row"] [data-testid="column"]:nth-child(3) .metric-info-panel {
   left: auto !important;
   right: 0 !important;
 }
@@ -2252,6 +2491,33 @@ footer.site-footer .site-footer-copy {
   box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.2) !important;
 }
 
+/* Scopus Author IDs textarea: stronger chrome + magnifier (aligned with placeholder copy) */
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea {
+  border: 2px solid #cbd5e1 !important;
+  border-radius: 12px !important;
+  padding: 0.8rem 0.95rem 0.8rem 2.85rem !important;
+  background-color: #ffffff !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: 1rem 1.05rem !important;
+  background-size: 1.22rem 1.22rem !important;
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.07),
+    0 1px 3px rgba(103, 58, 183, 0.06) !important;
+  min-height: 104px !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea:focus {
+  border-color: #7c3aed !important;
+  box-shadow:
+    0 0 0 3px rgba(124, 58, 237, 0.2),
+    0 3px 10px rgba(15, 23, 42, 0.08) !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #64748b !important;
+}
+
 /* Metrics merged into search shell: single card (no nested white/purple frame) */
 [class*="st-key-search_shell"] [class*="st-key-metrics_panel_shell"]:not(:has(span.skin-unified-form-shell)) {
   background: transparent !important;
@@ -2372,16 +2638,56 @@ footer.site-footer .site-footer-copy {
   align-items: center !important;
 }
 
-/* Select metrics: force single-line heading + helper text */
+/* Select metrics: badge stays outside horizontal scroll so circular rim is not clipped
+   (overflow-x:auto on an ancestor forces overflow-y to clip children). */
+.metrics-panel-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.55rem 0;
+  overflow: visible;
+}
+.metrics-panel-heading-row > .metrics-panel-heading-icon.minimal-filter-icon-badge {
+  flex-shrink: 0;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
+}
+.metrics-panel-heading-row > .metrics-panel-heading-icon.minimal-filter-icon-badge svg {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+.metrics-panel-heading-row > .metrics-panel-heading-scrollstrip {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
 .metrics-panel-heading-inline {
   display: flex;
   flex-wrap: nowrap;
-  align-items: baseline;
+  align-items: center;
   gap: 0.35rem;
   white-space: nowrap;
-  margin: 0 0 0.35rem 0;
-  overflow-x: auto;
+  margin: 0;
   scrollbar-width: thin;
+}
+.metrics-panel-heading-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.metrics-panel-heading-row .metrics-panel-heading {
+  margin: 0 !important;
+}
+[class*="st-key-metrics_panel_shell"] [data-testid="stMarkdownContainer"]:has(.metrics-panel-heading-row),
+[class*="st-key-search_shell"]
+  [class*="st-key-metrics_panel_shell"]
+  [data-testid="stMarkdownContainer"]:has(.metrics-panel-heading-row) {
+  overflow: visible !important;
+}
+.metrics-panel-heading-icon.minimal-filter-icon-badge {
+  align-self: center;
 }
 .metrics-panel-head-caption-inline {
   font-size: 0.8rem;
@@ -2395,7 +2701,7 @@ footer.site-footer .site-footer-copy {
   font-size: 1.05rem;
   font-weight: 800;
   color: #1e1b4b;
-  margin: 0 0 0.35rem 0;
+  margin: 0 0 0.55rem 0;
   padding: 0;
   border: none;
   border-bottom: none !important;
@@ -2475,6 +2781,29 @@ footer.site-footer .site-footer-copy {
   font-size: 0.95rem !important;
   padding: 0.55rem 0.75rem !important;
 }
+
+/* Validation toasts — amber styling if ``st.toast`` is used elsewhere */
+[data-testid="stToast"] {
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%) !important;
+  border: 2px solid #f59e0b !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 16px 48px rgba(15, 23, 42, 0.16),
+    0 6px 16px rgba(245, 158, 11, 0.22) !important;
+  color: #78350f !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+  padding: 0.85rem 1.15rem !important;
+  max-width: min(92vw, 26rem) !important;
+}
+[data-testid="stToast"] p,
+[data-testid="stToast"] span {
+  color: inherit !important;
+}
+[data-testid="stToast"] [data-testid="stMarkdownContainer"] {
+  color: inherit !important;
+}
+
 </style>
         """,
         unsafe_allow_html=True,
@@ -2564,9 +2893,9 @@ def _render_header_html() -> None:
 DEFAULT_METRICS = [
     {
         "id": "publication",
-        "label": "Publication",
+        "label": "Publications",
         "description": (
-            "Publication count (SciVal scholarly output): Scopus-indexed items in the selected window."
+            "Number of Scopus-indexed publications (SciVal scholarly output) in the selected window."
         ),
         "enabled": True,
     },
@@ -2574,8 +2903,8 @@ DEFAULT_METRICS = [
         "id": "fwci",
         "label": "Field-Weighted Citation Impact (FWCI)",
         "description": (
-            "FWCI: citations vs peer average for similar papers (1.0 = average); "
-            "volatile when the publication set is small."
+            "FWCI: citations vs. peer average for similar papers (1.0 = average); "
+            "most volatile when the number of publications is small."
         ),
         "enabled": True,
     },
@@ -2583,7 +2912,7 @@ DEFAULT_METRICS = [
         "id": "topJournal",
         "label": "Publications in Top 10% Journals",
         "description": (
-            "Share of publications in journals SciVal ranks in the top tenth by CiteScore percentile."
+            "Share of publications in journals that SciVal ranks in the top tenth by CiteScore percentile."
         ),
         "enabled": True,
     },
@@ -2596,7 +2925,7 @@ DEFAULT_METRICS = [
     {
         "id": "hIndex",
         "label": "H-Index",
-        "description": "H-index: largest h where at least h papers each have ≥ h citations.",
+        "description": "H-index: greatest h such that at least h publications have been cited at least h times each.",
         "enabled": True,
     },
     {
@@ -2611,7 +2940,7 @@ DEFAULT_METRICS = [
         "description": (
             "International collaboration: multi-author; addresses span more than one country/region."
         ),
-        "enabled": True,
+        "enabled": False,
     },
     {
         "id": "collaborationNational",
@@ -2619,7 +2948,7 @@ DEFAULT_METRICS = [
         "description": (
             "National collaboration: multi-author, one country/region, two or more SciVal institutions."
         ),
-        "enabled": True,
+        "enabled": False,
     },
     {
         "id": "collaborationInstitutional",
@@ -2627,13 +2956,13 @@ DEFAULT_METRICS = [
         "description": (
             "Institutional collaboration: multi-author, one country/region, one SciVal institution."
         ),
-        "enabled": True,
+        "enabled": False,
     },
     {
         "id": "collaborationSingleAuthorship",
         "label": "Single authorship",
         "description": "Single authorship: one author; no co-authors.",
-        "enabled": True,
+        "enabled": False,
     },
     {
         "id": "academicCorporateWith",
@@ -2641,30 +2970,55 @@ DEFAULT_METRICS = [
         "description": (
             "Share of publications SciVal classifies as involving both academic and corporate affiliations."
         ),
-        "enabled": True,
+        "enabled": False,
     },
     {
         "id": "academicCorporateWithout",
         "label": "No academic–corporate collaboration",
         "description": "Share of publications not classified by SciVal as academic–corporate collaboration.",
-        "enabled": True,
+        "enabled": False,
     },
 ]
+
+# Panel display order for grouped accordions (IDs must match ``DEFAULT_METRICS``).
+METRIC_IDS_CORE = (
+    "publication",
+    "citationCount",
+    "citationsPerPublication",
+    "topJournal",
+    "fwci",
+    "hIndex",
+)
+METRIC_IDS_COLLABORATIVE = (
+    "collaborationInternational",
+    "collaborationNational",
+    "collaborationInstitutional",
+    "collaborationSingleAuthorship",
+    "academicCorporateWith",
+    "academicCorporateWithout",
+)
+
+
+def _metrics_for_panel_ordered(
+    am_list: list[dict], id_order: tuple[str, ...]
+) -> list[dict]:
+    """Return metrics from ``am_list`` in ``id_order``, skipping unknown ids."""
+    by_id = {m["id"]: m for m in am_list}
+    return [by_id[i] for i in id_order if i in by_id]
 
 # Metric info (i) panels: ``{Topic}: …`` lead line, then detail; collaboration types use bullets.
 METRIC_INFO_TEXT: dict[str, str] = {
     "publication": (
-        "Publication count (SciVal scholarly output): count of this entity’s Scopus-indexed "
-        "publications in the selected document-type and year window. Year values are grouped by "
-        "publication year."
+        "Publications (SciVal scholarly output): number of Scopus-indexed publications for this entity "
+        "in the selected document-type and year window. Values are grouped by publication year."
     ),
     "fwci": (
-        "FWCI: citations on this entity’s papers vs the average for similar papers worldwide "
+        "FWCI: citations on this entity’s papers vs. the average for similar papers worldwide "
         "(field, document type, age). 1.0 matches that peer-group average; small samples move easily."
     ),
     "topJournal": (
-        "Publications in top 10% journals: share of publications in journals SciVal ranks in the "
-        "top tenth by CiteScore percentile. Items without CiteScore journal metrics "
+        "Publications in the top 10% of journals: share of publications in journals that SciVal ranks in the "
+        "top tenth by CiteScore percentile. Publications without CiteScore journal metrics "
         "(e.g. many books) are out of scope."
     ),
     "citationCount": (
@@ -2672,7 +3026,7 @@ METRIC_INFO_TEXT: dict[str, str] = {
         "Year axes use publication year of cited papers, not the year a citation occurred."
     ),
     "hIndex": (
-        "H-index: largest h such that at least h publications each have h or more citations. "
+        "H-index: greatest h such that at least h publications have been cited at least h times each. "
         "Combines how many qualifying papers you have with how often they are cited."
     ),
     "citationsPerPublication": (
@@ -2732,7 +3086,48 @@ def _metric_title_with_info_html(metric_id: str, label: str) -> str:
 
 
 # Default on/off per metric id (used when creating ``met_*`` session keys).
-DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {m["id"]: True for m in DEFAULT_METRICS}
+# Core metrics on; collaboration metrics off → "6 of 12" selected by default.
+DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {
+    m["id"]: (m["id"] in METRIC_IDS_CORE) for m in DEFAULT_METRICS
+}
+
+
+def _render_metric_toggle_grid_rows(
+    metrics_slice: list[dict], row_key_prefix: str
+) -> None:
+    """Render 3-column rows of metric toggle cards (toggle left; title + (i); Baseweb switch)."""
+    _ncols = 3
+    for row_idx, row_start in enumerate(range(0, len(metrics_slice), _ncols)):
+        row_key = f"{row_key_prefix}_{row_idx}"
+        row = metrics_slice[row_start : row_start + _ncols]
+        with st.container(border=False, key=row_key):
+            cols = st.columns(_ncols, gap="small")
+            for i, metric in enumerate(row):
+                with cols[i]:
+                    with st.container(key=f"metric_cell_{metric['id']}"):
+                        csw, ct = st.columns([0.28, 1], gap="small")
+                        with csw:
+                            _mk = f"met_{metric['id']}"
+                            _def_on = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
+                                metric["id"], False
+                            )
+                            _cur = bool(st.session_state.get(_mk, _def_on))
+                            st.session_state[_mk] = _cur
+                            metric["enabled"] = st.toggle(
+                                metric["label"],
+                                value=_cur,
+                                key=_mk,
+                                label_visibility="collapsed",
+                            )
+                        with ct:
+                            st.html(
+                                _metric_title_with_info_html(
+                                    str(metric["id"]),
+                                    str(metric["label"]),
+                                ),
+                                width="content",
+                            )
+
 
 # Bump when default metric toggles change so Streamlit widget keys (met_*) resync.
 # v5: reset stuck "all off" sessions; ensure defaults come from DEFAULT_METRICS, not stale dict copies.
@@ -2744,7 +3139,8 @@ DEFAULT_METRIC_TOGGLE_DEFAULT: dict[str, bool] = {m["id"]: True for m in DEFAULT
 # v11: Academic–corporate metric descriptions + (i) help text (SciVal definition).
 # v12: Collaboration submetrics UI/export order (international → national → institutional → single).
 # v13: Re-init metric toggles; pass explicit ``value=`` + scope card CSS to Baseweb switch (default on).
-_METRICS_SESSION_DEFAULT_VERSION = 13
+# v14: Default selection is six core metrics on, six collaboration metrics off.
+_METRICS_SESSION_DEFAULT_VERSION = 14
 
 YEAR_OPTIONS = {
     "3yrs": "Last 3 completed calendar years — compact recent window",
@@ -2859,9 +3255,15 @@ YEAR_FILTER_LABEL_TOOLTIP_HTML = (
     "• Indexed manuscripts with a future official publication date<br />"
 )
 
+SELF_CIT_LABEL_TOOLTIP_HTML = (
+    "<strong>Self-citations</strong><br />"
+    "Self-citations are citations where an author cites their own previous work. "
+    "Including them may increase citation counts and H-index values."
+)
+
 SELF_CIT_HELP = (
     "Self-citations are citations where an author cites their own previous work. "
-    "This setting applies to citation-based metrics where SciVal supports self-citation handling."
+    "Including them may increase citation counts and H-index values."
 )
 
 DOCS_SELECTION_CAPTION = "Include all types matching your selection above."
@@ -2883,14 +3285,14 @@ def _init_session() -> None:
         for m in DEFAULT_METRICS:
             mid = m["id"]
             st.session_state[f"met_{mid}"] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
-                mid, True
+                mid, False
             )
     elif "available_metrics" not in st.session_state:
         st.session_state.available_metrics = [dict(m) for m in DEFAULT_METRICS]
         for m in DEFAULT_METRICS:
             mk = f"met_{m['id']}"
             if mk not in st.session_state:
-                st.session_state[mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(m["id"], True)
+                st.session_state[mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(m["id"], False)
     if "results" not in st.session_state:
         st.session_state.results = []
     if "loading" not in st.session_state:
@@ -2903,6 +3305,8 @@ def _init_session() -> None:
         st.session_state.rate_limit_error = False
     if "scopus_author_ids" not in st.session_state:
         st.session_state.scopus_author_ids = ""
+    if "find_scopus_panel_open" not in st.session_state:
+        st.session_state.find_scopus_panel_open = False
     if "self_cit_radio" not in st.session_state:
         st.session_state.self_cit_radio = (
             "include" if st.session_state.get("self_cit_include", True) else "exclude"
@@ -2954,7 +3358,7 @@ def _build_metrics_table_rows(
         return f"{int(fv)}%" if fv.is_integer() else f"{fv:.2f}%"
 
     row_defs = [
-        ("publication", "Publication", lambda x: x["scholarlyOutput"], True, False),
+        ("publication", "Publications", lambda x: x["scholarlyOutput"], True, False),
         ("citationCount", "Citation Count", lambda x: x["citationCount"], True, False),
         (
             "citationsPerPublication",
@@ -4296,6 +4700,137 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     )
 
 
+def _merge_scopus_author_id_into_search_box(new_id: str) -> str:
+    """Merge resolved ID into ``scopus_author_ids``. Returns ``added``, ``duplicate``, or ``noop``."""
+    new_id = (new_id or "").strip()
+    if not new_id:
+        return "noop"
+    existing = (st.session_state.get("scopus_author_ids") or "").strip()
+    if not existing:
+        st.session_state.scopus_author_ids = new_id
+        return "added"
+    parts = [x.strip() for x in re.split(r"[,\n;]+", existing) if x.strip()]
+    if new_id in parts:
+        return "duplicate"
+    if "\n" in existing:
+        sep = "\n"
+    elif "," in existing:
+        sep = ", "
+    else:
+        sep = "\n"
+    st.session_state.scopus_author_ids = existing + sep + new_id
+    return "added"
+
+
+@st.dialog("Notice")
+def _dialog_author_id_required() -> None:
+    """Centered modal when Analyze runs with no author IDs (dismiss with OK)."""
+    st.warning("Enter at least one author ID.")
+    _ok_l, _ok_c, _ok_r = st.columns([1, 2, 1])
+    with _ok_c:
+        if st.button(
+            "OK",
+            type="primary",
+            use_container_width=True,
+            key="author_id_required_modal_ok",
+        ):
+            st.rerun()
+
+
+def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
+    """HKUST portal, Scopus, ORCID lookup; ORCID resolution fills the author ID box."""
+    with st.container(border=False, key="find_scopus_help_panel"):
+        st.markdown(
+            '<div class="find-scopus-banner" role="heading" aria-level="3">'
+            '<span class="minimal-filter-icon-badge minimal-filter-icon-badge--person '
+            'find-scopus-banner-badge" aria-hidden="true">'
+            f"{_FILTER_ICON_PERSON}</span>"
+            "<span>Find Scopus Author ID</span></div>",
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            st.markdown("**Option 1: HKUST Research Portal**")
+            st.caption(
+                "Browse HKUST researcher profiles to find Scopus Author IDs linked from the portal."
+            )
+            st.link_button(
+                "Open HKUST Scholar Profiles",
+                "https://researchportal.hkust.edu.hk/en/persons/",
+                icon=":material/open_in_new:",
+                use_container_width=True,
+            )
+        with st.container(border=True):
+            st.markdown("**Option 2: Beyond HKUST (Scopus)**")
+            st.markdown(
+                "To look for your Scopus Author profile and ID, perform a search on Scopus "
+                "using the steps below."
+            )
+            st.markdown(
+                "1. Go to [Scopus](https://www.scopus.com/home.uri) and click **Author Search**.\n\n"
+                "2. Enter your **first and last name**, and your **affiliation**, then click **Search**.\n\n"
+                "3. Open the record that matches your profile to view your Scopus Author details "
+                "(including your Author ID)."
+            )
+            st.link_button(
+                "Open Scopus",
+                "https://www.scopus.com/home.uri",
+                icon=":material/open_in_new:",
+                use_container_width=True,
+            )
+        with st.container(border=True):
+            st.markdown("**Option 3: Find by ORCID**")
+            st.caption(
+                "Resolve an ORCID to a Scopus Author ID via SciVal (requires an API key)."
+            )
+            st.markdown(
+                "About ORCID: [https://orcid.org/](https://orcid.org/)"
+            )
+            _orch = st.text_input(
+                "ORCID Identifier",
+                placeholder="XXXX-XXXX-XXXX-XXXX (16-digit identifier)",
+                key="find_scopus_orcid_input",
+            )
+            st.caption(
+                "ORCID format: XXXX-XXXX-XXXX-XXXX (16-digit identifier)"
+            )
+            if st.button("Find Scopus ID", key="find_scopus_orcid_submit", type="primary"):
+                if not api_key_effective:
+                    st.warning(
+                        "Add a SciVal API key in the sidebar (or environment) to look up ORCID."
+                    )
+                elif not (_orch or "").strip():
+                    st.warning("Enter an ORCID (16-digit identifier or URL).")
+                else:
+                    try:
+                        sid, name = lookup_scopus_id_from_orcid(
+                            _orch, api_key_effective
+                        )
+                        _action = _merge_scopus_author_id_into_search_box(sid)
+                        _nm = (name or "").strip()
+                        if _action == "duplicate":
+                            st.info(
+                                f"Scopus Author ID **{sid}** is already in the search box."
+                                + (f" ({_nm})" if _nm else "")
+                            )
+                        else:
+                            st.success(
+                                f"Added Scopus Author ID **{sid}** to the search box."
+                                + (f" ({_nm})" if _nm else "")
+                            )
+                    except APIError as e:
+                        st.error(format_error_message_for_user(str(e)))
+        st.markdown(
+            '<div class="find-scopus-about"><strong>About Finding Scopus Author IDs:</strong>'
+            "<ul>"
+            "<li><strong>HKUST portal:</strong> Browse HKUST researcher profiles with pre-linked Scopus IDs.</li>"
+            "<li><strong>ORCID lookup:</strong> Enter an ORCID to find the corresponding Scopus Author ID.</li>"
+            "<li>ORCID is a persistent digital identifier for researchers.</li>"
+            '<li><a href="https://orcid.org/" target="_blank" rel="noopener noreferrer">Learn more about ORCID ↗</a></li>'
+            "</ul></div>",
+            unsafe_allow_html=True,
+        )
+
+
 def main() -> None:
     _init_session()
     _inject_theme_css()
@@ -4360,10 +4895,69 @@ def main() -> None:
     analyze_metrics_inline = False
     with st.container():
         with st.container(border=True, key="search_shell"):
+            _hdr_l, _hdr_r = st.columns([4, 1])
+            with _hdr_l:
+                st.markdown(
+                    '<p class="search-config-title">SEARCH CONFIGURATION</p>',
+                    unsafe_allow_html=True,
+                )
+            with _hdr_r:
+                _lbl = (
+                    "Hide Find Scopus ID"
+                    if st.session_state.get("find_scopus_panel_open")
+                    else "Find Scopus ID"
+                )
+                if st.button(
+                    _lbl,
+                    key="toggle_find_scopus_panel",
+                    use_container_width=True,
+                    type="secondary",
+                    icon=":material/person:",
+                ):
+                    st.session_state.find_scopus_panel_open = not bool(
+                        st.session_state.get("find_scopus_panel_open")
+                    )
+
+            if st.session_state.get("find_scopus_panel_open"):
+                _render_find_scopus_author_id_help(api_key_effective)
+
+            _raw_header_ids = st.session_state.get("scopus_author_ids") or ""
+            _parsed_header_ids = [
+                x.strip() for x in re.split(r"[,\n;]+", _raw_header_ids) if x.strip()
+            ]
+            _limit_cls_header = (
+                "author-limit-hint--warn"
+                if len(_parsed_header_ids) > MAX_AUTHORS_PER_RUN
+                else "author-limit-hint--ok"
+            )
             st.markdown(
-                '<p class="search-config-title">SEARCH CONFIGURATION</p>',
+                '<div class="author-input-header-row">'
+                '<span class="author-input-header-title">Scopus Author ID</span>'
+                '<div class="author-limit-hint author-limit-hint-inline '
+                f'{_limit_cls_header}"><span class="minimal-filter-icon-badge '
+                'minimal-filter-icon-badge--compact minimal-filter-icon-badge--users '
+                f'author-limit-icon" aria-hidden="true">{_FILTER_ICON_USERS}</span>'
+                "<span><strong>Search up to "
+                f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
+                "Use commas, semicolons, or line breaks to separate entries. "
+                '<span class="author-limit-count">'
+                f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} entered"
+                "</span></span></div></div>",
                 unsafe_allow_html=True,
             )
+            author_ids = st.text_area(
+                "Scopus Author ID",
+                placeholder=(
+                    "Enter Scopus Author ID(s). Don't know your ID? Use Find Scopus ID "
+                    "above — HKUST portal, Scopus, or ORCID lookup."
+                ),
+                label_visibility="collapsed",
+                key="scopus_author_ids",
+                height=96,
+            )
+            parsed_author_ids = [
+                x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
+            ]
 
             fy, fd, fs = st.columns(3, gap="small")
             with fy:
@@ -4375,7 +4969,7 @@ def main() -> None:
                     "<span>Year</span>"
                     '<span class="year-filter-tip" tabindex="0" role="button" '
                     'aria-label="Year range information, details in tooltip">'
-                    f'<span class="year-filter-tip-marker" aria-hidden="true">{_FILTER_ICON_INFO_SMALL}</span>'
+                    f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--compact minimal-filter-icon-badge--info year-filter-tip-marker" aria-hidden="true">{_FILTER_ICON_INFO_SMALL}</span>'
                     '<span class="year-filter-tip-popup" role="tooltip" '
                     'id="year-range-options-tooltip">'
                     f"{YEAR_FILTER_LABEL_TOOLTIP_HTML}"
@@ -4412,11 +5006,22 @@ def main() -> None:
                 st.markdown(
                     '<div class="minimal-filter-label">'
                     f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--funnel" '
-                    f'aria-hidden="true">{_FILTER_ICON_FUNNEL}</span><span>Self-citations for citation metrics</span></div>',
+                    f'aria-hidden="true">{_FILTER_ICON_FUNNEL}</span>'
+                    '<span class="year-filter-label-with-tip">'
+                    "<span>Self-citations</span>"
+                    '<span class="year-filter-tip" tabindex="0" role="button" '
+                    'aria-label="Self-citations information, details in tooltip">'
+                    f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--compact '
+                    'minimal-filter-icon-badge--info year-filter-tip-marker" aria-hidden="true">'
+                    f"{_FILTER_ICON_INFO_SMALL}</span>"
+                    '<span class="year-filter-tip-popup" role="tooltip" '
+                    'id="self-citations-tooltip">'
+                    f"{SELF_CIT_LABEL_TOOLTIP_HTML}"
+                    "</span></span></span></div>",
                     unsafe_allow_html=True,
                 )
                 st.radio(
-                    "Self-citation handling for supported citation metrics",
+                    " ",
                     options=["include", "exclude"],
                     format_func=lambda k: SELF_CIT_RADIO_LABELS[k],
                     horizontal=True,
@@ -4432,10 +5037,18 @@ def main() -> None:
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    '<p class="metrics-panel-heading metrics-panel-heading-inline">'
-                    '<span>Select Metrics to Include</span>'
+                    '<div class="metrics-panel-heading-row">'
+                    '<span class="minimal-filter-icon-badge minimal-filter-icon-badge--compact '
+                    'minimal-filter-icon-badge--metrics metrics-panel-heading-icon" '
+                    f'aria-hidden="true">{_FILTER_ICON_METRICS_MENU}</span>'
+                    '<p class="metrics-panel-heading metrics-panel-heading-inline '
+                    'metrics-panel-heading-scrollstrip">'
+                    '<span class="metrics-panel-heading-lead">'
+                    "<span>Select Metrics to Include</span>"
+                    "</span>"
                     '<span class="metrics-panel-head-caption-inline">(Toggle metrics on/off)</span>'
-                    "</p>",
+                    "</p>"
+                    "</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -4446,9 +5059,9 @@ def main() -> None:
                     mk = f"met_{m['id']}"
                     if mk not in st.session_state:
                         st.session_state[mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
-                            m["id"], True
+                            m["id"], False
                         )
-                    m["enabled"] = bool(st.session_state.get(mk, True))
+                    m["enabled"] = bool(st.session_state[mk])
                 with st.container(border=False, key="metrics_toolbar_shell"):
                     tb1, tb2, tb3 = st.columns([1, 1, 2], gap="small")
                     with tb1:
@@ -4457,6 +5070,7 @@ def main() -> None:
                             key="metrics_select_all",
                             type="secondary",
                             use_container_width=True,
+                            icon=":material/check_circle:",
                         ):
                             for m in am:
                                 m["enabled"] = True
@@ -4467,6 +5081,7 @@ def main() -> None:
                             key="metrics_clear_all",
                             type="secondary",
                             use_container_width=True,
+                            icon=":material/layers_clear:",
                         ):
                             for m in am:
                                 m["enabled"] = False
@@ -4477,9 +5092,9 @@ def main() -> None:
                         _mk = f"met_{m['id']}"
                         if _mk not in st.session_state:
                             st.session_state[_mk] = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
-                                m["id"], True
+                                m["id"], False
                             )
-                        m["enabled"] = bool(st.session_state.get(_mk, True))
+                        m["enabled"] = bool(st.session_state[_mk])
                     n_on = sum(1 for m in am if m.get("enabled"))
                     with tb3:
                         st.markdown(
@@ -4487,78 +5102,31 @@ def main() -> None:
                             unsafe_allow_html=True,
                         )
 
+                core_metrics = _metrics_for_panel_ordered(am, METRIC_IDS_CORE)
+                collab_metrics = _metrics_for_panel_ordered(am, METRIC_IDS_COLLABORATIVE)
+
                 with st.container(border=False, key="metrics_grid_shell"):
-                    for row_idx, row_start in enumerate(range(0, len(am), 4)):
-                        row_key = f"metrics_grid_row{row_idx}"
-                        row = am[row_start : row_start + 4]
-                        with st.container(border=False, key=row_key):
-                            cols = st.columns(4, gap="small")
-                            for i, metric in enumerate(row):
-                                with cols[i]:
-                                    with st.container(key=f"metric_cell_{metric['id']}"):
-                                        ct, csw = st.columns([1, 0.28], gap="small")
-                                        with ct:
-                                            # Avoid ``st.markdown`` here: GFM treats blank lines in help as new blocks.
-                                            st.html(
-                                                _metric_title_with_info_html(
-                                                    str(metric["id"]),
-                                                    str(metric["label"]),
-                                                ),
-                                                width="content",
-                                            )
-                                        with csw:
-                                            _mk = f"met_{metric['id']}"
-                                            # Explicit ``value`` so first-time widget serde is not False;
-                                            # keep in sync with ``st.session_state`` (see ``register_widget``).
-                                            _def_on = DEFAULT_METRIC_TOGGLE_DEFAULT.get(
-                                                metric["id"], True
-                                            )
-                                            _cur = bool(st.session_state.get(_mk, _def_on))
-                                            st.session_state[_mk] = _cur
-                                            metric["enabled"] = st.toggle(
-                                                metric["label"],
-                                                value=_cur,
-                                                key=_mk,
-                                                label_visibility="collapsed",
-                                            )
+                    with st.expander(
+                        "Core Research Metrics",
+                        expanded=False,
+                        icon=":material/analytics:",
+                    ):
+                        _render_metric_toggle_grid_rows(
+                            core_metrics, "metrics_grid_row_core"
+                        )
+                    with st.expander(
+                        "Collaboration Metrics",
+                        expanded=False,
+                        icon=":material/hub:",
+                    ):
+                        _render_metric_toggle_grid_rows(
+                            collab_metrics, "metrics_grid_row_collab"
+                        )
 
             st.markdown(
                 '<div class="minimal-section-divider"></div>',
                 unsafe_allow_html=True,
             )
-
-            _raw_header_ids = st.session_state.get("scopus_author_ids") or ""
-            _parsed_header_ids = [
-                x.strip() for x in re.split(r"[,\n;]+", _raw_header_ids) if x.strip()
-            ]
-            _limit_cls_header = (
-                "author-limit-hint--warn"
-                if len(_parsed_header_ids) > MAX_AUTHORS_PER_RUN
-                else "author-limit-hint--ok"
-            )
-            st.markdown(
-                '<div class="author-input-header-row">'
-                '<span class="author-input-header-title">Scopus Author ID</span>'
-                '<div class="author-limit-hint author-limit-hint-inline '
-                f'{_limit_cls_header}"><span class="author-limit-icon" aria-hidden="true">👥</span>'
-                "<span><strong>Search up to "
-                f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
-                "Use commas, semicolons, or line breaks to separate entries. "
-                '<span class="author-limit-count">'
-                f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} entered"
-                "</span></span></div></div>",
-                unsafe_allow_html=True,
-            )
-            author_ids = st.text_area(
-                "Scopus Author ID",
-                placeholder="Enter Scopus Author ID(s)...",
-                label_visibility="collapsed",
-                key="scopus_author_ids",
-                height=96,
-            )
-            parsed_author_ids = [
-                x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
-            ]
             _, _analyze_inline_col, _ = st.columns([1, 2, 1])
             with _analyze_inline_col:
                 analyze_metrics_inline = st.button(
@@ -4586,7 +5154,7 @@ def main() -> None:
                 1 for m in st.session_state.available_metrics if m.get("enabled")
             )
             if not ids:
-                st.warning("Enter at least one author ID.")
+                _dialog_author_id_required()
             elif selected_metric_count == 0:
                 st.warning("Turn on at least one metric (all are off).")
             elif len(ids) > MAX_AUTHORS_PER_RUN:

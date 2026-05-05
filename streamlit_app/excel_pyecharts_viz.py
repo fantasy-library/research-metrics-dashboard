@@ -163,9 +163,13 @@ def main() -> None:
 
     metric_options = metrics_df["Metric"].tolist()
     default_metric = (
-        "Publication"
-        if "Publication" in metric_options
-        else ("Scholarly Output" if "Scholarly Output" in metric_options else None)
+        "Publications"
+        if "Publications" in metric_options
+        else (
+            "Publication"
+            if "Publication" in metric_options
+            else ("Scholarly Output" if "Scholarly Output" in metric_options else None)
+        )
     )
     selected_metric = st.selectbox(
         "Metric (rows in the Excel)",
@@ -174,7 +178,7 @@ def main() -> None:
         if default_metric and default_metric in metric_options
         else 0,
     )
-    st.caption("Tip: pick `Publication` to review publication counts by year.")
+    st.caption("Tip: pick `Publications` to review counts by year (legacy sheets may still say `Publication`).")
 
     chart_type = st.radio("Chart type", options=["Bar", "Line"], horizontal=True, index=0)
     invert_axes = st.checkbox("Invert axes (metric value on X, year on Y)", value=False)
@@ -196,7 +200,7 @@ def main() -> None:
     components.html(html, height=460, scrolling=True)
 
     st.caption(
-        "Note: in this Excel export, `Publication` is a metric row and years are columns, so the default chart plots publication year (X) vs publication count (Y)."
+        "Note: in this Excel export, `Publications` is the metric row (older files may use `Publication`); years are columns, so the default chart plots publication year (X) vs count (Y)."
     )
 
 

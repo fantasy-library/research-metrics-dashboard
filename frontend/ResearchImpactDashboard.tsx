@@ -22,64 +22,168 @@ type MetricDef = {
   id: string;
   title: string;
   description: string;
-  group: "core" | "collab";
 };
 
-const METRICS: MetricDef[] = [
+/** Panel order matches Streamlit ``METRIC_IDS_CORE`` */
+const CORE_METRICS: MetricDef[] = [
   {
     id: "publication",
-    title: "Publication",
+    title: "Publications",
     description:
-      "Publication count (SciVal scholarly output): Scopus-indexed items in the selected window.",
-    group: "core",
-  },
-  {
-    id: "fwci",
-    title: "Field-Weighted Citation Impact (FWCI)",
-    description:
-      "FWCI: citations vs peer average for similar papers (1.0 = average); volatile when the set is small.",
-    group: "core",
-  },
-  {
-    id: "topJournal",
-    title: "Publications in Top 10% Journals",
-    description:
-      "Share of publications in journals SciVal ranks in the top tenth by CiteScore percentile.",
-    group: "core",
+      "Number of Scopus-indexed publications (SciVal scholarly output) in the selected window.",
   },
   {
     id: "citationCount",
     title: "Citation Count",
-    description: "Citation count: citations received by the selected publications, grouped by publication year.",
-    group: "core",
-  },
-  {
-    id: "hIndex",
-    title: "H-Index",
-    description: "H-index: largest h where at least h papers each have ≥ h citations.",
-    group: "core",
+    description:
+      "Citation count: citations received by the selected publications, grouped by publication year.",
   },
   {
     id: "citationsPerPublication",
     title: "Citations Per Publication",
     description:
       "Citations per publication: average citations received per publication in the selected window.",
-    group: "core",
   },
   {
+    id: "topJournal",
+    title: "Publications in Top 10% Journals",
+    description:
+      "Share of publications in journals that SciVal ranks in the top tenth by CiteScore percentile.",
+  },
+  {
+    id: "fwci",
+    title: "Field-Weighted Citation Impact (FWCI)",
+    description:
+      "FWCI: citations vs. peer average for similar papers (1.0 = average); most volatile when the number of publications is small.",
+  },
+  {
+    id: "hIndex",
+    title: "H-Index",
+    description:
+      "H-index: greatest h such that at least h publications have been cited at least h times each.",
+  },
+];
+
+/** Panel order matches Streamlit ``METRIC_IDS_COLLABORATIVE`` */
+const COLLAB_METRICS: MetricDef[] = [
+  {
     id: "collaborationInternational",
-    title: "Collaboration",
-    description: "SciVal collaboration-type percentages: institutional, national, international, and single author.",
-    group: "collab",
+    title: "International collaboration",
+    description:
+      "International collaboration: multi-author; addresses span more than one country/region.",
+  },
+  {
+    id: "collaborationNational",
+    title: "National collaboration",
+    description:
+      "National collaboration: multi-author, one country/region, two or more SciVal institutions.",
+  },
+  {
+    id: "collaborationInstitutional",
+    title: "Institutional collaboration",
+    description:
+      "Institutional collaboration: multi-author, one country/region, one SciVal institution.",
+  },
+  {
+    id: "collaborationSingleAuthorship",
+    title: "Single authorship",
+    description: "Single authorship: one author; no co-authors.",
   },
   {
     id: "academicCorporateWith",
-    title: "Academic–Corporate Collaboration",
+    title: "Academic–corporate collaboration",
     description:
       "Share of publications SciVal classifies as involving both academic and corporate affiliations.",
-    group: "collab",
+  },
+  {
+    id: "academicCorporateWithout",
+    title: "No academic–corporate collaboration",
+    description:
+      "Share of publications not classified by SciVal as academic–corporate collaboration.",
   },
 ];
+
+const METRICS: MetricDef[] = [...CORE_METRICS, ...COLLAB_METRICS];
+
+/** Fixed slot for metrics accordion icons (Streamlit core glyph ``1.125rem``). */
+function MetricsAccordionIconSlot({
+  children,
+  compact,
+}: {
+  children: React.ReactNode;
+  /** Collaboration hub reads slightly larger than analytics — use smaller slot */
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center text-violet-600 [&_svg]:block ${
+        compact ? "[&_svg]:size-4" : "[&_svg]:size-[1.125rem]"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Bar-chart style icon (pairs with Streamlit ``:material/analytics:`` for core metrics). */
+function CoreResearchMetricsIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="currentColor">
+      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 15h2v2H7v-2zm4-4h2v6h-2v-6zm4-4h2v10h-2V7z" />
+    </svg>
+  );
+}
+
+/** Network / collaboration section icon (matches Streamlit ``:material/hub:`` metaphor). */
+function CollaborationNetworkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="2.75" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="7" r="2" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="8" r="2" fill="currentColor" stroke="none" />
+      <circle cx="7" cy="18" r="2" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="17" r="2" fill="currentColor" stroke="none" />
+      <path d="M10.4 10.2 6.5 8.3M13.6 10.2l4.5-1.8M10 13.4l-2.8 3.3M14 13.5l2.7 2.8" />
+    </svg>
+  );
+}
+
+const DEFAULT_METRIC_ENABLED: Record<string, boolean> = Object.fromEntries(
+  METRICS.map((m) => [
+    m.id,
+    CORE_METRICS.some((c) => c.id === m.id),
+  ]),
+);
+
+function MetricInfoIcon({ title, hint }: { title: string; hint: string }) {
+  return (
+    <span className="group relative ml-1 inline-flex align-middle">
+      <button
+        type="button"
+        tabIndex={0}
+        className="inline-flex h-[1.05rem] w-[1.05rem] shrink-0 cursor-help items-center justify-center rounded-full border-[1.5px] border-slate-500 bg-slate-50 font-serif text-[0.58rem] font-extrabold italic leading-none text-slate-600 outline-none transition hover:border-indigo-700 hover:bg-indigo-50 hover:text-indigo-900 focus-visible:ring-2 focus-visible:ring-indigo-400"
+        aria-label={`SciVal definition: ${title}`}
+      >
+        i
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible absolute left-0 top-[calc(100%+6px)] z-[9999] block w-[min(22rem,calc(100vw-1.25rem))] max-h-[min(88vh,28rem)] overflow-y-auto rounded-[10px] border border-slate-200 bg-white p-2.5 text-left text-[0.78rem] leading-snug text-slate-700 shadow-xl opacity-0 transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+      >
+        {hint}
+      </span>
+    </span>
+  );
+}
 
 function Toggle({
   checked,
@@ -117,9 +221,9 @@ export function ResearchImpactDashboard() {
   const [year, setYear] = useState<(typeof YEAR_OPTIONS)[number]["value"]>("5yrs");
   const [docs, setDocs] = useState<(typeof DOCS_OPTIONS)[number]["value"]>("all");
   const [selfCit, setSelfCit] = useState<"include" | "exclude">("include");
-  const [enabled, setEnabled] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(METRICS.map((m) => [m.id, m.group === "core"])),
-  );
+  const [enabled, setEnabled] = useState<Record<string, boolean>>(() => ({
+    ...DEFAULT_METRIC_ENABLED,
+  }));
 
   const selectedCount = useMemo(
     () => Object.values(enabled).filter(Boolean).length,
@@ -348,78 +452,93 @@ export function ResearchImpactDashboard() {
             </button>
           </div>
 
-          <p className="mb-3 border-l-4 border-violet-500 pl-3 text-sm font-bold text-violet-950">
-            Core research metrics
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {METRICS.filter((m) => m.group === "core").map((m) => {
-              const on = enabled[m.id];
-              return (
-                <div
-                  key={m.id}
-                  className={`rounded-xl border p-4 shadow-sm transition ${
-                    on
-                      ? "border-violet-400 bg-gradient-to-br from-violet-50 to-white"
-                      : "border-slate-200 bg-slate-50 text-slate-500"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span
-                      className={`font-semibold ${on ? "text-slate-900" : "text-slate-500"}`}
-                    >
-                      {m.title}
-                    </span>
-                    <Toggle
-                      checked={on}
-                      onChange={(v) => setMetric(m.id, v)}
-                      label={m.title}
-                    />
-                  </div>
-                  <p
-                    className={`mt-2 text-xs leading-relaxed ${on ? "text-slate-600" : "text-slate-400"}`}
-                  >
-                    {m.description}
-                  </p>
+          <div className="space-y-3">
+            <details
+              open
+              className="rounded-[14px] border border-violet-200/90 bg-white/90 shadow-sm ring-1 ring-violet-100"
+            >
+              <summary className="flex cursor-pointer list-none items-center gap-2.5 bg-slate-100/90 px-4 py-3 font-bold text-violet-950 [&::-webkit-details-marker]:hidden">
+                <MetricsAccordionIconSlot>
+                  <CoreResearchMetricsIcon />
+                </MetricsAccordionIconSlot>
+                Core Research Metrics
+              </summary>
+              <div className="border-t border-violet-100 px-3 pb-4 pt-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  {CORE_METRICS.map((m) => {
+                    const on = enabled[m.id];
+                    return (
+                      <div
+                        key={m.id}
+                        className={`rounded-xl border p-3 shadow-sm transition ${
+                          on
+                            ? "border-violet-400 bg-gradient-to-br from-violet-50 to-white"
+                            : "border-slate-200 bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="shrink-0 pt-0.5">
+                            <Toggle
+                              checked={on}
+                              onChange={(v) => setMetric(m.id, v)}
+                              label={m.title}
+                            />
+                          </div>
+                          <span
+                            className={`inline-flex min-w-0 flex-1 items-start gap-0.5 font-semibold leading-snug ${on ? "text-slate-900" : "text-slate-500"}`}
+                          >
+                            <span>{m.title}</span>
+                            <MetricInfoIcon title={m.title} hint={m.description} />
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </details>
 
-          <p className="mb-3 mt-8 border-l-4 border-violet-500 pl-3 text-sm font-bold text-violet-950">
-            Collaboration metrics
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {METRICS.filter((m) => m.group === "collab").map((m) => {
-              const on = enabled[m.id];
-              return (
-                <div
-                  key={m.id}
-                  className={`rounded-xl border p-4 shadow-sm transition ${
-                    on
-                      ? "border-violet-400 bg-gradient-to-br from-violet-50 to-white"
-                      : "border-slate-200 bg-slate-50 text-slate-500"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span
-                      className={`font-semibold ${on ? "text-slate-900" : "text-slate-500"}`}
-                    >
-                      {m.title}
-                    </span>
-                    <Toggle
-                      checked={on}
-                      onChange={(v) => setMetric(m.id, v)}
-                      label={m.title}
-                    />
-                  </div>
-                  <p
-                    className={`mt-2 text-xs leading-relaxed ${on ? "text-slate-600" : "text-slate-400"}`}
-                  >
-                    {m.description}
-                  </p>
+            <details className="rounded-[14px] border border-violet-200/90 bg-white/90 shadow-sm ring-1 ring-violet-100">
+              <summary className="flex cursor-pointer list-none items-center gap-2.5 bg-slate-100/90 px-4 py-3 font-bold text-violet-950 [&::-webkit-details-marker]:hidden">
+                <MetricsAccordionIconSlot compact>
+                  <CollaborationNetworkIcon />
+                </MetricsAccordionIconSlot>
+                Collaboration Metrics
+              </summary>
+              <div className="border-t border-violet-100 px-3 pb-4 pt-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  {COLLAB_METRICS.map((m) => {
+                    const on = enabled[m.id];
+                    return (
+                      <div
+                        key={m.id}
+                        className={`rounded-xl border p-3 shadow-sm transition ${
+                          on
+                            ? "border-violet-400 bg-gradient-to-br from-violet-50 to-white"
+                            : "border-slate-200 bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="shrink-0 pt-0.5">
+                            <Toggle
+                              checked={on}
+                              onChange={(v) => setMetric(m.id, v)}
+                              label={m.title}
+                            />
+                          </div>
+                          <span
+                            className={`inline-flex min-w-0 flex-1 items-start gap-0.5 font-semibold leading-snug ${on ? "text-slate-900" : "text-slate-500"}`}
+                          >
+                            <span>{m.title}</span>
+                            <MetricInfoIcon title={m.title} hint={m.description} />
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            </details>
           </div>
 
           <div id="analyze" className="mt-8 scroll-mt-8">
