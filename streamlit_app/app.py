@@ -4946,18 +4946,13 @@ def main() -> None:
                 )
             with _hdr_r:
                 _panel_open = bool(st.session_state.get("find_scopus_panel_open"))
-                _toggle_btn_help = (
-                    "Click again to collapse the help panel (portal, Scopus, ORCID)."
-                    if _panel_open
-                    else "Show help: HKUST portal, Scopus steps, and ORCID lookup."
-                )
                 if st.button(
                     "Find Scopus ID",
                     key="toggle_find_scopus_panel",
                     use_container_width=True,
                     type="secondary",
                     icon=":material/person:",
-                    help=_toggle_btn_help,
+                    help="HKUST portal, Scopus steps, and ORCID lookup.",
                 ):
                     st.session_state.find_scopus_panel_open = not _panel_open
 
