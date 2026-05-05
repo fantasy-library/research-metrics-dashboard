@@ -705,6 +705,49 @@ footer[data-testid="stFooter"] {
   outline-offset: 3px !important;
 }
 
+/* Analyze Metrics — prominent loading (spinner + multi-author progress bar) */
+[data-testid="stSpinner"] {
+  padding: 1.05rem 1.35rem !important;
+  margin: 0.65rem 0 !important;
+  background: linear-gradient(180deg, #faf5ff 0%, #f3e8ff 42%, #ffffff 100%) !important;
+  border: 2px solid #a78bfa !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 14px 44px rgba(91, 33, 182, 0.15),
+    0 4px 14px rgba(15, 23, 42, 0.07) !important;
+}
+[data-testid="stSpinner"] p,
+[data-testid="stSpinner"] span,
+[data-testid="stSpinner"] label {
+  font-size: 1.14rem !important;
+  font-weight: 700 !important;
+  color: #4c1d95 !important;
+  line-height: 1.35 !important;
+}
+.metrics-fetch-subhint {
+  margin: 0.5rem 0 0 0 !important;
+  padding: 0 !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: #5b21b6 !important;
+  line-height: 1.45 !important;
+}
+[data-testid="stProgress"] {
+  padding: 0.95rem 1.2rem !important;
+  margin: 0.55rem 0 0.75rem 0 !important;
+  background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 52%, #ffffff 100%) !important;
+  border: 2px solid #c4b5fd !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 36px rgba(91, 33, 182, 0.13) !important;
+}
+[data-testid="stProgress"] p,
+[data-testid="stProgress"] [data-testid="stMarkdownContainer"] p {
+  font-size: 1.06rem !important;
+  font-weight: 700 !important;
+  color: #4c1d95 !important;
+  margin-bottom: 0.55rem !important;
+}
+
 /* Metric toggle cards: stronger “on” vs “off” affordance */
 [class*="st-key-metric_card_"]:has(input:checked),
 [class*="st-key-metric_card_"]:has(input:checked),
@@ -3630,7 +3673,7 @@ def _fetch_multi_author_metrics_with_progress(
 ) -> list[dict]:
     """Load each author sequentially so the UI can show real progress (and respect direct-API pacing)."""
     n = len(resolved_ids)
-    progress = st.progress(0, text=f"Loading {n} author(s)…")
+    progress = st.progress(0, text=f"Loading metrics for {n} authors…")
     out: list[dict] = []
     for i, aid in enumerate(resolved_ids):
         progress.progress(
@@ -5167,7 +5210,12 @@ def main() -> None:
                 try:
                     with st.spinner("Fetching metrics…"):
                         if USE_DIRECT_API:
-                            st.caption("SciVal can take up to ~1 min; retry on timeout.")
+                            st.markdown(
+                                '<p class="metrics-fetch-subhint">'
+                                "SciVal can take up to ~1 min; retry on timeout."
+                                "</p>",
+                                unsafe_allow_html=True,
+                            )
                         resolved_ids, resolution_warnings = (
                             resolve_author_ids_for_metrics_safe(
                                 ids, api_key_effective
