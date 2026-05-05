@@ -4765,18 +4765,33 @@ def _merge_scopus_author_id_into_search_box(new_id: str) -> str:
     return "added"
 
 
+def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
+    """Centered Notice modal (warning | error | info); dismiss with OK."""
+    st.session_state["_notice_dialog_body"] = body
+    st.session_state["_notice_dialog_variant"] = variant
+    _render_notice_dialog()
+
+
 @st.dialog("Notice")
-def _dialog_author_id_required() -> None:
-    """Centered modal when Analyze runs with no author IDs (dismiss with OK)."""
-    st.warning("Enter at least one author ID.")
+def _render_notice_dialog() -> None:
+    body = str(st.session_state.get("_notice_dialog_body") or "")
+    variant = str(st.session_state.get("_notice_dialog_variant") or "warning")
+    if variant == "error":
+        st.error(body)
+    elif variant == "info":
+        st.info(body)
+    else:
+        st.warning(body)
     _ok_l, _ok_c, _ok_r = st.columns([1, 2, 1])
     with _ok_c:
         if st.button(
             "OK",
             type="primary",
             use_container_width=True,
-            key="author_id_required_modal_ok",
+            key="notice_dialog_ok",
         ):
+            st.session_state.pop("_notice_dialog_body", None)
+            st.session_state.pop("_notice_dialog_variant", None)
             st.rerun()
 
 
@@ -4838,11 +4853,13 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             )
             if st.button("Find Scopus ID", key="find_scopus_orcid_submit", type="primary"):
                 if not api_key_effective:
-                    st.warning(
+                    _invoke_notice_dialog(
                         "Add a SciVal API key in the sidebar (or environment) to look up ORCID."
                     )
                 elif not (_orch or "").strip():
-                    st.warning("Enter an ORCID (16-digit identifier or URL).")
+                    _invoke_notice_dialog(
+                        "Enter an ORCID (16-digit identifier or URL)."
+                    )
                 else:
                     try:
                         sid, name = lookup_scopus_id_from_orcid(
@@ -4851,9 +4868,10 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
                         _action = _merge_scopus_author_id_into_search_box(sid)
                         _nm = (name or "").strip()
                         if _action == "duplicate":
-                            st.info(
+                            _invoke_notice_dialog(
                                 f"Scopus Author ID **{sid}** is already in the search box."
-                                + (f" ({_nm})" if _nm else "")
+                                + (f" ({_nm})" if _nm else ""),
+                                variant="info",
                             )
                         else:
                             st.success(
@@ -4861,7 +4879,10 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
                                 + (f" ({_nm})" if _nm else "")
                             )
                     except APIError as e:
-                        st.error(format_error_message_for_user(str(e)))
+                        _invoke_notice_dialog(
+                            format_error_message_for_user(str(e)),
+                            variant="error",
+                        )
         st.markdown(
             '<div class="find-scopus-about"><strong>About Finding Scopus Author IDs:</strong>'
             "<ul>"
@@ -5192,11 +5213,11 @@ def main() -> None:
                 1 for m in st.session_state.available_metrics if m.get("enabled")
             )
             if not ids:
-                _dialog_author_id_required()
+                _invoke_notice_dialog("Enter at least one author ID.")
             elif selected_metric_count == 0:
-                st.warning("Turn on at least one metric (all are off).")
+                _invoke_notice_dialog("Turn on at least one metric (all are off).")
             elif len(ids) > MAX_AUTHORS_PER_RUN:
-                st.warning(
+                _invoke_notice_dialog(
                     f"Please limit to {MAX_AUTHORS_PER_RUN} Scopus Author IDs per run."
                 )
             else:
@@ -5216,15 +5237,22 @@ def main() -> None:
                                 ids, api_key_effective
                             )
                         )
+                        _notice_resolution_parts: list[str] = []
                         if resolution_warnings:
-                            msg = "Skipped unresolved input(s):\n- " + "\n- ".join(
-                                resolution_warnings
+                            _notice_resolution_parts.append(
+                                "Skipped unresolved input(s):\n- "
+                                + "\n- ".join(resolution_warnings)
                             )
-                            st.warning(msg)
                         if not resolved_ids:
-                            st.session_state.error_msg = (
+                            _notice_resolution_parts.append(
                                 "No valid Scopus Author ID could be resolved from the input."
                             )
+                        if _notice_resolution_parts:
+                            _invoke_notice_dialog(
+                                "\n\n".join(_notice_resolution_parts),
+                                variant="error" if not resolved_ids else "warning",
+                            )
+                        if not resolved_ids:
                             st.session_state.results = []
                         elif len(resolved_ids) == 1:
                             try:
