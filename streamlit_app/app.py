@@ -4945,21 +4945,21 @@ def main() -> None:
                     unsafe_allow_html=True,
                 )
             with _hdr_r:
-                _lbl = (
-                    "Hide Find Scopus ID"
-                    if st.session_state.get("find_scopus_panel_open")
-                    else "Find Scopus ID"
+                _panel_open = bool(st.session_state.get("find_scopus_panel_open"))
+                _toggle_btn_help = (
+                    "Click again to collapse the help panel (portal, Scopus, ORCID)."
+                    if _panel_open
+                    else "Show help: HKUST portal, Scopus steps, and ORCID lookup."
                 )
                 if st.button(
-                    _lbl,
+                    "Find Scopus ID",
                     key="toggle_find_scopus_panel",
                     use_container_width=True,
                     type="secondary",
                     icon=":material/person:",
+                    help=_toggle_btn_help,
                 ):
-                    st.session_state.find_scopus_panel_open = not bool(
-                        st.session_state.get("find_scopus_panel_open")
-                    )
+                    st.session_state.find_scopus_panel_open = not _panel_open
 
             if st.session_state.get("find_scopus_panel_open"):
                 _render_find_scopus_author_id_help(api_key_effective)
