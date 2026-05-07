@@ -4893,10 +4893,16 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             unsafe_allow_html=True,
         )
         with st.container(border=True):
-            st.markdown("**HKUST Researchers (Selected)**")
+            st.markdown("**For HKUST Researchers (Selected)**")
             st.caption(
-                "Browse HKUST researcher profiles to find Scopus Author IDs linked from the portal."
+                "Browse HKUST researcher profiles to find Scopus Author IDs."
             )
+            _scholar_profiles_img = _ROOT / "Scholar_Profiles.png"
+            if _scholar_profiles_img.exists():
+                st.image(
+                    str(_scholar_profiles_img),
+                    use_container_width=True,
+                )
             st.link_button(
                 "Open HKUST Research Portal",
                 "https://researchportal.hkust.edu.hk/en/persons/",
@@ -4922,7 +4928,7 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
                 use_container_width=True,
             )
         with st.container(border=True):
-            st.markdown("**Option 3: Find by ORCID**")
+            st.markdown("**Find by ORCID**")
             st.caption(
                 "Resolve an ORCID to a Scopus Author ID via SciVal (requires an API key)."
             )
@@ -5209,31 +5215,8 @@ def main() -> None:
                         )
                     m["enabled"] = bool(st.session_state[mk])
                 with st.container(border=False, key="metrics_toolbar_shell"):
-                    tb1, tb2, tb3 = st.columns([1, 1, 2], gap="small")
-                    with tb1:
-                        if st.button(
-                            "Select All",
-                            key="metrics_select_all",
-                            type="secondary",
-                            use_container_width=True,
-                            icon=":material/check_circle:",
-                        ):
-                            for m in am:
-                                m["enabled"] = True
-                                st.session_state[f"met_{m['id']}"] = True
-                    with tb2:
-                        if st.button(
-                            "Clear All",
-                            key="metrics_clear_all",
-                            type="secondary",
-                            use_container_width=True,
-                            icon=":material/layers_clear:",
-                        ):
-                            for m in am:
-                                m["enabled"] = False
-                                st.session_state[f"met_{m['id']}"] = False
-                    # Re-sync after toolbar clicks so the count matches session_state
-                    # in the same run (otherwise n_on is stale until the next rerun).
+                    # Select/Clear toolbar buttons are intentionally hidden.
+                    # Keep count bar synced with current toggle state.
                     for m in am:
                         _mk = f"met_{m['id']}"
                         if _mk not in st.session_state:
@@ -5242,11 +5225,10 @@ def main() -> None:
                             )
                         m["enabled"] = bool(st.session_state[_mk])
                     n_on = sum(1 for m in am if m.get("enabled"))
-                    with tb3:
-                        st.markdown(
-                            f'<span class="metrics-count-bar">{n_on} of {len(am)} metrics selected</span>',
-                            unsafe_allow_html=True,
-                        )
+                    st.markdown(
+                        f'<span class="metrics-count-bar">{n_on} of {len(am)} metrics selected</span>',
+                        unsafe_allow_html=True,
+                    )
 
                 core_metrics = _metrics_for_panel_ordered(am, METRIC_IDS_CORE)
                 collab_metrics = _metrics_for_panel_ordered(am, METRIC_IDS_COLLABORATIVE)
@@ -5310,116 +5292,119 @@ def main() -> None:
             else:
                 svc = get_api_service()
                 am_payload = [dict(m) for m in st.session_state.available_metrics]
+                _metrics_fetch_loading_ph = st.empty()
                 try:
-                    with st.container(key="metrics_fetch_loading_overlay"):
-                        with st.container(key="metrics_fetch_loading_inner"):
-                            st.markdown(
-                                '<p class="metrics-fetch-loading-title">'
-                                "Fetching metrics…"
-                                "</p>",
-                                unsafe_allow_html=True,
-                            )
-                            st.markdown(
-                                '<p class="metrics-fetch-loading-hint">'
-                                "SciVal can take up to ~1 min; retry on timeout."
-                                "</p>",
-                                unsafe_allow_html=True,
-                            )
-                            detail_ph = st.empty()
-                            flush_prog = st.progress(0)
-                            _metrics_fetch_loading_detail(
-                                detail_ph, "Resolving author IDs…"
-                            )
+                    with _metrics_fetch_loading_ph.container():
+                        with st.container(key="metrics_fetch_loading_overlay"):
+                            with st.container(key="metrics_fetch_loading_inner"):
+                                st.markdown(
+                                    '<p class="metrics-fetch-loading-title">'
+                                    "Fetching metrics…"
+                                    "</p>",
+                                    unsafe_allow_html=True,
+                                )
+                                st.markdown(
+                                    '<p class="metrics-fetch-loading-hint">'
+                                    "SciVal can take up to ~1 min; retry on timeout."
+                                    "</p>",
+                                    unsafe_allow_html=True,
+                                )
+                                _detail_ph = st.empty()
+                                _flush_prog = st.progress(0)
 
-                            resolved_ids, resolution_warnings = (
-                                resolve_author_ids_for_metrics_safe(
-                                    ids, api_key_effective
-                                )
+                    _metrics_fetch_loading_detail(_detail_ph, "Resolving author IDs…")
+
+                    resolved_ids, resolution_warnings = (
+                        resolve_author_ids_for_metrics_safe(
+                            ids, api_key_effective
+                        )
+                    )
+                    _notice_resolution_parts: list[str] = []
+                    if resolution_warnings:
+                        _notice_resolution_parts.append(
+                            "Skipped unresolved input(s):\n- "
+                            + "\n- ".join(resolution_warnings)
+                        )
+                    if not resolved_ids:
+                        _notice_resolution_parts.append(
+                            "No valid Scopus Author ID could be resolved from the input."
+                        )
+                    if _notice_resolution_parts:
+                        _invoke_notice_dialog(
+                            "\n\n".join(_notice_resolution_parts),
+                            variant="error" if not resolved_ids else "warning",
+                        )
+                    _flush_prog.progress(0.12)
+                    if not resolved_ids:
+                        st.session_state.results = []
+                    elif len(resolved_ids) == 1:
+                        try:
+                            _metrics_fetch_loading_detail(
+                                _detail_ph,
+                                f"Fetching author 1 of 1 ({resolved_ids[0]})…",
                             )
-                            _notice_resolution_parts: list[str] = []
-                            if resolution_warnings:
-                                _notice_resolution_parts.append(
-                                    "Skipped unresolved input(s):\n- "
-                                    + "\n- ".join(resolution_warnings)
-                                )
-                            if not resolved_ids:
-                                _notice_resolution_parts.append(
-                                    "No valid Scopus Author ID could be resolved from the input."
-                                )
-                            if _notice_resolution_parts:
-                                _invoke_notice_dialog(
-                                    "\n\n".join(_notice_resolution_parts),
-                                    variant="error" if not resolved_ids else "warning",
-                                )
-                            flush_prog.progress(0.12)
-                            if not resolved_ids:
+                            _flush_prog.progress(1.0)
+                            data = svc.get_author_metrics(
+                                resolved_ids[0],
+                                api_key_effective,
+                                year_key,
+                                am_payload,
+                                docs_key,
+                                self_cit,
+                            )
+                            st.session_state.results = [
+                                {
+                                    "id": resolved_ids[0],
+                                    "data": data,
+                                    "isEntitlementError": False,
+                                    "isRateLimitError": False,
+                                }
+                            ]
+                        except APIError as e:
+                            st.session_state.error_msg = str(e)
+                            st.session_state.entitlement_error = (
+                                e.is_entitlement_error
+                            )
+                            st.session_state.rate_limit_error = (
+                                e.is_rate_limit_error
+                            )
+                            if is_missing_scival_api_key_error(
+                                str(e)
+                            ) or is_scival_authentication_error(str(e)):
                                 st.session_state.results = []
-                            elif len(resolved_ids) == 1:
-                                try:
-                                    _metrics_fetch_loading_detail(
-                                        detail_ph,
-                                        f"Fetching author 1 of 1 ({resolved_ids[0]})…",
-                                    )
-                                    flush_prog.progress(1.0)
-                                    data = svc.get_author_metrics(
-                                        resolved_ids[0],
-                                        api_key_effective,
-                                        year_key,
-                                        am_payload,
-                                        docs_key,
-                                        self_cit,
-                                    )
-                                    st.session_state.results = [
-                                        {
-                                            "id": resolved_ids[0],
-                                            "data": data,
-                                            "isEntitlementError": False,
-                                            "isRateLimitError": False,
-                                        }
-                                    ]
-                                except APIError as e:
-                                    st.session_state.error_msg = str(e)
-                                    st.session_state.entitlement_error = (
-                                        e.is_entitlement_error
-                                    )
-                                    st.session_state.rate_limit_error = (
-                                        e.is_rate_limit_error
-                                    )
-                                    if is_missing_scival_api_key_error(
-                                        str(e)
-                                    ) or is_scival_authentication_error(str(e)):
-                                        st.session_state.results = []
-                                    else:
-                                        st.session_state.results = [
-                                            {
-                                                "id": resolved_ids[0],
-                                                "data": {
-                                                    "error": str(e),
-                                                    "metrics": _placeholder_metrics(),
-                                                },
-                                                "isEntitlementError": e.is_entitlement_error,
-                                                "isRateLimitError": e.is_rate_limit_error,
-                                            }
-                                        ]
                             else:
-                                st.session_state.results = (
-                                    _fetch_multi_author_metrics_with_progress(
-                                        svc,
-                                        resolved_ids,
-                                        api_key_effective,
-                                        year_key,
-                                        am_payload,
-                                        docs_key,
-                                        self_cit,
-                                        detail_ph=detail_ph,
-                                        flush_prog=flush_prog,
-                                    )
-                                )
+                                st.session_state.results = [
+                                    {
+                                        "id": resolved_ids[0],
+                                        "data": {
+                                            "error": str(e),
+                                            "metrics": _placeholder_metrics(),
+                                        },
+                                        "isEntitlementError": e.is_entitlement_error,
+                                        "isRateLimitError": e.is_rate_limit_error,
+                                    }
+                                ]
+                    else:
+                        st.session_state.results = (
+                            _fetch_multi_author_metrics_with_progress(
+                                svc,
+                                resolved_ids,
+                                api_key_effective,
+                                year_key,
+                                am_payload,
+                                docs_key,
+                                self_cit,
+                                detail_ph=_detail_ph,
+                                flush_prog=_flush_prog,
+                            )
+                        )
                 except APIError as e:
                     st.session_state.error_msg = str(e)
                     st.session_state.results = []
                 except Exception as e:
                     st.session_state.error_msg = str(e)
+                finally:
+                    _metrics_fetch_loading_ph.empty()
 
     if st.session_state.error_msg:
         st.error(
