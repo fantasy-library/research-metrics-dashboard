@@ -3878,9 +3878,7 @@ def _render_single_author_export_workspace(
             unsafe_allow_html=True,
         )
         st.markdown(
-            _export_options_heading_html(
-                subtitle="Choose display order below."
-            ),
+            _export_options_heading_html(),
             unsafe_allow_html=True,
         )
         with st.container(border=True, key="export_results_shell_single"):
@@ -4062,7 +4060,7 @@ def _render_metric_visibility_controls(
     order_state_key: str,
     removed_key: str,
     sortable_key: str,
-    pick_heading_markdown: str | None = "**Step 1. Pick metrics**",
+    pick_heading_markdown: str | None = "**Pick metrics**",
     multiselect_label: str = "Metrics to display",
     show_all_visible_caption: bool = True,
 ) -> list[str]:
@@ -4223,7 +4221,7 @@ def _render_pick_via_metric_order_section(
         removed_key=removed_key,
         multiselect_label=_pick_ms_label,
     )
-    st.markdown("**Step 2. Order**")
+    st.markdown("**Order**")
     order_pick = _render_metric_sort_order(
         metric_ids=order_pick,
         label_map=label_map,
@@ -5310,7 +5308,14 @@ def main() -> None:
                                 if _hold_on_gif.exists():
                                     _g_l, _g_c, _g_r = st.columns([3, 2, 3])
                                     with _g_c:
-                                        st.image(str(_hold_on_gif), width=96)
+                                        _gif_src = _hold_on_gif.resolve().as_uri()
+                                        st.markdown(
+                                            '<div style="display:flex;justify-content:center;">'
+                                            f'<img src="{_gif_src}" alt="Loading" '
+                                            'style="width:96px;height:96px;object-fit:contain;" />'
+                                            "</div>",
+                                            unsafe_allow_html=True,
+                                        )
                                 _detail_ph = st.empty()
                                 _flush_prog = st.progress(0)
 
