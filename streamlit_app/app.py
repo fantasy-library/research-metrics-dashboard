@@ -5581,7 +5581,6 @@ def main() -> None:
                                 index=0,
                                 key=f"chart_type_{aid}",
                             )
-                            st.caption("Axis is fixed: publication year on X, metric value on Y.")
 
                         with c_chart:
                             series_name_short = _metric_short_label(
