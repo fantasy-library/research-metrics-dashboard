@@ -4898,13 +4898,12 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
         with st.container(border=True):
             st.markdown("**For non-HKUST researchers**")
             st.markdown(
-                "To look for your Scopus Author profile and ID, perform a search on Scopus "
-                "using the steps below."
+                "To find a Scopus Author profile and ID, search on Scopus using these steps:"
             )
             st.markdown(
                 "1. Go to [Scopus](https://www.scopus.com/home.uri) and click **Author Search**.\n\n"
-                "2. Enter your **first and last name**, and your **affiliation**, then click **Search**.\n\n"
-                "3. Open the record that matches your profile to view your Scopus Author ID."
+                "2. Enter a **first name**, **last name**, and **affiliation**, then click **Search**.\n\n"
+                "3. Open the matching record to view the Scopus Author ID."
             )
             st.link_button(
                 "Open Scopus",
@@ -4914,9 +4913,6 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             )
         with st.container(border=True):
             st.markdown("**Find by ORCID**")
-            st.caption(
-                "Resolve an ORCID to a Scopus Author ID via SciVal (requires an API key)."
-            )
             st.markdown(
                 "About ORCID: [https://orcid.org/](https://orcid.org/)"
             )
@@ -4924,9 +4920,6 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
                 "ORCID Identifier",
                 placeholder="XXXX-XXXX-XXXX-XXXX (16-digit identifier)",
                 key="find_scopus_orcid_input",
-            )
-            st.caption(
-                "ORCID format: XXXX-XXXX-XXXX-XXXX (16-digit identifier)"
             )
             if st.button(
                 "Find Scopus Author ID",
