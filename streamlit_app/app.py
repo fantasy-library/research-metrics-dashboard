@@ -4423,7 +4423,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     line_series.append(ser)
                 if line_series:
                     toolbox_line = _compare_toolbox()
-                    toolbox_line["right"] = 12
+                    toolbox_line["right"] = 40
                     toolbox_line["top"] = 8
                     line_legend_rows = max(1, (len(line_series) + 4) // 5)
                     line_grid_top = 128 + max(0, line_legend_rows - 1) * 22
@@ -4699,7 +4699,7 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                         )
 
                     toolbox_bubble = _compare_toolbox()
-                    toolbox_bubble["right"] = 10
+                    toolbox_bubble["right"] = 40
                     toolbox_bubble["top"] = 8
 
                     bubble_opts = {
@@ -4897,12 +4897,10 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             st.caption(
                 "Browse HKUST researcher profiles to find Scopus Author IDs."
             )
-            _scholar_profiles_img = _ROOT / "Scholar_Profiles.png"
-            if _scholar_profiles_img.exists():
-                st.image(
-                    str(_scholar_profiles_img),
-                    use_container_width=True,
-                )
+            st.image(
+                str(_ROOT / "Scholar_Profiles.png"),
+                use_container_width=True,
+            )
             st.link_button(
                 "Open HKUST Research Portal",
                 "https://researchportal.hkust.edu.hk/en/persons/",
@@ -4918,8 +4916,7 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             st.markdown(
                 "1. Go to [Scopus](https://www.scopus.com/home.uri) and click **Author Search**.\n\n"
                 "2. Enter your **first and last name**, and your **affiliation**, then click **Search**.\n\n"
-                "3. Open the record that matches your profile to view your Scopus Author details "
-                "(including your Author ID)."
+                "3. Open the record that matches your profile to view your Scopus Author ID."
             )
             st.link_button(
                 "Open Scopus",
@@ -5645,7 +5642,7 @@ def main() -> None:
                                     "toolbox": {
                                         **_compare_toolbox(),
                                         "top": 8,
-                                        "right": 10,
+                                        "right": 40,
                                     },
                                     "grid": {
                                         "left": "6%",
