@@ -87,6 +87,30 @@ ELSEVIER_INSTTOKEN: str = _resolve_insttoken()
 # so traffic exits from an allowlisted university address. Example: http://proxy.ust.hk:8080
 SCIVAL_HTTP_PROXY: str = (os.getenv("SCIVAL_HTTP_PROXY") or "").strip()
 
+
+def scival_httpx_verify() -> bool | str:
+    """TLS ``verify`` argument for httpx clients talking to Elsevier/SciVal.
+
+    - Default: Mozilla CA bundle via ``certifi`` when installed (often fixes Windows
+      ``CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate``).
+    - ``SCIVAL_SSL_VERIFY=false`` (or ``0`` / ``no``): disable verification — **insecure**;
+      only as a last resort (e.g. unusual TLS inspection without a corporate CA file).
+    - ``SCIVAL_SSL_CA_BUNDLE``: path to a PEM bundle (e.g. institutional root CA).
+    """
+    ssl_raw = (os.getenv("SCIVAL_SSL_VERIFY") or "").strip().lower()
+    if ssl_raw in ("0", "false", "no", "off"):
+        return False
+    ca_path = (os.getenv("SCIVAL_SSL_CA_BUNDLE") or "").strip()
+    if ca_path:
+        return ca_path
+    try:
+        import certifi
+
+        return certifi.where()
+    except ImportError:
+        return True
+
+
 DIRECT_API_BASE: str = (
     "https://api.elsevier.com/analytics/scival/author/metrics"
 )

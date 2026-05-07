@@ -23,6 +23,7 @@ from streamlit_app.config import (
     SCIVAL_HTTP_PROXY,
     SUPABASE_ANON_KEY,
     USE_DIRECT_API,
+    scival_httpx_verify,
     supabase_proxy_url,
 )
 
@@ -541,6 +542,7 @@ class APIService:
             timeout=httpx.Timeout(55.0, connect=12.0),
             proxy=px,
             trust_env=True,
+            verify=scival_httpx_verify(),
         )
 
     def close(self) -> None:
@@ -1342,9 +1344,21 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
         timeout=httpx.Timeout(45.0, connect=10.0),
         proxy=_scival_http_client_proxy(),
         trust_env=True,
+        verify=scival_httpx_verify(),
     )
     try:
-        r = client.get(base, params=params, headers=headers)
+        try:
+            r = client.get(base, params=params, headers=headers)
+        except httpx.ConnectError as e:
+            err_s = str(e).lower()
+            if "certificate" in err_s or "ssl" in err_s:
+                raise APIError(
+                    "Secure connection to Elsevier failed (TLS certificate verification). "
+                    "The app uses the certifi CA bundle by default. If you are on a managed network, "
+                    "set SCIVAL_SSL_CA_BUNDLE to your institution's PEM root bundle. "
+                    "Only if you understand the risk: SCIVAL_SSL_VERIFY=false turns off verification."
+                ) from e
+            raise
         if not r.is_success:
             if r.status_code == 404:
                 raise APIError("No researcher found for this identifier in the SciVal database.")

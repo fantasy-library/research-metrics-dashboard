@@ -224,6 +224,7 @@ export function ResearchImpactDashboard() {
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() => ({
     ...DEFAULT_METRIC_ENABLED,
   }));
+  const [findScopusHelpOpen, setFindScopusHelpOpen] = useState(false);
 
   const selectedCount = useMemo(
     () => Object.values(enabled).filter(Boolean).length,
@@ -248,16 +249,29 @@ export function ResearchImpactDashboard() {
               <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
                 Search
               </p>
-              <h2 className="mt-1 text-xl font-bold text-slate-900">
-                Search Configuration
+              <h2 className="mt-1 text-lg font-bold leading-snug text-slate-900 sm:text-xl">
+                Enter Scopus Author ID, select Search Scope and Metrics
               </h2>
             </div>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-gradient-to-br from-emerald-100 to-green-200 px-4 py-2 text-sm font-semibold text-emerald-900 shadow-sm transition hover:brightness-105"
+              onClick={() => setFindScopusHelpOpen((o) => !o)}
+              aria-expanded={findScopusHelpOpen}
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-emerald-300 bg-gradient-to-br from-emerald-100 to-green-200 px-5 py-2 text-sm font-semibold text-emerald-900 shadow-sm transition hover:brightness-105"
             >
-              <span aria-hidden>🔍</span>
-              Find Scopus ID
+              <svg
+                className="h-5 w-5 shrink-0 transition-transform duration-200"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden
+              >
+                {findScopusHelpOpen ? (
+                  <path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                ) : (
+                  <path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+                )}
+              </svg>
+              Find Scopus Author ID
             </button>
           </div>
           <label className="block text-sm font-semibold text-slate-800">
@@ -274,7 +288,7 @@ export function ResearchImpactDashboard() {
               value={authorIds}
               onChange={(e) => setAuthorIds(e.target.value)}
               rows={4}
-              placeholder="Enter your Scopus Author ID. Don’t know your Scopus ID? Use Find Scopus ID above."
+              placeholder="Enter your Scopus Author ID. Don’t know your Scopus ID? Use Find Scopus Author ID above."
               className="w-full rounded-2xl border-2 border-slate-200 bg-white py-3 pl-12 pr-4 text-sm !text-slate-900 caret-slate-900 shadow-inner outline-none transition [color-scheme:light] placeholder:text-slate-400 placeholder:opacity-100 placeholder:[-webkit-text-fill-color:#94a3b8] focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
               style={{ WebkitTextFillColor: "#0f172a" }}
             />
@@ -425,7 +439,7 @@ export function ResearchImpactDashboard() {
                 🔽
               </span>
               <h2 className="text-lg font-bold text-violet-950">
-                Select Metrics to Include
+                Select Metrics
                 <span className="ml-2 text-sm font-normal text-violet-900/75">
                   (Toggle metrics on or off.)
                 </span>
@@ -461,7 +475,7 @@ export function ResearchImpactDashboard() {
                 <MetricsAccordionIconSlot>
                   <CoreResearchMetricsIcon />
                 </MetricsAccordionIconSlot>
-                Core Research Metrics
+                Metrics (Default)
               </summary>
               <div className="border-t border-violet-100 px-3 pb-4 pt-3">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -503,7 +517,7 @@ export function ResearchImpactDashboard() {
                 <MetricsAccordionIconSlot compact>
                   <CollaborationNetworkIcon />
                 </MetricsAccordionIconSlot>
-                Collaboration Metrics
+                More Metrics
               </summary>
               <div className="border-t border-violet-100 px-3 pb-4 pt-3">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

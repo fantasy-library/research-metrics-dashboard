@@ -748,6 +748,64 @@ footer[data-testid="stFooter"] {
   margin-bottom: 0.55rem !important;
 }
 
+/* Analyze Metrics — fullscreen loading popup (backdrop + card) */
+[class*="st-key-metrics_fetch_loading_overlay"] {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999990 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(15, 23, 42, 0.48) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  padding: 1.25rem !important;
+  margin: 0 !important;
+}
+[class*="st-key-metrics_fetch_loading_inner"] {
+  width: min(28rem, calc(100vw - 2.5rem)) !important;
+  margin: 0 auto !important;
+  padding: 1.35rem 1.6rem 1.5rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 25px 50px -12px rgba(15, 23, 42, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset !important;
+}
+[class*="st-key-metrics_fetch_loading_inner"] .metrics-fetch-loading-title {
+  margin: 0 0 0.35rem 0 !important;
+  font-size: 1.28rem !important;
+  font-weight: 700 !important;
+  color: #1e1b4b !important;
+  letter-spacing: -0.02em !important;
+}
+[class*="st-key-metrics_fetch_loading_inner"] .metrics-fetch-loading-hint {
+  margin: 0 0 1rem 0 !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  line-height: 1.45 !important;
+}
+[class*="st-key-metrics_fetch_loading_inner"] .metrics-fetch-loading-detail {
+  margin: 0 !important;
+  padding: 0.65rem 0.85rem !important;
+  font-size: 1.02rem !important;
+  font-weight: 600 !important;
+  color: #4338ca !important;
+  line-height: 1.4 !important;
+  background: linear-gradient(180deg, #f5f3ff 0%, #faf5ff 100%) !important;
+  border: 1px solid #ddd6fe !important;
+  border-radius: 10px !important;
+}
+[class*="st-key-metrics_fetch_loading_inner"] [data-testid="stProgress"] {
+  margin-top: 0.85rem !important;
+  padding: 0.35rem 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Metric toggle cards: stronger “on” vs “off” affordance */
 [class*="st-key-metric_card_"]:has(input:checked),
 [class*="st-key-metric_card_"]:has(input:checked),
@@ -1071,11 +1129,11 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 .search-config-title {
   margin: 0 0 0.65rem 0 !important;
   font-family: 'Inter', 'Segoe UI', sans-serif !important;
-  font-size: 1.25rem !important;
+  font-size: 1.1rem !important;
   font-weight: 600 !important;
-  letter-spacing: 0.055em !important;
-  text-transform: uppercase !important;
+  letter-spacing: 0.015em !important;
   color: #111827 !important;
+  line-height: 1.35 !important;
 }
 [class*="st-key-find_scopus_help_panel"] {
   margin: 0 0 1rem 0 !important;
@@ -1097,27 +1155,6 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 }
 [class*="st-key-find_scopus_help_panel"] .find-scopus-banner-badge {
   flex-shrink: 0 !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-about {
-  margin-top: 0.85rem !important;
-  padding: 0.65rem 0.75rem !important;
-  border-radius: 10px !important;
-  background: rgba(255, 255, 255, 0.85) !important;
-  border: 1px solid #e2e8f0 !important;
-  font-size: 0.875rem !important;
-  line-height: 1.5 !important;
-  color: #334155 !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-about ul {
-  margin: 0.35rem 0 0 1rem !important;
-  padding: 0 !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-about li {
-  margin-bottom: 0.25rem !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-about a {
-  font-weight: 600 !important;
-  color: #2563eb !important;
 }
 .minimal-filter-label {
   display: flex;
@@ -1373,6 +1410,7 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   line-height: 1.28 !important;
   margin: 0 !important;
   padding-top: 0.06rem !important;
+  white-space: nowrap !important;
 }
 [class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] svg,
 [class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] svg {
@@ -1635,7 +1673,7 @@ a.minimal-go-analyze-btn:focus-visible,
   min-height: 2.7em !important;
   margin-top: 0.05rem !important;
 }
-/* Minimal metrics grid: 3 columns per row (Select Metrics to Include) */
+/* Minimal metrics grid: 3 columns per row (Select Metrics) */
 [class*="st-key-metrics_toolbar_shell"] {
   /* Space below heading row so button chrome/icons clear any divider / tight baseline */
   margin-top: 0.45rem !important;
@@ -1700,7 +1738,7 @@ a.minimal-go-analyze-btn:focus-visible,
   flex-shrink: 0 !important;
   object-fit: contain !important;
 }
-/* Core Research Metrics — slightly larger analytics glyph */
+/* Metrics (Default) panel — slightly larger analytics glyph */
 [class*="st-key-metrics_grid_shell"]
   details[data-testid="stExpander"]:first-of-type
   summary
@@ -2245,7 +2283,7 @@ hr.export-bundle-divider {
   margin: 0 0 0.35rem 0 !important;
   padding: 0 !important;
 }
-/* Same typography as export step labels, e.g. "Metrics to export" */
+/* Same typography as export step labels (e.g. Pick metrics / Metrics to export) */
 .export-downloads-kicker {
   margin: 0 0 0.35rem 0 !important;
   font-size: 0.92rem !important;
@@ -3667,6 +3705,16 @@ def _compare_toolbox() -> dict:
     }
 
 
+def _metrics_fetch_loading_detail(detail_ph, message: str) -> None:
+    """Single line inside the loading popup (plain text, escaped)."""
+    detail_ph.markdown(
+        '<p class="metrics-fetch-loading-detail" role="status" aria-live="polite">'
+        f"{html.escape(message)}"
+        "</p>",
+        unsafe_allow_html=True,
+    )
+
+
 def _fetch_multi_author_metrics_with_progress(
     svc,
     resolved_ids: list[str],
@@ -3675,16 +3723,19 @@ def _fetch_multi_author_metrics_with_progress(
     am_payload: list,
     docs_key: str,
     self_cit: bool,
+    *,
+    detail_ph,
+    flush_prog,
 ) -> list[dict]:
     """Load each author sequentially so the UI can show real progress (and respect direct-API pacing)."""
     n = len(resolved_ids)
-    progress = st.progress(0, text=f"Loading metrics for {n} authors…")
     out: list[dict] = []
     for i, aid in enumerate(resolved_ids):
-        progress.progress(
-            i / max(n, 1),
-            text=f"Fetching author {i + 1} of {n} ({aid})…",
+        _metrics_fetch_loading_detail(
+            detail_ph,
+            f"Fetching author {i + 1} of {n} ({aid})…",
         )
+        flush_prog.progress((i + 1) / max(n, 1))
         try:
             d = svc.get_author_metrics(
                 aid,
@@ -3716,7 +3767,6 @@ def _fetch_multi_author_metrics_with_progress(
             )
         if USE_DIRECT_API and i < n - 1:
             time.sleep(1.0)
-    progress.progress(1.0, text=f"Finished loading {n} author(s).")
     return out
 
 
@@ -3834,9 +3884,14 @@ def _render_single_author_export_workspace(
             unsafe_allow_html=True,
         )
         with st.container(border=True, key="export_results_shell_single"):
+            _order_kicker = (
+                "Order"
+                if len(opt_list) > 1
+                else "Display order (top to bottom)"
+            )
             st.markdown(
                 '<p class="export-metric-order-kicker">'
-                "Display order (top to bottom)</p>",
+                f"{html.escape(_order_kicker)}</p>",
                 unsafe_allow_html=True,
             )
             _render_pick_via_metric_order_section(
@@ -4139,15 +4194,26 @@ def _render_pick_via_metric_order_section(
     embed_in_export_workspace: bool = False,
 ) -> tuple[list[str], list[str]]:
     """Metric controls use chips for visibility and drag-and-drop for ordering."""
+    _order_heading = (
+        "Order" if len(opt_list) > 1 else "Display order (top to bottom)"
+    )
+    _pick_ms_label = (
+        "Pick metrics" if len(opt_list) > 1 else "Metrics to display"
+    )
+    _sort_header = (
+        "Sort metrics (drag and drop)"
+        if len(opt_list) > 1
+        else "Sort metrics"
+    )
     if embed_in_export_workspace:
         pass
     elif step_order is not None:
         st.markdown(
-            _export_step_heading_html(step_order, "Display order (top to bottom)"),
+            _export_step_heading_html(step_order, _order_heading),
             unsafe_allow_html=True,
         )
     else:
-        st.markdown("##### Display order (top to bottom)")
+        st.markdown(f"##### {_order_heading}")
 
     order_pick = _render_metric_visibility_controls(
         opt_list=opt_list,
@@ -4155,6 +4221,7 @@ def _render_pick_via_metric_order_section(
         order_state_key=order_state_key,
         sortable_key=sortable_key,
         removed_key=removed_key,
+        multiselect_label=_pick_ms_label,
     )
     st.markdown("**Step 2. Order**")
     order_pick = _render_metric_sort_order(
@@ -4162,7 +4229,7 @@ def _render_pick_via_metric_order_section(
         label_map=label_map,
         order_state_key=order_state_key,
         sortable_key=sortable_key,
-        header="Sort metrics",
+        header=_sort_header,
     )
     picked = list(order_pick)
     if not picked:
@@ -4182,9 +4249,23 @@ def _metrics_multiselect_and_order_ui(
     step_order: int | None = None,
 ) -> tuple[list[str], list[str]]:
     """Export bundle: metric chips with hidden restore panel + drag/drop ordering."""
+    _multi_opts = len(opt_list) > 1
+    eff_multiselect_label = (
+        "Pick metrics"
+        if _multi_opts
+        else (multiselect_label or "Metrics to export")
+    )
+    eff_order_heading = (
+        "Order" if _multi_opts else "Display order (top to bottom)"
+    )
+    eff_sort_header = (
+        "Sort metrics (drag and drop)"
+        if _multi_opts
+        else "Sort metrics"
+    )
     if step_multiselect is not None:
         st.markdown(
-            _export_step_heading_html(step_multiselect, multiselect_label or ""),
+            _export_step_heading_html(step_multiselect, eff_multiselect_label),
             unsafe_allow_html=True,
         )
     removed_key = f"{order_state_key}__removed"
@@ -4195,7 +4276,7 @@ def _metrics_multiselect_and_order_ui(
         removed_key=removed_key,
         sortable_key=sortable_key,
         pick_heading_markdown=None,
-        multiselect_label=multiselect_label or "Metrics to export",
+        multiselect_label=eff_multiselect_label,
     )
     if not picked_norm:
         st.caption("Select at least one metric.")
@@ -4205,11 +4286,11 @@ def _metrics_multiselect_and_order_ui(
 
     if step_order is not None:
         st.markdown(
-            _export_step_heading_html(step_order, "Display order (top to bottom)"),
+            _export_step_heading_html(step_order, eff_order_heading),
             unsafe_allow_html=True,
         )
     else:
-        st.markdown("Display order (top to bottom)")
+        st.markdown(eff_order_heading)
 
     order_pick = [m for m in order_pick if m in opt_list]
     order_pick = [m for m in order_pick if m in picked_norm]
@@ -4220,7 +4301,7 @@ def _metrics_multiselect_and_order_ui(
         label_map=label_map,
         order_state_key=order_state_key,
         sortable_key=sortable_key,
-        header="Sort metrics",
+        header=eff_sort_header,
     )
 
     order_pick = [m for m in st.session_state.get(order_state_key, []) if m in opt_list]
@@ -4801,7 +4882,7 @@ def _render_notice_dialog() -> None:
 
 
 def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
-    """HKUST portal, Scopus, ORCID lookup; ORCID resolution fills the author ID box."""
+    """HKUST Research Portal, Scopus lookup, optional ORCID → Scopus Author ID."""
     with st.container(border=False, key="find_scopus_help_panel"):
         st.markdown(
             '<div class="find-scopus-banner" role="heading" aria-level="3">'
@@ -4812,18 +4893,18 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             unsafe_allow_html=True,
         )
         with st.container(border=True):
-            st.markdown("**Option 1: HKUST Research Portal**")
+            st.markdown("**HKUST Researchers (Selected)**")
             st.caption(
                 "Browse HKUST researcher profiles to find Scopus Author IDs linked from the portal."
             )
             st.link_button(
-                "Open HKUST Scholar Profiles",
+                "Open HKUST Research Portal",
                 "https://researchportal.hkust.edu.hk/en/persons/",
                 icon=":material/open_in_new:",
                 use_container_width=True,
             )
         with st.container(border=True):
-            st.markdown("**Option 2: Beyond HKUST (Scopus)**")
+            st.markdown("**For non-HKUST researchers**")
             st.markdown(
                 "To look for your Scopus Author profile and ID, perform a search on Scopus "
                 "using the steps below."
@@ -4856,7 +4937,12 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             st.caption(
                 "ORCID format: XXXX-XXXX-XXXX-XXXX (16-digit identifier)"
             )
-            if st.button("Find Scopus ID", key="find_scopus_orcid_submit", type="primary"):
+            if st.button(
+                "Find Scopus Author ID",
+                key="find_scopus_orcid_submit",
+                type="secondary",
+                use_container_width=True,
+            ):
                 if not api_key_effective:
                     _invoke_notice_dialog(
                         "Add a SciVal API key in the sidebar (or environment) to look up ORCID."
@@ -4888,16 +4974,6 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
                             format_error_message_for_user(str(e)),
                             variant="error",
                         )
-        st.markdown(
-            '<div class="find-scopus-about"><strong>About Finding Scopus Author IDs:</strong>'
-            "<ul>"
-            "<li><strong>HKUST portal:</strong> Browse HKUST researcher profiles with pre-linked Scopus IDs.</li>"
-            "<li><strong>ORCID lookup:</strong> Enter an ORCID to find the corresponding Scopus Author ID.</li>"
-            "<li>ORCID is a persistent digital identifier for researchers.</li>"
-            '<li><a href="https://orcid.org/" target="_blank" rel="noopener noreferrer">Learn more about ORCID ↗</a></li>'
-            "</ul></div>",
-            unsafe_allow_html=True,
-        )
 
 
 def main() -> None:
@@ -4964,21 +5040,27 @@ def main() -> None:
     analyze_metrics_inline = False
     with st.container():
         with st.container(border=True, key="search_shell"):
-            _hdr_l, _hdr_r = st.columns([4, 1])
+            # Extra width on the right so “Find Scopus Author ID” fits on one line
+            _hdr_l, _hdr_r = st.columns([11, 5])
             with _hdr_l:
                 st.markdown(
-                    '<p class="search-config-title">SEARCH CONFIGURATION</p>',
+                    '<p class="search-config-title">Enter Scopus Author ID, select '
+                    "Search Scope and Metrics</p>",
                     unsafe_allow_html=True,
                 )
             with _hdr_r:
                 _panel_open = bool(st.session_state.get("find_scopus_panel_open"))
+                _find_scopus_icon = (
+                    ":material/chevron_right:"
+                    if _panel_open
+                    else ":material/expand_more:"
+                )
                 if st.button(
-                    "Find Scopus ID",
+                    "Find Scopus Author ID",
                     key="toggle_find_scopus_panel",
                     use_container_width=True,
                     type="secondary",
-                    icon=":material/person:",
-                    help="HKUST portal, Scopus steps, and ORCID lookup.",
+                    icon=_find_scopus_icon,
                 ):
                     st.session_state.find_scopus_panel_open = not _panel_open
 
@@ -5012,8 +5094,8 @@ def main() -> None:
             author_ids = st.text_area(
                 "Scopus Author ID",
                 placeholder=(
-                    "Enter Scopus Author ID(s). Don't know your ID? Use Find Scopus ID "
-                    "above — HKUST portal, Scopus, or ORCID lookup."
+                    "Enter Scopus Author ID(s). Don't know your ID? "
+                    "Use Find Scopus Author ID above."
                 ),
                 label_visibility="collapsed",
                 key="scopus_author_ids",
@@ -5094,7 +5176,7 @@ def main() -> None:
                 )
                 self_cit = st.session_state.self_cit_radio == "include"
 
-            # --- Metrics (same bordered SEARCH CONFIGURATION section) ---
+            # --- Metrics (same bordered search configuration section) ---
             with st.container(border=False, key="metrics_panel_shell"):
                 st.markdown(
                     '<span class="skin-metrics-panel-shell" aria-hidden="true"></span>',
@@ -5108,7 +5190,7 @@ def main() -> None:
                     '<p class="metrics-panel-heading metrics-panel-heading-inline '
                     'metrics-panel-heading-scrollstrip">'
                     '<span class="metrics-panel-heading-lead">'
-                    "<span>Select Metrics to Include</span>"
+                    "<span>Select Metrics</span>"
                     "</span>"
                     '<span class="metrics-panel-head-caption-inline">(Toggle metrics on/off)</span>'
                     "</p>"
@@ -5171,15 +5253,15 @@ def main() -> None:
 
                 with st.container(border=False, key="metrics_grid_shell"):
                     with st.expander(
-                        "Core Research Metrics",
-                        expanded=False,
+                        "Metrics (Default)",
+                        expanded=True,
                         icon=":material/analytics:",
                     ):
                         _render_metric_toggle_grid_rows(
                             core_metrics, "metrics_grid_row_core"
                         )
                     with st.expander(
-                        "Collaboration Metrics",
+                        "More Metrics",
                         expanded=False,
                         icon=":material/hub:",
                     ):
@@ -5218,7 +5300,7 @@ def main() -> None:
                 1 for m in st.session_state.available_metrics if m.get("enabled")
             )
             if not ids:
-                _invoke_notice_dialog("Enter at least one author ID.")
+                _invoke_notice_dialog("Enter at least one Scopus author ID.")
             elif selected_metric_count == 0:
                 _invoke_notice_dialog("Turn on at least one metric (all are off).")
             elif len(ids) > MAX_AUTHORS_PER_RUN:
@@ -5229,86 +5311,110 @@ def main() -> None:
                 svc = get_api_service()
                 am_payload = [dict(m) for m in st.session_state.available_metrics]
                 try:
-                    with st.spinner("Fetching metrics…"):
-                        if USE_DIRECT_API:
+                    with st.container(key="metrics_fetch_loading_overlay"):
+                        with st.container(key="metrics_fetch_loading_inner"):
                             st.markdown(
-                                '<p class="metrics-fetch-subhint">'
+                                '<p class="metrics-fetch-loading-title">'
+                                "Fetching metrics…"
+                                "</p>",
+                                unsafe_allow_html=True,
+                            )
+                            st.markdown(
+                                '<p class="metrics-fetch-loading-hint">'
                                 "SciVal can take up to ~1 min; retry on timeout."
                                 "</p>",
                                 unsafe_allow_html=True,
                             )
-                        resolved_ids, resolution_warnings = (
-                            resolve_author_ids_for_metrics_safe(
-                                ids, api_key_effective
+                            detail_ph = st.empty()
+                            flush_prog = st.progress(0)
+                            _metrics_fetch_loading_detail(
+                                detail_ph, "Resolving author IDs…"
                             )
-                        )
-                        _notice_resolution_parts: list[str] = []
-                        if resolution_warnings:
-                            _notice_resolution_parts.append(
-                                "Skipped unresolved input(s):\n- "
-                                + "\n- ".join(resolution_warnings)
-                            )
-                        if not resolved_ids:
-                            _notice_resolution_parts.append(
-                                "No valid Scopus Author ID could be resolved from the input."
-                            )
-                        if _notice_resolution_parts:
-                            _invoke_notice_dialog(
-                                "\n\n".join(_notice_resolution_parts),
-                                variant="error" if not resolved_ids else "warning",
-                            )
-                        if not resolved_ids:
-                            st.session_state.results = []
-                        elif len(resolved_ids) == 1:
-                            try:
-                                data = svc.get_author_metrics(
-                                    resolved_ids[0],
-                                    api_key_effective,
-                                    year_key,
-                                    am_payload,
-                                    docs_key,
-                                    self_cit,
+
+                            resolved_ids, resolution_warnings = (
+                                resolve_author_ids_for_metrics_safe(
+                                    ids, api_key_effective
                                 )
-                                st.session_state.results = [
-                                    {
-                                        "id": resolved_ids[0],
-                                        "data": data,
-                                        "isEntitlementError": False,
-                                        "isRateLimitError": False,
-                                    }
-                                ]
-                            except APIError as e:
-                                st.session_state.error_msg = str(e)
-                                st.session_state.entitlement_error = e.is_entitlement_error
-                                st.session_state.rate_limit_error = e.is_rate_limit_error
-                                if is_missing_scival_api_key_error(str(e)) or is_scival_authentication_error(
-                                    str(e)
-                                ):
-                                    st.session_state.results = []
-                                else:
+                            )
+                            _notice_resolution_parts: list[str] = []
+                            if resolution_warnings:
+                                _notice_resolution_parts.append(
+                                    "Skipped unresolved input(s):\n- "
+                                    + "\n- ".join(resolution_warnings)
+                                )
+                            if not resolved_ids:
+                                _notice_resolution_parts.append(
+                                    "No valid Scopus Author ID could be resolved from the input."
+                                )
+                            if _notice_resolution_parts:
+                                _invoke_notice_dialog(
+                                    "\n\n".join(_notice_resolution_parts),
+                                    variant="error" if not resolved_ids else "warning",
+                                )
+                            flush_prog.progress(0.12)
+                            if not resolved_ids:
+                                st.session_state.results = []
+                            elif len(resolved_ids) == 1:
+                                try:
+                                    _metrics_fetch_loading_detail(
+                                        detail_ph,
+                                        f"Fetching author 1 of 1 ({resolved_ids[0]})…",
+                                    )
+                                    flush_prog.progress(1.0)
+                                    data = svc.get_author_metrics(
+                                        resolved_ids[0],
+                                        api_key_effective,
+                                        year_key,
+                                        am_payload,
+                                        docs_key,
+                                        self_cit,
+                                    )
                                     st.session_state.results = [
                                         {
                                             "id": resolved_ids[0],
-                                            "data": {
-                                                "error": str(e),
-                                                "metrics": _placeholder_metrics(),
-                                            },
-                                            "isEntitlementError": e.is_entitlement_error,
-                                            "isRateLimitError": e.is_rate_limit_error,
+                                            "data": data,
+                                            "isEntitlementError": False,
+                                            "isRateLimitError": False,
                                         }
                                     ]
-                        else:
-                            st.session_state.results = (
-                                _fetch_multi_author_metrics_with_progress(
-                                    svc,
-                                    resolved_ids,
-                                    api_key_effective,
-                                    year_key,
-                                    am_payload,
-                                    docs_key,
-                                    self_cit,
+                                except APIError as e:
+                                    st.session_state.error_msg = str(e)
+                                    st.session_state.entitlement_error = (
+                                        e.is_entitlement_error
+                                    )
+                                    st.session_state.rate_limit_error = (
+                                        e.is_rate_limit_error
+                                    )
+                                    if is_missing_scival_api_key_error(
+                                        str(e)
+                                    ) or is_scival_authentication_error(str(e)):
+                                        st.session_state.results = []
+                                    else:
+                                        st.session_state.results = [
+                                            {
+                                                "id": resolved_ids[0],
+                                                "data": {
+                                                    "error": str(e),
+                                                    "metrics": _placeholder_metrics(),
+                                                },
+                                                "isEntitlementError": e.is_entitlement_error,
+                                                "isRateLimitError": e.is_rate_limit_error,
+                                            }
+                                        ]
+                            else:
+                                st.session_state.results = (
+                                    _fetch_multi_author_metrics_with_progress(
+                                        svc,
+                                        resolved_ids,
+                                        api_key_effective,
+                                        year_key,
+                                        am_payload,
+                                        docs_key,
+                                        self_cit,
+                                        detail_ph=detail_ph,
+                                        flush_prog=flush_prog,
+                                    )
                                 )
-                            )
                 except APIError as e:
                     st.session_state.error_msg = str(e)
                     st.session_state.results = []
