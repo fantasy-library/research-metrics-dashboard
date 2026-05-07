@@ -5617,7 +5617,7 @@ def main() -> None:
                                         else series_name_short
                                     ),
                                     "nameLocation": "middle",
-                                    "nameGap": 56,
+                                    "nameGap": 50,
                                     "nameRotate": 90,
                                     "nameTextStyle": {"fontSize": 11, "color": "#475569"},
                                 }
@@ -5642,7 +5642,7 @@ def main() -> None:
                                         "right": 40,
                                     },
                                     "grid": {
-                                        "left": "6%",
+                                        "left": "10%",
                                         "right": "5%",
                                         "top": 84,
                                         "bottom": 74,
