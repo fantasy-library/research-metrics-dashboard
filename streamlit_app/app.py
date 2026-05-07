@@ -2534,7 +2534,7 @@ footer.site-footer .site-footer-copy {
   box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.2) !important;
 }
 
-/* Scopus Author IDs textarea: stronger chrome + magnifier (aligned with placeholder copy) */
+/* Scopus Author IDs textarea: magnifier middle-left (vertically centered on left strip); copy left-aligned */
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea {
   border: 2px solid #cbd5e1 !important;
   border-radius: 12px !important;
@@ -2542,12 +2542,18 @@ footer.site-footer .site-footer-copy {
   background-color: #ffffff !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important;
-  background-position: 1rem 1.05rem !important;
+  background-position: 1rem center !important;
   background-size: 1.22rem 1.22rem !important;
   box-shadow:
     0 2px 8px rgba(15, 23, 42, 0.07),
     0 1px 3px rgba(103, 58, 183, 0.06) !important;
   min-height: 104px !important;
+  text-align: left !important;
+  box-sizing: border-box !important;
+}
+/* Empty field: placeholder lines vertically centered as a block; still left-aligned */
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea:placeholder-shown {
+  align-content: center !important;
 }
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea:focus {
   border-color: #7c3aed !important;
@@ -3299,7 +3305,6 @@ YEAR_FILTER_LABEL_TOOLTIP_HTML = (
 )
 
 SELF_CIT_LABEL_TOOLTIP_HTML = (
-    "<strong>Self-citations</strong><br />"
     "Self-citations are citations where an author cites their own previous work. "
     "Including them may increase citation counts and H-index values."
 )
