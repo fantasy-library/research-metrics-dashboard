@@ -5306,6 +5306,11 @@ def main() -> None:
                                     "</p>",
                                     unsafe_allow_html=True,
                                 )
+                                _hold_on_gif = _ROOT / "hold-on.gif"
+                                if _hold_on_gif.exists():
+                                    _g_l, _g_c, _g_r = st.columns([3, 2, 3])
+                                    with _g_c:
+                                        st.image(str(_hold_on_gif), width=96)
                                 _detail_ph = st.empty()
                                 _flush_prog = st.progress(0)
 
