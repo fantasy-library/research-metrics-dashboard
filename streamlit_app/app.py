@@ -34,7 +34,6 @@ from streamlit_app.api_service import (
     get_api_service,
     is_missing_scival_api_key_error,
     is_scival_authentication_error,
-    lookup_scopus_id_from_orcid,
     resolve_author_ids_for_metrics_safe,
 )
 from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_API
@@ -145,20 +144,6 @@ _FILTER_ICON_FUNNEL = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
     'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
     '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>'
-)
-_FILTER_ICON_PERSON = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
-    'aria-hidden="true" focusable="false">'
-    '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
-)
-_FILTER_ICON_USERS = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
-    'aria-hidden="true" focusable="false">'
-    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
-    '<circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>'
-    '<path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
 )
 _FILTER_ICON_METRICS_MENU = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
@@ -1135,27 +1120,6 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   color: #111827 !important;
   line-height: 1.35 !important;
 }
-[class*="st-key-find_scopus_help_panel"] {
-  margin: 0 0 1rem 0 !important;
-  padding: 1rem 1.05rem !important;
-  border-radius: 14px !important;
-  border: 1px solid #bbf7d0 !important;
-  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 55%, #f8fafc 100%) !important;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06) !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-banner {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.45rem !important;
-  margin: 0 0 0.85rem 0 !important;
-  font-size: 1.05rem !important;
-  font-weight: 800 !important;
-  color: #14532d !important;
-  letter-spacing: -0.02em !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-banner-badge {
-  flex-shrink: 0 !important;
-}
 .minimal-filter-label {
   display: flex;
   align-items: center;
@@ -1307,127 +1271,74 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   opacity: 1 !important;
   -webkit-text-fill-color: #9CA3AF !important;
 }
-[class*="st-key-search_shell"] .author-limit-hint {
-  display: flex;
-  align-items: center;
-  gap: 0.52rem;
-  margin: 0.35rem 0 0.1rem 0;
-  padding: 0.5rem 0.65rem;
-  border-radius: 10px;
-  font-size: 0.84rem;
-  line-height: 1.35;
-  overflow: visible;
+[class*="st-key-scopus_id_section"] {
+  margin-bottom: 0.75rem !important;
+  padding: 0.85rem 0.95rem 0.75rem !important;
+  border-color: #dbeafe !important;
+  background: #f8fbff !important;
 }
-[class*="st-key-search_shell"] .author-limit-hint--ok {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e3a8a;
-}
-[class*="st-key-search_shell"] .author-limit-hint--warn {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
-}
-[class*="st-key-search_shell"] .author-limit-icon.minimal-filter-icon-badge {
-  align-self: center !important;
-  margin-top: 0 !important;
-  flex-shrink: 0 !important;
-}
-[class*="st-key-search_shell"] .author-limit-count {
-  font-weight: 700;
-  margin-left: 0.25rem;
-}
-[class*="st-key-search_shell"] .author-input-header-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.45rem 0.85rem;
-  margin: 0 0 0.25rem 0;
-}
-[class*="st-key-search_shell"] .author-input-header-title {
+[class*="st-key-scopus_id_section"] .scopus-id-section-head {
+  margin: 0 0 0.5rem 0;
   font-size: 0.875rem;
-  font-weight: 500;
-  color: #4b5563;
-  flex: 0 0 auto;
+  font-weight: 700;
+  color: #374151;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
+  line-height: 1.45;
 }
-[class*="st-key-search_shell"] .author-limit-hint-inline {
-  margin: 0 !important;
-  flex: 1 1 220px;
-  min-width: min(100%, 14rem);
-  align-items: center !important;
-  padding: 0.52rem 0.65rem !important;
-  font-size: 0.8rem !important;
-  line-height: 1.4 !important;
-  overflow: visible !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-head .scopus-id-count--warn {
+  color: #c2410c;
 }
-[class*="st-key-search_shell"]
-  [data-testid="stMarkdownContainer"]:has(.author-limit-hint-inline) {
-  overflow: visible !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
 }
-/* Find Scopus toggle: light-green pill; icon + label centered (avoid svg clip) */
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"],
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] {
-  gap: 0.55rem !important;
-  column-gap: 0.55rem !important;
-  background: #ecfdf5 !important;
-  background-image: none !important;
-  border: 1px solid #a7f3d0 !important;
-  color: #14532d !important;
-  min-height: 2.65rem !important;
-  padding-top: 0.42rem !important;
-  padding-bottom: 0.42rem !important;
-  padding-left: 0.65rem !important;
-  padding-right: 0.65rem !important;
-  overflow: visible !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-shadow: 0 1px 2px rgba(20, 83, 45, 0.06) !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list li {
+  margin: 0;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"]:hover,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"]:hover {
-  background: #d1fae5 !important;
-  border-color: #6ee7b7 !important;
-  color: #052e16 !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list li + li {
+  margin-top: 0.3rem;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"]:focus-visible,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"]:focus-visible {
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.32) !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list a {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: none;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] > div,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] > div {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.55rem !important;
-  line-height: 1 !important;
-  overflow: visible !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list a:hover {
+  text-decoration: underline;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] p,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] p {
-  color: inherit !important;
-  -webkit-text-fill-color: inherit !important;
-  line-height: 1.28 !important;
-  margin: 0 !important;
-  padding-top: 0.06rem !important;
-  white-space: nowrap !important;
+[class*="st-key-scopus_id_section"] [class*="st-key-scopus_author_ids"] textarea {
+  margin-top: 0.65rem;
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] svg,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] svg {
-  flex-shrink: 0 !important;
-  width: 1.38rem !important;
-  height: 1.38rem !important;
-  min-width: 1.38rem !important;
-  min-height: 1.38rem !important;
-  color: #15803d !important;
-  -webkit-text-fill-color: #15803d !important;
-  overflow: visible !important;
-  display: block !important;
-  vertical-align: middle !important;
+[class*="st-key-scopus_id_section"] [class*="st-key-scopus_author_ids"] textarea::placeholder {
+  font-size: 0.875rem !important;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] [data-testid="element-container"],
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] .stButton {
-  overflow: visible !important;
+.doc-type-breakdown-wrap {
+  margin: 0.15rem 0 0.65rem 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
+}
+.doc-type-breakdown-title {
+  margin: 0 0 0.25rem 0;
+  font-weight: 600;
+  color: #1f2937;
+}
+.doc-type-breakdown-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.doc-type-breakdown-list li {
+  margin: 0.15rem 0;
+}
+.doc-type-breakdown-list strong {
+  color: #111827;
 }
 .minimal-section-divider {
   border-top: 1px solid #E5E7EB;
@@ -2102,6 +2013,16 @@ p.metric-subtext {
   line-height: 1.6;
   font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
 }
+.disclaimer-card ul {
+  margin: 0 0 0.8rem;
+  padding-left: 1.35rem;
+  color: #1f2937;
+  font-size: 1rem;
+  line-height: 1.6;
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+}
+.disclaimer-card li { margin-bottom: 0.35rem; }
+.disclaimer-card li:last-child { margin-bottom: 0; }
 .disclaimer-heading {
   margin: 0 0 0.65rem 0;
   color: #0f172a;
@@ -3096,58 +3017,55 @@ def _metrics_for_panel_ordered(
 # Metric info (i) panels: ``{Topic}: …`` lead line, then detail; collaboration types use bullets.
 METRIC_INFO_TEXT: dict[str, str] = {
     "publication": (
-        "Publications (SciVal scholarly output): number of Scopus-indexed publications for this entity "
-        "in the selected document-type and year window. Values are grouped by publication year."
+        "SciVal scholarly output: number of Scopus-indexed publications of the selected type. "
+        "Values are grouped by publication year."
     ),
     "fwci": (
-        "FWCI: citations on this entity’s papers vs. the average for similar papers worldwide "
-        "(field, document type, age). 1.0 matches that peer-group average; small samples move easily."
+        "Citations on a researcher’s papers vs. the average for similar papers worldwide "
+        "1.0 means it matches that peer-group average."
     ),
     "topJournal": (
-        "Publications in the top 10% of journals: share of publications in journals that SciVal ranks in the "
-        "top tenth by CiteScore percentile. Publications without CiteScore journal metrics "
-        "(e.g. many books) are out of scope."
+        "This is based on a SciVal ranking of top 10% of journals it indexes. "
+        "Books and chapters are out of scope."
     ),
     "citationCount": (
-        "Citation count: total citations received on the entity’s publications. "
-        "Year axes use publication year of cited papers, not the year a citation occurred."
+        "Total citations of publication(s). "
+        "The year axes are the publication year(s), not the year a citation occurred."
     ),
     "hIndex": (
-        "H-index: greatest h such that at least h publications have been cited at least h times each. "
-        "Combines how many qualifying papers you have with how often they are cited."
+        "The value of h is equal to the number of papers (N) in the list that have N or more citations.\n\n"
+        "Example: H-index of 10, means that of all a researcher’s indexed articles, "
+        "at least 10 have been cited 10 or more times.\n\n"
+        "This measure seeks to combine productivity and impact in a single number."
     ),
     "citationsPerPublication": (
-        "Citations per publication: average citations received per publication in the selected "
-        "document-type and year window. The self-citation setting applies where SciVal supports it."
+        "Average citations received per publication. "
+        "This number will change based on whether you include or exclude self-citation."
     ),
     "collaborationInternational": (
-        "International collaboration:\n"
-        "• More than one author\n"
-        "• More than one country/region among publication addresses"
+        "This metric requires that there be more than one author, and that the authors come from "
+        "more than one country or region.\n\n"
+        "In our Hong Kong context, collaborations with researchers in the mainland, Macau, and Taiwan "
+        "are considered by SciVal to “international.”"
     ),
     "collaborationNational": (
-        "National collaboration:\n"
-        "• More than one author\n"
-        "• One country/region on the publication\n"
-        "• Affiliations map to two or more SciVal institutions in that country/region"
+        "This metric requires that there be more than one author and only one country or region. "
+        "In our Hong Kong context, SciVal calls collaborations between the HKSAR institutions "
+        "“national”."
     ),
     "collaborationInstitutional": (
-        "Institutional collaboration:\n"
-        "• More than one author\n"
-        "• One country/region on the publication\n"
-        "• Every affiliation maps to the same SciVal institution"
+        "This metric requires that there be more than one author and that the authors are "
+        "from the same SciVal listed institution."
     ),
     "collaborationSingleAuthorship": (
-        "Single authorship: exactly one author; no co-authors on the publication."
+        "Exactly one author; no co-authors on the publication."
     ),
     "academicCorporateWith": (
-        "Academic–corporate collaboration: share of publications where SciVal maps at least one "
-        "affiliation to an academic organization and at least one affiliation to a corporate "
-        "(industrial) organization."
+        "Proportion of publications where SciVal maps at least one affiliation to an academic "
+        "organization and at least one affiliation to a corporate (industrial) organization."
     ),
     "academicCorporateWithout": (
-        "No academic–corporate collaboration: share of publications not classified by SciVal as "
-        "academic–corporate collaboration."
+        "Proportion of publications not classified by SciVal as academic–corporate collaboration."
     ),
 }
 
@@ -3229,36 +3147,24 @@ def _render_metric_toggle_grid_rows(
 # v14: Default selection is six core metrics on, six collaboration metrics off.
 _METRICS_SESSION_DEFAULT_VERSION = 14
 
-YEAR_OPTIONS = {
-    "3yrs": "Last 3 completed calendar years — compact recent window",
-    "3yrsAndCurrent": (
-        "Last 3 completed calendar years + current year — includes the calendar year still in progress"
-    ),
-    "3yrsAndCurrentAndFuture": (
-        "Last 3 completed calendar years + current + future — adds indexed manuscripts "
-        "whose official publication date is still in the future"
-    ),
-    "5yrs": "Last 5 completed calendar years — balanced default window",
-    "5yrsAndCurrent": (
-        "Last 5 completed calendar years + current year — includes the calendar year still in progress"
-    ),
-    "5yrsAndCurrentAndFuture": (
-        "Last 5 completed calendar years + current + future — widest recent window plus indexed "
-        "manuscripts whose official publication date is still in the future"
-    ),
-    "10yrs": "Last 10 completed calendar years — long-term trend view",
-}
+YEAR_FILTER_KEYS = (
+    "3yrs",
+    "3yrsAndCurrentAndFuture",
+    "5yrs",
+    "5yrsAndCurrent",
+    "5yrsAndCurrentAndFuture",
+    "10yrs",
+)
 MAX_AUTHORS_PER_RUN = 10
 
 # Short labels for dropdowns (matches compact SaaS-style UI)
 YEAR_OPTIONS_DISPLAY = {
-    "3yrs": "Last 3 completed calendar years",
-    "3yrsAndCurrent": "Last 3 completed calendar years + current year",
-    "3yrsAndCurrentAndFuture": "Last 3 completed calendar years + current + future",
-    "5yrs": "Last 5 completed calendar years (default)",
-    "5yrsAndCurrent": "Last 5 completed calendar years + current year",
-    "5yrsAndCurrentAndFuture": "Last 5 completed calendar years + current + future",
-    "10yrs": "Last 10 completed calendar years",
+    "3yrs": "Last 3 years",
+    "3yrsAndCurrentAndFuture": "Last 3 years + current + future/accepted",
+    "5yrs": "Last 5 years (default)",
+    "5yrsAndCurrent": "Last 5 years + current",
+    "5yrsAndCurrentAndFuture": "Last 5 years + current + future/accepted",
+    "10yrs": "Last 10 years",
 }
 
 DOCS_OPTIONS = {
@@ -3284,72 +3190,14 @@ SELF_CIT_RADIO_LABELS = {
     "exclude": "Exclude",
 }
 
-YEAR_FOOTNOTES = {
-    "3yrs": "3 completed calendar years",
-    "3yrsAndCurrent": "3 completed calendar years plus current year",
-    "3yrsAndCurrentAndFuture": (
-        "3 completed calendar years, current year, and manuscripts indexed before their official publication date"
-    ),
-    "5yrs": "5 completed calendar years",
-    "5yrsAndCurrent": "5 completed calendar years plus current year",
-    "5yrsAndCurrentAndFuture": (
-        "5 completed calendar years, current year, and manuscripts indexed before their official publication date"
-    ),
-    "10yrs": "10 completed calendar years",
-}
-
-# Streamlit selectbox “?” — precise definition of the selected preset (SciVal yearRange).
-YEAR_SELECT_HELP = {
-    "3yrs": (
-        "For this preset, metrics use publication years in the last 3 completed calendar years only "
-        "(SciVal yearRange 3yrs)."
-    ),
-    "3yrsAndCurrent": (
-        "For this preset, metrics use the last 3 completed calendar years plus the ongoing calendar year "
-        "(SciVal yearRange 3yrsAndCurrent)."
-    ),
-    "3yrsAndCurrentAndFuture": (
-        "For this preset, metrics use the last 3 completed calendar years, the current calendar year, "
-        "and indexed manuscripts whose official publication date is still in the future "
-        "(SciVal 3yrsAndCurrentAndFuture). "
-        "Record inclusion depends on SciVal–Scopus indexing and updates."
-    ),
-    "5yrs": (
-        "For this preset, metrics use publication years in the last 5 completed calendar years only "
-        "(SciVal yearRange 5yrs)."
-    ),
-    "5yrsAndCurrent": (
-        "For this preset, metrics use the last 5 completed calendar years plus the ongoing calendar year "
-        "(SciVal yearRange 5yrsAndCurrent)."
-    ),
-    "5yrsAndCurrentAndFuture": (
-        "For this preset, metrics use the last 5 completed calendar years, the current calendar year, "
-        "and indexed manuscripts whose official publication date is still in the future "
-        "(SciVal 5yrsAndCurrentAndFuture). "
-        "Record inclusion depends on SciVal–Scopus indexing and updates."
-    ),
-    "10yrs": (
-        "For this preset, metrics use publication years in the last 10 completed calendar years only "
-        "(SciVal yearRange 10yrs)."
-    ),
-}
-
-# Year filter info tooltip — short summary of what the year window can include.
-YEAR_FILTER_LABEL_TOOLTIP_HTML = (
-    "<strong>Year range:</strong><br />"
-    "• Completed calendar years<br />"
-    "• The current calendar year<br />"
-    "• Indexed manuscripts with a future official publication date<br />"
-)
-
 SELF_CIT_LABEL_TOOLTIP_HTML = (
-    "Self-citations are citations where an author cites their own previous work. "
-    "Including them may increase citation counts and H-index values."
+    "An author cites their previous work. "
+    "Including self-citations may increase citation counts and H-index values."
 )
 
 SELF_CIT_HELP = (
-    "Self-citations are citations where an author cites their own previous work. "
-    "Including them may increase citation counts and H-index values."
+    "An author cites their previous work. "
+    "Including self-citations may increase citation counts and H-index values."
 )
 
 DOCS_SELECTION_CAPTION = "Include all types matching your selection above."
@@ -3391,8 +3239,6 @@ def _init_session() -> None:
         st.session_state.rate_limit_error = False
     if "scopus_author_ids" not in st.session_state:
         st.session_state.scopus_author_ids = ""
-    if "find_scopus_panel_open" not in st.session_state:
-        st.session_state.find_scopus_panel_open = False
     if "self_cit_radio" not in st.session_state:
         st.session_state.self_cit_radio = (
             "include" if st.session_state.get("self_cit_include", True) else "exclude"
@@ -4817,28 +4663,6 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     )
 
 
-def _merge_scopus_author_id_into_search_box(new_id: str) -> str:
-    """Merge resolved ID into ``scopus_author_ids``. Returns ``added``, ``duplicate``, or ``noop``."""
-    new_id = (new_id or "").strip()
-    if not new_id:
-        return "noop"
-    existing = (st.session_state.get("scopus_author_ids") or "").strip()
-    if not existing:
-        st.session_state.scopus_author_ids = new_id
-        return "added"
-    parts = [x.strip() for x in re.split(r"[,\n;]+", existing) if x.strip()]
-    if new_id in parts:
-        return "duplicate"
-    if "\n" in existing:
-        sep = "\n"
-    elif "," in existing:
-        sep = ", "
-    else:
-        sep = "\n"
-    st.session_state.scopus_author_ids = existing + sep + new_id
-    return "added"
-
-
 def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
     """Centered Notice modal (warning | error | info); dismiss with OK."""
     st.session_state["_notice_dialog_body"] = body
@@ -4847,6 +4671,42 @@ def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
 
 
 @st.dialog("Notice")
+def _render_author_results_metadata(
+    data_source: dict | None,
+    docs_key: str,
+    document_type_breakdown: dict | None,
+) -> None:
+    """Source/year metadata, selected document-type filter, and publication-type breakdown."""
+    doc_filter_label = DOCS_OPTIONS_DISPLAY.get(docs_key, docs_key)
+    if data_source:
+        st.caption(
+            f"Source: {data_source.get('sourceName', '')} · "
+            f"Updated: {data_source.get('lastUpdated', '')} · "
+            f"Years: {data_source.get('metricStartYear', '')}–{data_source.get('metricEndYear', '')} · "
+            f"Document Type filter: {doc_filter_label}"
+        )
+
+    breakdown = document_type_breakdown or {}
+    items = breakdown.get("items") or []
+    if not items:
+        return
+
+    total = breakdown.get("total")
+    total_txt = html.escape(str(total)) if total is not None else "—"
+    list_items = "".join(
+        f"<li>{html.escape(str(it.get('label', '')))}: "
+        f"<strong>{html.escape(str(it.get('count', 0)))}</strong></li>"
+        for it in items
+    )
+    st.markdown(
+        '<div class="doc-type-breakdown-wrap">'
+        f'<p class="doc-type-breakdown-title">Document types ({total_txt} publications)</p>'
+        f'<ul class="doc-type-breakdown-list">{list_items}</ul>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _render_notice_dialog() -> None:
     body = str(st.session_state.get("_notice_dialog_body") or "")
     variant = str(st.session_state.get("_notice_dialog_variant") or "warning")
@@ -4867,97 +4727,6 @@ def _render_notice_dialog() -> None:
             st.session_state.pop("_notice_dialog_body", None)
             st.session_state.pop("_notice_dialog_variant", None)
             st.rerun()
-
-
-def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
-    """HKUST Research Portal, Scopus lookup, optional ORCID → Scopus Author ID."""
-    with st.container(border=False, key="find_scopus_help_panel"):
-        st.markdown(
-            '<div class="find-scopus-banner" role="heading" aria-level="3">'
-            '<span class="minimal-filter-icon-badge minimal-filter-icon-badge--person '
-            'find-scopus-banner-badge" aria-hidden="true">'
-            f"{_FILTER_ICON_PERSON}</span>"
-            "<span>Find Scopus Author ID</span></div>",
-            unsafe_allow_html=True,
-        )
-        with st.container(border=True):
-            st.markdown("**For HKUST Researchers (Selected)**")
-            st.caption(
-                "Browse HKUST researcher profiles to find Scopus Author IDs."
-            )
-            st.image(
-                str(_ROOT / "Scholar_Profiles.png"),
-                use_container_width=True,
-            )
-            st.link_button(
-                "Open HKUST Research Portal",
-                "https://researchportal.hkust.edu.hk/en/persons/",
-                icon=":material/open_in_new:",
-                use_container_width=True,
-            )
-        with st.container(border=True):
-            st.markdown("**For non-HKUST researchers**")
-            st.markdown(
-                "To find a Scopus Author profile and ID, search on Scopus using these steps:"
-            )
-            st.markdown(
-                "1. Go to [Scopus](https://www.scopus.com/home.uri) and click **Author Search**.\n\n"
-                "2. Enter a **first name**, **last name**, and **affiliation**, then click **Search**.\n\n"
-                "3. Open the matching record to view the Scopus Author ID."
-            )
-            st.link_button(
-                "Open Scopus",
-                "https://www.scopus.com/home.uri",
-                icon=":material/open_in_new:",
-                use_container_width=True,
-            )
-        with st.container(border=True):
-            st.markdown("**Find by ORCID**")
-            st.markdown(
-                "About ORCID: [https://orcid.org/](https://orcid.org/)"
-            )
-            _orch = st.text_input(
-                "ORCID Identifier",
-                placeholder="XXXX-XXXX-XXXX-XXXX (16-digit identifier)",
-                key="find_scopus_orcid_input",
-            )
-            if st.button(
-                "Find Scopus Author ID",
-                key="find_scopus_orcid_submit",
-                type="secondary",
-                use_container_width=True,
-            ):
-                if not api_key_effective:
-                    _invoke_notice_dialog(
-                        "Add a SciVal API key in the sidebar (or environment) to look up ORCID."
-                    )
-                elif not (_orch or "").strip():
-                    _invoke_notice_dialog(
-                        "Enter an ORCID (16-digit identifier or URL)."
-                    )
-                else:
-                    try:
-                        sid, name = lookup_scopus_id_from_orcid(
-                            _orch, api_key_effective
-                        )
-                        _action = _merge_scopus_author_id_into_search_box(sid)
-                        _nm = (name or "").strip()
-                        if _action == "duplicate":
-                            _invoke_notice_dialog(
-                                f"Scopus Author ID **{sid}** is already in the search box."
-                                + (f" ({_nm})" if _nm else ""),
-                                variant="info",
-                            )
-                        else:
-                            st.success(
-                                f"Added Scopus Author ID **{sid}** to the search box."
-                                + (f" ({_nm})" if _nm else "")
-                            )
-                    except APIError as e:
-                        _invoke_notice_dialog(
-                            format_error_message_for_user(str(e)),
-                            variant="error",
-                        )
 
 
 def main() -> None:
@@ -4987,20 +4756,19 @@ def main() -> None:
             """
 <div class="disclaimer-card-wrap">
   <div class="disclaimer-card">
-    <p class="disclaimer-heading"><span aria-hidden="true">⚠️</span> Research Impact Dashboard — Disclaimer</p>
+    <p class="disclaimer-heading"><span aria-hidden="true">⚠️</span> Disclaimer</p>
     <p>
-      This dashboard provides a high-level summary of research-impact indicators using Elsevier&rsquo;s SciVal APIs.
-      It is intended as a starting point for exploration, not a substitute for the full SciVal platform.
-      For granular benchmarking and comprehensive longitudinal data, please consult the
-      <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a> via HKUST Library.
+      This tool provides a basic summary of SciVal&rsquo;s research-impact indicators. It is meant to be
+      a starting point for exploration, not a substitute for the full
+      <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a>.
     </p>
+    <ul>
+      <li>Accuracy depends on a correct Scopus Author ID and profile.</li>
+      <li>Regularly check &amp; verify your profile so citations &amp; publications are correct.</li>
+    </ul>
     <p>
-      <strong>Important: Metric accuracy depends on a correct Scopus Author ID and profile. We strongly recommend
-      verifying your profile so that citations and publications are attributed correctly.</strong>
-    </p>
-    <p>
-      Where institutional policy governs hiring, reappointment, tenure, or promotion, do not rely on this dashboard
-      alone; follow unit- and university-approved evidence and procedures.
+      <strong>Do NOT</strong> rely on this tool for issues relating to hiring, reappointment, tenure, or promotion, etc.
+      Instead, follow unit and university-approved evidence &amp; procedures.
     </p>
     <div class="disclaimer-links">
       Resources:
@@ -5024,67 +4792,51 @@ def main() -> None:
     analyze_metrics_inline = False
     with st.container():
         with st.container(border=True, key="search_shell"):
-            # Extra width on the right so “Find Scopus Author ID” fits on one line
-            _hdr_l, _hdr_r = st.columns([11, 5])
-            with _hdr_l:
-                st.markdown(
-                    '<p class="search-config-title">Enter Scopus Author ID, select '
-                    "Search Scope and Metrics</p>",
-                    unsafe_allow_html=True,
-                )
-            with _hdr_r:
-                _panel_open = bool(st.session_state.get("find_scopus_panel_open"))
-                _find_scopus_icon = (
-                    ":material/chevron_right:"
-                    if _panel_open
-                    else ":material/expand_more:"
-                )
-                if st.button(
-                    "Find Scopus Author ID",
-                    key="toggle_find_scopus_panel",
-                    use_container_width=True,
-                    type="secondary",
-                    icon=_find_scopus_icon,
-                ):
-                    st.session_state.find_scopus_panel_open = not _panel_open
-
-            if st.session_state.get("find_scopus_panel_open"):
-                _render_find_scopus_author_id_help(api_key_effective)
+            st.markdown(
+                '<p class="search-config-title">Enter Scopus Author ID, select '
+                "Search Scope and Metrics</p>",
+                unsafe_allow_html=True,
+            )
 
             _raw_header_ids = st.session_state.get("scopus_author_ids") or ""
             _parsed_header_ids = [
                 x.strip() for x in re.split(r"[,\n;]+", _raw_header_ids) if x.strip()
             ]
-            _limit_cls_header = (
-                "author-limit-hint--warn"
+            _count_cls = (
+                " scopus-id-count--warn"
                 if len(_parsed_header_ids) > MAX_AUTHORS_PER_RUN
-                else "author-limit-hint--ok"
+                else ""
             )
-            st.markdown(
-                '<div class="author-input-header-row">'
-                '<span class="author-input-header-title">Scopus Author ID</span>'
-                '<div class="author-limit-hint author-limit-hint-inline '
-                f'{_limit_cls_header}"><span class="minimal-filter-icon-badge '
-                'minimal-filter-icon-badge--compact minimal-filter-icon-badge--users '
-                f'author-limit-icon" aria-hidden="true">{_FILTER_ICON_USERS}</span>'
-                "<span><strong>Search up to "
-                f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
-                "Use commas, semicolons, or line breaks to separate entries. "
-                '<span class="author-limit-count">'
-                f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} entered"
-                "</span></span></div></div>",
-                unsafe_allow_html=True,
-            )
-            author_ids = st.text_area(
-                "Scopus Author ID",
-                placeholder=(
-                    "Enter Scopus Author ID(s). Don't know your ID? "
-                    "Use Find Scopus Author ID above."
-                ),
-                label_visibility="collapsed",
-                key="scopus_author_ids",
-                height=96,
-            )
+            with st.container(border=True, key="scopus_id_section"):
+                st.markdown(
+                    '<div class="scopus-id-section">'
+                    '<div class="scopus-id-section-head">Scopus Author ID / '
+                    f'<span class="scopus-id-count{_count_cls}">'
+                    f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} entered"
+                    "</span></div>"
+                    '<ul class="scopus-id-section-list">'
+                    "<li><strong>HKUST researchers</strong> &ndash; Look for your Scopus ID in your "
+                    '<a href="https://researchportal.hkust.edu.hk/en/persons/" '
+                    'target="_blank" rel="noopener noreferrer">Research Portal profile</a></li>'
+                    "<li>Not there, or not an HKUST researcher? Try "
+                    '<a href="https://www.scopus.com/home.uri" '
+                    'target="_blank" rel="noopener noreferrer">searching Scopus itself</a> '
+                    "(<a href=\"https://libguides.hkust.edu.hk/research-impact/author-impact\" "
+                    'target="_blank" rel="noopener noreferrer">guide</a>).</li>'
+                    "</ul>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                author_ids = st.text_area(
+                    "Scopus Author ID",
+                    placeholder=(
+                        "Enter up to 10 Scopus IDs per search. Use commas, semicolons "
+                        "or line breaks to separate ID numbers."
+                    ),
+                    label_visibility="collapsed",
+                    key="scopus_author_ids",
+                    height=96,
+                )
             parsed_author_ids = [
                 x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
             ]
@@ -5094,29 +4846,19 @@ def main() -> None:
                 st.markdown(
                     '<div class="minimal-filter-label">'
                     f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--calendar" '
-                    f'aria-hidden="true">{_FILTER_ICON_CALENDAR}</span>'
-                    '<span class="year-filter-label-with-tip">'
-                    "<span>Year</span>"
-                    '<span class="year-filter-tip" tabindex="0" role="button" '
-                    'aria-label="Year range information, details in tooltip">'
-                    f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--compact minimal-filter-icon-badge--info year-filter-tip-marker" aria-hidden="true">{_FILTER_ICON_INFO_SMALL}</span>'
-                    '<span class="year-filter-tip-popup" role="tooltip" '
-                    'id="year-range-options-tooltip">'
-                    f"{YEAR_FILTER_LABEL_TOOLTIP_HTML}"
-                    "</span></span></span></div>",
+                    f'aria-hidden="true">{_FILTER_ICON_CALENDAR}</span><span>Year</span></div>',
                     unsafe_allow_html=True,
                 )
-                _year_help_key = st.session_state.get("year_filter_select", "5yrs")
+                _year_default = st.session_state.get("year_filter_select", "5yrs")
+                if _year_default not in YEAR_FILTER_KEYS:
+                    _year_default = "5yrs"
                 year_key = st.selectbox(
                     "Year",
-                    options=list(YEAR_OPTIONS.keys()),
+                    options=YEAR_FILTER_KEYS,
                     format_func=lambda k: YEAR_OPTIONS_DISPLAY[k],
-                    index=list(YEAR_OPTIONS.keys()).index("5yrs"),
+                    index=YEAR_FILTER_KEYS.index(_year_default),
                     label_visibility="collapsed",
                     key="year_filter_select",
-                    help=YEAR_SELECT_HELP.get(
-                        _year_help_key, YEAR_SELECT_HELP["5yrs"]
-                    ),
                 )
             with fd:
                 st.markdown(
@@ -5412,6 +5154,7 @@ def main() -> None:
 
     results = st.session_state.results
     valid = [r for r in results if not (r.get("data") or {}).get("error")]
+    _results_docs_key = st.session_state.get("docs_filter_select", "AllPublicationTypes")
 
     if valid:
         with st.container(border=True):
@@ -5512,12 +5255,11 @@ def main() -> None:
                         unsafe_allow_html=True,
                     )
                     ds = d.get("dataSource")
-                    if ds:
-                        st.caption(
-                            f"Source: {ds.get('sourceName', '')} · "
-                            f"Updated: {ds.get('lastUpdated', '')} · "
-                            f"Years: {ds.get('metricStartYear', '')}–{ds.get('metricEndYear', '')}"
-                        )
+                    _render_author_results_metadata(
+                        ds,
+                        _results_docs_key,
+                        d.get("documentTypeBreakdown"),
+                    )
 
                     order_opts = [
                         "publication",

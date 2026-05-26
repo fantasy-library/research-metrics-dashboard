@@ -733,6 +733,113 @@ class APIService:
             total = "N/A"
         return {"byYear": self._normalize_year_data(by_year), "total": total}
 
+    @staticmethod
+    def _extract_scholarly_output_total(total_data: Any) -> Optional[float]:
+        try:
+            val = total_data["results"][0]["metrics"][0].get("value")
+        except (KeyError, IndexError, TypeError):
+            return None
+        if isinstance(val, (int, float)):
+            return float(val)
+        if isinstance(val, str):
+            try:
+                return float(val.strip())
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _format_document_type_count(count: float) -> int | float:
+        if count == int(count):
+            return int(count)
+        return round(count, 2)
+
+    @classmethod
+    def _build_document_type_breakdown(
+        cls,
+        *,
+        articles_only: Optional[float],
+        articles_reviews: Optional[float],
+        articles_conf: Optional[float],
+        books: Optional[float],
+        total_all: Optional[float],
+    ) -> Dict[str, Any]:
+        articles = float(articles_only or 0.0)
+        reviews = max(0.0, float(articles_reviews or 0.0) - articles)
+        conference = max(0.0, float(articles_conf or 0.0) - articles)
+        books_count = float(books or 0.0)
+        categorized = articles + reviews + conference + books_count
+        total = float(total_all) if total_all is not None else categorized
+        other = max(0.0, total - categorized)
+
+        items: List[Dict[str, Any]] = []
+        for label, count in (
+            ("Articles", articles),
+            ("Reviews", reviews),
+            ("Conference papers", conference),
+            ("Books & book chapters", books_count),
+            ("Other", other),
+        ):
+            if count > 0:
+                items.append(
+                    {"label": label, "count": cls._format_document_type_count(count)}
+                )
+
+        return {
+            "total": cls._format_document_type_count(total) if total else 0,
+            "items": items,
+        }
+
+    def _fetch_document_type_breakdown(
+        self,
+        author_id: str,
+        custom_api_key: Optional[str],
+        year_range: str,
+        *,
+        total_all: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Derive publication counts by document type via SciVal ``includedDocs`` buckets."""
+        bucket_docs = {
+            "articlesOnly": "ArticlesOnly",
+            "articlesReviews": "ArticlesReviews",
+            "articlesConference": "ArticlesConferencePapers",
+            "books": "BooksAndBookChapters",
+        }
+        fetched: Dict[str, Optional[float]] = {}
+        for key, included_docs in bucket_docs.items():
+            time.sleep(0.2)
+            data = self._fetch_direct_metric(
+                author_id,
+                "ScholarlyOutput",
+                False,
+                custom_api_key,
+                year_range,
+                "false",
+                included_docs,
+            )
+            fetched[key] = self._extract_scholarly_output_total(data)
+
+        if total_all is None:
+            time.sleep(0.2)
+            all_data = self._fetch_direct_metric(
+                author_id,
+                "ScholarlyOutput",
+                False,
+                custom_api_key,
+                year_range,
+                "false",
+                "AllPublicationTypes",
+            )
+            total_all = self._extract_scholarly_output_total(all_data)
+
+        return self._build_document_type_breakdown(
+            articles_only=fetched["articlesOnly"],
+            articles_reviews=fetched["articlesReviews"],
+            articles_conf=fetched["articlesConference"],
+            books=fetched["books"],
+            total_all=total_all,
+        )
+
     def _process_fwci(self, year_data: Any, total_data: Any) -> Dict[str, Any]:
         try:
             by_year = year_data["results"][0]["metrics"][0].get("valueByYear") or {}
@@ -1106,6 +1213,20 @@ class APIService:
         else:
             _apply_academic_corporate_submetrics(metrics, None)
 
+        document_type_breakdown: Dict[str, Any] = {"total": None, "items": []}
+        try:
+            total_all: Optional[float] = None
+            if included_docs == "AllPublicationTypes" and so_total is not None:
+                total_all = self._extract_scholarly_output_total(so_total)
+            document_type_breakdown = self._fetch_document_type_breakdown(
+                author_id,
+                custom_api_key,
+                year_range,
+                total_all=total_all,
+            )
+        except Exception:
+            document_type_breakdown = {"total": None, "items": []}
+
         return {
             "authorName": author_name,
             "dataSource": {
@@ -1118,6 +1239,7 @@ class APIService:
                 or datetime.utcnow().year,
             },
             "metrics": metrics,
+            "documentTypeBreakdown": document_type_breakdown,
         }
 
     def get_author_metrics(

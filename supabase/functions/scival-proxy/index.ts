@@ -95,6 +95,79 @@ function processScholarlyOutput(yearData: any, totalData: any) {
   };
 }
 
+function extractScholarlyOutputTotal(totalData: any): number | null {
+  const val = totalData?.results?.[0]?.metrics?.[0]?.value;
+  if (typeof val === 'number' && Number.isFinite(val)) return val;
+  if (typeof val === 'string' && val.trim() !== '') {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function formatDocumentTypeCount(count: number): number {
+  return Number.isInteger(count) ? count : Math.round(count * 100) / 100;
+}
+
+function buildDocumentTypeBreakdown(args: {
+  articlesOnly: number | null;
+  articlesReviews: number | null;
+  articlesConf: number | null;
+  books: number | null;
+  totalAll: number | null;
+}) {
+  const articles = args.articlesOnly ?? 0;
+  const reviews = Math.max(0, (args.articlesReviews ?? 0) - articles);
+  const conference = Math.max(0, (args.articlesConf ?? 0) - articles);
+  const books = args.books ?? 0;
+  const categorized = articles + reviews + conference + books;
+  const total = args.totalAll ?? categorized;
+  const other = Math.max(0, total - categorized);
+  const items: Array<{ label: string; count: number }> = [];
+  for (const [label, count] of [
+    ['Articles', articles],
+    ['Reviews', reviews],
+    ['Conference papers', conference],
+    ['Books & book chapters', books],
+    ['Other', other],
+  ] as const) {
+    if (count > 0) {
+      items.push({ label, count: formatDocumentTypeCount(count) });
+    }
+  }
+  return { total: formatDocumentTypeCount(total), items };
+}
+
+async function fetchDocumentTypeBreakdown(
+  authorId: string,
+  customApiKey: string | undefined,
+  yearRange: string,
+  totalAll: number | null = null,
+) {
+  const bucketDocs = {
+    articlesOnly: 'ArticlesOnly',
+    articlesReviews: 'ArticlesReviews',
+    articlesConference: 'ArticlesConferencePapers',
+    books: 'BooksAndBookChapters',
+  } as const;
+  const fetched: Record<string, number | null> = {};
+  for (const [key, includedDocs] of Object.entries(bucketDocs)) {
+    const data = await fetchMetric(authorId, 'ScholarlyOutput', false, customApiKey, yearRange, 'false', includedDocs);
+    fetched[key] = extractScholarlyOutputTotal(data);
+  }
+  if (totalAll == null) {
+    const allData = await fetchMetric(authorId, 'ScholarlyOutput', false, customApiKey, yearRange, 'false', 'AllPublicationTypes');
+    totalAll = extractScholarlyOutputTotal(allData);
+  }
+  return buildDocumentTypeBreakdown({
+    articlesOnly: fetched.articlesOnly,
+    articlesReviews: fetched.articlesReviews,
+    articlesConf: fetched.articlesConference,
+    books: fetched.books,
+    totalAll,
+  });
+}
+
 function processFWCI(yearData: any, totalData: any) {
   const byYear = yearData.results[0]?.metrics[0]?.valueByYear || {};
   return {
@@ -417,6 +490,22 @@ async function getAuthorMetrics(authorId: string, customApiKey?: string, yearRan
       metrics.academicCorporateWithout = { ...emptyAccSlice };
     }
 
+    let documentTypeBreakdown: any = { total: null, items: [] };
+    try {
+      let totalAll: number | null = null;
+      if (includedDocs === 'AllPublicationTypes' && soTotalData) {
+        totalAll = extractScholarlyOutputTotal(soTotalData);
+      }
+      documentTypeBreakdown = await fetchDocumentTypeBreakdown(
+        authorId,
+        customApiKey,
+        yearRange,
+        totalAll,
+      );
+    } catch (_e) {
+      documentTypeBreakdown = { total: null, items: [] };
+    }
+
     return {
       authorName,
       dataSource: {
@@ -426,7 +515,8 @@ async function getAuthorMetrics(authorId: string, customApiKey?: string, yearRan
         metricStartYear: hIndexData.dataSource?.metricStartYear || 2020,
         metricEndYear: hIndexData.dataSource?.metricEndYear || new Date().getFullYear()
       },
-      metrics
+      metrics,
+      documentTypeBreakdown,
     };
   } catch (e) {
     console.error(`Error processing ${authorId}:`, e);
