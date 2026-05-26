@@ -95,54 +95,80 @@ function processScholarlyOutput(yearData: any, totalData: any) {
   };
 }
 
-function extractScholarlyOutputTotal(totalData: any): number | null {
-  const val = totalData?.results?.[0]?.metrics?.[0]?.value;
-  if (typeof val === 'number' && Number.isFinite(val)) return val;
-  if (typeof val === 'string' && val.trim() !== '') {
-    const n = Number(val);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
 function formatDocumentTypeCount(count: number): number {
   return Number.isInteger(count) ? count : Math.round(count * 100) / 100;
 }
 
-function buildDocumentTypeBreakdown(args: {
-  articlesOnly: number | null;
-  articlesReviews: number | null;
-  articlesConf: number | null;
-  books: number | null;
-  totalAll: number | null;
+function extractScholarlyOutputByYear(yearData: any): Record<string, number> {
+  const byYear = yearData?.results?.[0]?.metrics?.[0]?.valueByYear || {};
+  return normalizeYearData(byYear);
+}
+
+function yearMapValue(data: Record<string, number>, year: string | number): number {
+  const ys = String(year);
+  if (data[ys] != null) return Number(data[ys]) || 0;
+  return Number(data[String(Number(ys))] ?? 0) || 0;
+}
+
+function buildDocumentTypeBreakdownFromYearSeries(args: {
+  articlesOnly: Record<string, number>;
+  articlesReviews: Record<string, number>;
+  articlesConf: Record<string, number>;
+  books: Record<string, number>;
+  allTypes?: Record<string, number> | null;
 }) {
-  const articles = args.articlesOnly ?? 0;
-  const reviews = Math.max(0, (args.articlesReviews ?? 0) - articles);
-  const conference = Math.max(0, (args.articlesConf ?? 0) - articles);
-  const books = args.books ?? 0;
-  const categorized = articles + reviews + conference + books;
-  const total = args.totalAll ?? categorized;
-  const other = Math.max(0, total - categorized);
-  const items: Array<{ label: string; count: number }> = [];
-  for (const [label, count] of [
-    ['Articles', articles],
-    ['Reviews', reviews],
-    ['Conference papers', conference],
-    ['Books & book chapters', books],
-    ['Other', other],
-  ] as const) {
-    if (count > 0) {
-      items.push({ label, count: formatDocumentTypeCount(count) });
-    }
+  const years = new Set<string>();
+  for (const bucket of [args.articlesOnly, args.articlesReviews, args.articlesConf, args.books]) {
+    Object.keys(bucket).forEach((y) => years.add(String(y)));
   }
-  return { total: formatDocumentTypeCount(total), items };
+  if (args.allTypes) Object.keys(args.allTypes).forEach((y) => years.add(String(y)));
+
+  const byYear: Record<string, Record<string, number>> = {
+    Articles: {},
+    Reviews: {},
+    'Conference papers': {},
+    'Books & book chapters': {},
+    Other: {},
+  };
+
+  [...years].sort((a, b) => Number(a) - Number(b)).forEach((year) => {
+    const articles = yearMapValue(args.articlesOnly, year);
+    const reviews = Math.max(0, yearMapValue(args.articlesReviews, year) - articles);
+    const conference = Math.max(0, yearMapValue(args.articlesConf, year) - articles);
+    const books = yearMapValue(args.books, year);
+    const totalY = args.allTypes ? yearMapValue(args.allTypes, year) : articles + reviews + conference + books;
+    const other = args.allTypes ? Math.max(0, totalY - articles - reviews - conference - books) : 0;
+
+    for (const [label, count] of [
+      ['Articles', articles],
+      ['Reviews', reviews],
+      ['Conference papers', conference],
+      ['Books & book chapters', books],
+      ['Other', other],
+    ] as const) {
+      if (count > 0) {
+        byYear[label][year] = formatDocumentTypeCount(count);
+      }
+    }
+  });
+
+  const items: Array<{ label: string; count: number }> = [];
+  const byYearClean: Record<string, Record<string, number>> = {};
+  for (const [label, yearMap] of Object.entries(byYear)) {
+    if (!Object.keys(yearMap).length) continue;
+    byYearClean[label] = yearMap;
+    const totalCount = Object.values(yearMap).reduce((sum, v) => sum + Number(v), 0);
+    items.push({ label, count: formatDocumentTypeCount(totalCount) });
+  }
+  const grandTotal = items.reduce((sum, it) => sum + Number(it.count), 0);
+  return { total: formatDocumentTypeCount(grandTotal), items, byYear: byYearClean };
 }
 
 async function fetchDocumentTypeBreakdown(
   authorId: string,
   customApiKey: string | undefined,
   yearRange: string,
-  totalAll: number | null = null,
+  allByYear: Record<string, number> | null = null,
 ) {
   const bucketDocs = {
     articlesOnly: 'ArticlesOnly',
@@ -150,21 +176,21 @@ async function fetchDocumentTypeBreakdown(
     articlesConference: 'ArticlesConferencePapers',
     books: 'BooksAndBookChapters',
   } as const;
-  const fetched: Record<string, number | null> = {};
+  const fetched: Record<string, Record<string, number>> = {};
   for (const [key, includedDocs] of Object.entries(bucketDocs)) {
-    const data = await fetchMetric(authorId, 'ScholarlyOutput', false, customApiKey, yearRange, 'false', includedDocs);
-    fetched[key] = extractScholarlyOutputTotal(data);
+    const data = await fetchMetric(authorId, 'ScholarlyOutput', true, customApiKey, yearRange, 'false', includedDocs);
+    fetched[key] = extractScholarlyOutputByYear(data);
   }
-  if (totalAll == null) {
-    const allData = await fetchMetric(authorId, 'ScholarlyOutput', false, customApiKey, yearRange, 'false', 'AllPublicationTypes');
-    totalAll = extractScholarlyOutputTotal(allData);
+  if (allByYear == null) {
+    const allData = await fetchMetric(authorId, 'ScholarlyOutput', true, customApiKey, yearRange, 'false', 'AllPublicationTypes');
+    allByYear = extractScholarlyOutputByYear(allData);
   }
-  return buildDocumentTypeBreakdown({
+  return buildDocumentTypeBreakdownFromYearSeries({
     articlesOnly: fetched.articlesOnly,
     articlesReviews: fetched.articlesReviews,
     articlesConf: fetched.articlesConference,
     books: fetched.books,
-    totalAll,
+    allTypes: allByYear,
   });
 }
 
@@ -490,20 +516,20 @@ async function getAuthorMetrics(authorId: string, customApiKey?: string, yearRan
       metrics.academicCorporateWithout = { ...emptyAccSlice };
     }
 
-    let documentTypeBreakdown: any = { total: null, items: [] };
+    let documentTypeBreakdown: any = { total: null, items: [], byYear: {} };
     try {
-      let totalAll: number | null = null;
-      if (includedDocs === 'AllPublicationTypes' && soTotalData) {
-        totalAll = extractScholarlyOutputTotal(soTotalData);
+      let allByYear: Record<string, number> | null = null;
+      if (includedDocs === 'AllPublicationTypes' && soYearData) {
+        allByYear = extractScholarlyOutputByYear(soYearData);
       }
       documentTypeBreakdown = await fetchDocumentTypeBreakdown(
         authorId,
         customApiKey,
         yearRange,
-        totalAll,
+        allByYear,
       );
     } catch (_e) {
-      documentTypeBreakdown = { total: null, items: [] };
+      documentTypeBreakdown = { total: null, items: [], byYear: {} };
     }
 
     return {

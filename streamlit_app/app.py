@@ -1325,21 +1325,6 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   color: #374151;
   font-family: Inter, Roboto, "Segoe UI", sans-serif;
 }
-.doc-type-breakdown-title {
-  margin: 0 0 0.25rem 0;
-  font-weight: 600;
-  color: #1f2937;
-}
-.doc-type-breakdown-list {
-  margin: 0;
-  padding-left: 1.25rem;
-}
-.doc-type-breakdown-list li {
-  margin: 0.15rem 0;
-}
-.doc-type-breakdown-list strong {
-  color: #111827;
-}
 .minimal-section-divider {
   border-top: 1px solid #E5E7EB;
   margin: 0.28rem 0 0.5rem 0;
@@ -3185,6 +3170,14 @@ DOCS_OPTIONS_DISPLAY = {
     "BooksAndBookChapters": "Books & book chapters",
 }
 
+DOCUMENT_TYPE_CHART_COLORS = {
+    "Articles": "#2563eb",
+    "Reviews": "#7c3aed",
+    "Conference papers": "#0d9488",
+    "Books & book chapters": "#d97706",
+    "Other": "#64748b",
+}
+
 SELF_CIT_RADIO_LABELS = {
     "include": "Include",
     "exclude": "Exclude",
@@ -4663,6 +4656,46 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     )
 
 
+def _document_type_series_for_chart(
+    breakdown: dict | None, years: list[int], chart_type: str
+) -> list[dict]:
+    """Build stacked ECharts series for publication counts by document type."""
+    if not breakdown:
+        return []
+    by_year = breakdown.get("byYear") or {}
+    if not by_year:
+        return []
+
+    labels = [it.get("label") for it in (breakdown.get("items") or []) if it.get("label")]
+    if not labels:
+        labels = list(by_year.keys())
+
+    series: list[dict] = []
+    for label in labels:
+        year_map = by_year.get(label) or {}
+        data: list[int | float] = []
+        for y in years:
+            val = year_map.get(str(y))
+            if val is None:
+                val = year_map.get(y)
+            data.append(val if val is not None else 0)
+        if not any(data):
+            continue
+        entry: dict = {
+            "name": label,
+            "type": chart_type.lower(),
+            "stack": "publications",
+            "data": data,
+            "itemStyle": {"color": DOCUMENT_TYPE_CHART_COLORS.get(label, "#64748b")},
+            "emphasis": {"focus": "series"},
+        }
+        if chart_type == "Line":
+            entry["smooth"] = True
+            entry["areaStyle"] = {"opacity": 0.2}
+        series.append(entry)
+    return series
+
+
 def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
     """Centered Notice modal (warning | error | info); dismiss with OK."""
     st.session_state["_notice_dialog_body"] = body
@@ -4671,42 +4704,6 @@ def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
 
 
 @st.dialog("Notice")
-def _render_author_results_metadata(
-    data_source: dict | None,
-    docs_key: str,
-    document_type_breakdown: dict | None,
-) -> None:
-    """Source/year metadata, selected document-type filter, and publication-type breakdown."""
-    doc_filter_label = DOCS_OPTIONS_DISPLAY.get(docs_key, docs_key)
-    if data_source:
-        st.caption(
-            f"Source: {data_source.get('sourceName', '')} · "
-            f"Updated: {data_source.get('lastUpdated', '')} · "
-            f"Years: {data_source.get('metricStartYear', '')}–{data_source.get('metricEndYear', '')} · "
-            f"Document Type filter: {doc_filter_label}"
-        )
-
-    breakdown = document_type_breakdown or {}
-    items = breakdown.get("items") or []
-    if not items:
-        return
-
-    total = breakdown.get("total")
-    total_txt = html.escape(str(total)) if total is not None else "—"
-    list_items = "".join(
-        f"<li>{html.escape(str(it.get('label', '')))}: "
-        f"<strong>{html.escape(str(it.get('count', 0)))}</strong></li>"
-        for it in items
-    )
-    st.markdown(
-        '<div class="doc-type-breakdown-wrap">'
-        f'<p class="doc-type-breakdown-title">Document types ({total_txt} publications)</p>'
-        f'<ul class="doc-type-breakdown-list">{list_items}</ul>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-
 def _render_notice_dialog() -> None:
     body = str(st.session_state.get("_notice_dialog_body") or "")
     variant = str(st.session_state.get("_notice_dialog_variant") or "warning")
@@ -4727,6 +4724,21 @@ def _render_notice_dialog() -> None:
             st.session_state.pop("_notice_dialog_body", None)
             st.session_state.pop("_notice_dialog_variant", None)
             st.rerun()
+
+
+def _render_author_results_metadata(
+    data_source: dict | None,
+    docs_key: str,
+) -> None:
+    """Source/year metadata and selected document-type filter."""
+    doc_filter_label = DOCS_OPTIONS_DISPLAY.get(docs_key, docs_key)
+    if data_source:
+        st.caption(
+            f"Source: {data_source.get('sourceName', '')} · "
+            f"Updated: {data_source.get('lastUpdated', '')} · "
+            f"Years: {data_source.get('metricStartYear', '')}–{data_source.get('metricEndYear', '')} · "
+            f"Document Type filter: {doc_filter_label}"
+        )
 
 
 def main() -> None:
@@ -5255,11 +5267,7 @@ def main() -> None:
                         unsafe_allow_html=True,
                     )
                     ds = d.get("dataSource")
-                    _render_author_results_metadata(
-                        ds,
-                        _results_docs_key,
-                        d.get("documentTypeBreakdown"),
-                    )
+                    _render_author_results_metadata(ds, _results_docs_key)
 
                     order_opts = [
                         "publication",
@@ -5334,10 +5342,74 @@ def main() -> None:
                                 or plot_metric in ACADEMIC_CORPORATE_SUBMETRIC_IDS
                             )
                             metrics_payload = d.get("metrics") or {}
+                            doc_type_breakdown = d.get("documentTypeBreakdown") or {}
+                            doctype_series = (
+                                _document_type_series_for_chart(
+                                    doc_type_breakdown, years, chart_type
+                                )
+                                if plot_metric == "publication"
+                                else []
+                            )
                             by_year = _extract_metric_by_year(metrics_payload, plot_metric)
-                            if not by_year:
+                            if not by_year and not doctype_series:
                                 st.caption(
                                     "Chart is not available for this metric row (for example, H-Index)."
+                                )
+                            elif doctype_series:
+                                x_years = [str(y) for y in years]
+                                _yaxis_single = {
+                                    "type": "value",
+                                    "name": "Publications",
+                                    "nameLocation": "middle",
+                                    "nameGap": 50,
+                                    "nameRotate": 90,
+                                    "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                }
+                                echarts_options = {
+                                    "animation": True,
+                                    "title": {
+                                        "text": "Publications by document type",
+                                        "left": "center",
+                                        "top": 8,
+                                        "textStyle": {"fontSize": 15},
+                                    },
+                                    "tooltip": {"trigger": "axis"},
+                                    "legend": {
+                                        "show": True,
+                                        "bottom": 0,
+                                        "type": "scroll",
+                                    },
+                                    "toolbox": {
+                                        **_compare_toolbox(),
+                                        "top": 8,
+                                        "right": 40,
+                                    },
+                                    "grid": {
+                                        "left": "10%",
+                                        "right": "5%",
+                                        "top": 84,
+                                        "bottom": 96,
+                                        "containLabel": True,
+                                    },
+                                    "xAxis": {
+                                        "type": "category",
+                                        "name": "Year",
+                                        "nameLocation": "middle",
+                                        "nameGap": 28,
+                                        "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                        "data": x_years,
+                                    },
+                                    "yAxis": _yaxis_single,
+                                    "series": doctype_series,
+                                    "dataZoom": [
+                                        {"type": "inside"},
+                                        {"type": "slider", "height": 18, "bottom": 36},
+                                    ],
+                                }
+                                st_echarts(
+                                    options=echarts_options,
+                                    height="500px",
+                                    key=f"echarts_{aid}_{plot_metric}_doctype",
                                 )
                             else:
                                 values = [by_year.get(str(y)) for y in years]

@@ -749,45 +749,104 @@ class APIService:
         return None
 
     @staticmethod
+    def _extract_scholarly_output_by_year(year_data: Any) -> Dict[str, float]:
+        try:
+            by_year = year_data["results"][0]["metrics"][0].get("valueByYear") or {}
+        except (KeyError, IndexError, TypeError):
+            by_year = {}
+        out: Dict[str, float] = {}
+        if not isinstance(by_year, dict):
+            return out
+        for year_str, value in by_year.items():
+            try:
+                int(year_str)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(value, dict) and value is not None and "value" in value:
+                out[str(year_str)] = round(float(value["value"]), 2)
+            elif isinstance(value, (int, float)):
+                out[str(year_str)] = round(float(value), 2)
+            else:
+                out[str(year_str)] = 0.0
+        return out
+
+    @staticmethod
+    def _year_map_value(data: Dict[str, float], year: str | int) -> float:
+        ys = str(year)
+        if ys in data:
+            return float(data[ys])
+        try:
+            return float(data.get(int(ys), 0.0))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return 0.0
+
+    @staticmethod
     def _format_document_type_count(count: float) -> int | float:
         if count == int(count):
             return int(count)
         return round(count, 2)
 
     @classmethod
-    def _build_document_type_breakdown(
+    def _build_document_type_breakdown_from_year_series(
         cls,
         *,
-        articles_only: Optional[float],
-        articles_reviews: Optional[float],
-        articles_conf: Optional[float],
-        books: Optional[float],
-        total_all: Optional[float],
+        articles_only: Dict[str, float],
+        articles_reviews: Dict[str, float],
+        articles_conf: Dict[str, float],
+        books: Dict[str, float],
+        all_types: Optional[Dict[str, float]] = None,
     ) -> Dict[str, Any]:
-        articles = float(articles_only or 0.0)
-        reviews = max(0.0, float(articles_reviews or 0.0) - articles)
-        conference = max(0.0, float(articles_conf or 0.0) - articles)
-        books_count = float(books or 0.0)
-        categorized = articles + reviews + conference + books_count
-        total = float(total_all) if total_all is not None else categorized
-        other = max(0.0, total - categorized)
+        years: set[str] = set()
+        for bucket in (articles_only, articles_reviews, articles_conf, books):
+            years.update(str(y) for y in bucket.keys())
+        if all_types:
+            years.update(str(y) for y in all_types.keys())
+
+        by_year: Dict[str, Dict[str, int | float]] = {
+            "Articles": {},
+            "Reviews": {},
+            "Conference papers": {},
+            "Books & book chapters": {},
+            "Other": {},
+        }
+
+        for year in sorted(years, key=lambda y: int(y)):
+            articles = cls._year_map_value(articles_only, year)
+            reviews = max(0.0, cls._year_map_value(articles_reviews, year) - articles)
+            conference = max(0.0, cls._year_map_value(articles_conf, year) - articles)
+            books_count = cls._year_map_value(books, year)
+            if all_types is not None:
+                total_y = cls._year_map_value(all_types, year)
+                other = max(0.0, total_y - articles - reviews - conference - books_count)
+            else:
+                other = 0.0
+
+            for label, count in (
+                ("Articles", articles),
+                ("Reviews", reviews),
+                ("Conference papers", conference),
+                ("Books & book chapters", books_count),
+                ("Other", other),
+            ):
+                if count > 0:
+                    by_year[label][year] = cls._format_document_type_count(count)
 
         items: List[Dict[str, Any]] = []
-        for label, count in (
-            ("Articles", articles),
-            ("Reviews", reviews),
-            ("Conference papers", conference),
-            ("Books & book chapters", books_count),
-            ("Other", other),
-        ):
-            if count > 0:
-                items.append(
-                    {"label": label, "count": cls._format_document_type_count(count)}
-                )
+        by_year_clean: Dict[str, Dict[str, int | float]] = {}
+        for label, year_map in by_year.items():
+            if not year_map:
+                continue
+            by_year_clean[label] = year_map
+            total_count = sum(float(v) for v in year_map.values())
+            items.append(
+                {"label": label, "count": cls._format_document_type_count(total_count)}
+            )
 
+        grand_total = sum(float(it["count"]) for it in items)
         return {
-            "total": cls._format_document_type_count(total) if total else 0,
+            "total": cls._format_document_type_count(grand_total) if items else 0,
             "items": items,
+            "byYear": by_year_clean,
         }
 
     def _fetch_document_type_breakdown(
@@ -796,7 +855,7 @@ class APIService:
         custom_api_key: Optional[str],
         year_range: str,
         *,
-        total_all: Optional[float] = None,
+        all_by_year: Optional[Dict[str, float]] = None,
     ) -> Dict[str, Any]:
         """Derive publication counts by document type via SciVal ``includedDocs`` buckets."""
         bucket_docs = {
@@ -805,39 +864,39 @@ class APIService:
             "articlesConference": "ArticlesConferencePapers",
             "books": "BooksAndBookChapters",
         }
-        fetched: Dict[str, Optional[float]] = {}
+        fetched: Dict[str, Dict[str, float]] = {}
         for key, included_docs in bucket_docs.items():
             time.sleep(0.2)
             data = self._fetch_direct_metric(
                 author_id,
                 "ScholarlyOutput",
-                False,
+                True,
                 custom_api_key,
                 year_range,
                 "false",
                 included_docs,
             )
-            fetched[key] = self._extract_scholarly_output_total(data)
+            fetched[key] = self._extract_scholarly_output_by_year(data)
 
-        if total_all is None:
+        if all_by_year is None:
             time.sleep(0.2)
             all_data = self._fetch_direct_metric(
                 author_id,
                 "ScholarlyOutput",
-                False,
+                True,
                 custom_api_key,
                 year_range,
                 "false",
                 "AllPublicationTypes",
             )
-            total_all = self._extract_scholarly_output_total(all_data)
+            all_by_year = self._extract_scholarly_output_by_year(all_data)
 
-        return self._build_document_type_breakdown(
+        return self._build_document_type_breakdown_from_year_series(
             articles_only=fetched["articlesOnly"],
             articles_reviews=fetched["articlesReviews"],
             articles_conf=fetched["articlesConference"],
             books=fetched["books"],
-            total_all=total_all,
+            all_types=all_by_year,
         )
 
     def _process_fwci(self, year_data: Any, total_data: Any) -> Dict[str, Any]:
@@ -1213,19 +1272,19 @@ class APIService:
         else:
             _apply_academic_corporate_submetrics(metrics, None)
 
-        document_type_breakdown: Dict[str, Any] = {"total": None, "items": []}
+        document_type_breakdown: Dict[str, Any] = {"total": None, "items": [], "byYear": {}}
         try:
-            total_all: Optional[float] = None
-            if included_docs == "AllPublicationTypes" and so_total is not None:
-                total_all = self._extract_scholarly_output_total(so_total)
+            all_by_year: Optional[Dict[str, float]] = None
+            if included_docs == "AllPublicationTypes" and so_year is not None:
+                all_by_year = self._extract_scholarly_output_by_year(so_year)
             document_type_breakdown = self._fetch_document_type_breakdown(
                 author_id,
                 custom_api_key,
                 year_range,
-                total_all=total_all,
+                all_by_year=all_by_year,
             )
         except Exception:
-            document_type_breakdown = {"total": None, "items": []}
+            document_type_breakdown = {"total": None, "items": [], "byYear": {}}
 
         return {
             "authorName": author_name,
