@@ -3287,6 +3287,47 @@ def _sdg_codes_for_row(row: dict) -> list[str]:
     return valid
 
 
+SDG_NAMES = {
+    "1": "No Poverty",
+    "2": "Zero Hunger",
+    "3": "Good Health and Well-being",
+    "4": "Quality Education",
+    "5": "Gender Equality",
+    "6": "Clean Water and Sanitation",
+    "7": "Affordable and Clean Energy",
+    "8": "Decent Work and Economic Growth",
+    "9": "Industry, Innovation and Infrastructure",
+    "10": "Reduced Inequalities",
+    "11": "Sustainable Cities and Communities",
+    "12": "Responsible Consumption and Production",
+    "13": "Climate Action",
+    "14": "Life Below Water",
+    "15": "Life on Land",
+    "16": "Peace, Justice and Strong Institutions",
+    "17": "Partnerships for the Goals",
+}
+
+SDG_COLORS = {
+    "1": "#e5243b",
+    "2": "#dda63a",
+    "3": "#4c9f38",
+    "4": "#c5192d",
+    "5": "#ff3a21",
+    "6": "#26bde2",
+    "7": "#fcc30b",
+    "8": "#a21942",
+    "9": "#fd6925",
+    "10": "#dd1367",
+    "11": "#fd9d24",
+    "12": "#bf8b2e",
+    "13": "#3f7e44",
+    "14": "#0a97d9",
+    "15": "#56c02b",
+    "16": "#00689d",
+    "17": "#19486a",
+}
+
+
 def _render_sdg_distribution(rows: list[dict]) -> None:
     counts: dict[str, int] = {}
     for row in rows:
@@ -3295,10 +3336,46 @@ def _render_sdg_distribution(rows: list[dict]) -> None:
     if not counts:
         st.info("No SDG labels were found in the fetched publication rows.")
         return
-    chart_df = pd.DataFrame(
-        [{"SDG": f"SDG {code}", "Publications": count} for code, count in sorted(counts.items(), key=lambda item: int(item[0]))]
+    try:
+        import plotly.graph_objects as go
+    except ImportError as exc:
+        st.warning(f"Install Plotly to render the SDG donut chart: {exc}")
+        return
+
+    ordered = sorted(counts.items(), key=lambda item: int(item[0]))
+    labels = [f"SDG {code} ({SDG_NAMES.get(code, 'Unknown')})" for code, _ in ordered]
+    values = [count for _, count in ordered]
+    colors = [SDG_COLORS.get(code, "#64748b") for code, _ in ordered]
+
+    st.markdown("#### SDG distribution")
+    st.caption("SDGs in all publications")
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.45,
+                sort=False,
+                marker=dict(colors=colors, line=dict(color="#ffffff", width=1)),
+                textinfo="none",
+                hovertemplate="%{label}<br>%{value} publications<extra></extra>",
+            )
+        ]
     )
-    st.bar_chart(chart_df, x="SDG", y="Publications", use_container_width=True)
+    fig.update_layout(
+        height=430,
+        margin=dict(l=10, r=10, t=10, b=10),
+        legend=dict(
+            title="Sustainable Development Goals",
+            orientation="v",
+            y=0.5,
+            yanchor="middle",
+            x=1.02,
+            xanchor="left",
+            font=dict(size=11),
+        ),
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def _publication_preview_df(rows: list[dict]) -> pd.DataFrame:
@@ -3390,11 +3467,76 @@ def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> 
         st.info("No co-affiliations found among the fetched publications.")
         return
 
+    label_by_node = {node: node_labels.get(node, node) for node in node_labels}
+    for edge in edge_counts:
+        for node in edge:
+            label_by_node.setdefault(node, node_labels.get(node, node))
+
     degree: dict[str, int] = {}
     for (a, b), weight in edge_counts.items():
         degree[a] = degree.get(a, 0) + weight
         degree[b] = degree.get(b, 0) + weight
+
+    focus_query = st.text_input(
+        "Search institution to center the network (optional)",
+        value="",
+        key="sdg_network_institution_search",
+        help="Type part of an institution name from the fetched publication set.",
+    ).strip()
+    selected_focus: str | None = None
+    if focus_query:
+        q = focus_query.lower()
+        matches = [
+            node
+            for node, label in label_by_node.items()
+            if q in label.lower() or q in node.lower()
+        ]
+        matches.sort(key=lambda node: (-degree.get(node, 0), label_by_node.get(node, node)))
+        if not matches:
+            st.warning("No institution in this SDG publication set matches that search.")
+        elif len(matches) == 1:
+            selected_focus = matches[0]
+            st.caption(f"Centered on: {label_by_node[selected_focus]}")
+        else:
+            selected_label = st.selectbox(
+                "Multiple institution matches - pick one",
+                options=[label_by_node[node] for node in matches],
+                index=0,
+                key="sdg_network_institution_match",
+            )
+            selected_focus = next(
+                node for node in matches if label_by_node[node] == selected_label
+            )
+
+    if selected_focus:
+        primary_edges = {
+            edge: weight
+            for edge, weight in edge_counts.items()
+            if selected_focus in edge
+        }
+        neighbors: set[str] = set()
+        for a, b in primary_edges:
+            neighbors.update((a, b))
+        neighbors.discard(selected_focus)
+        secondary_edges = {
+            edge: weight
+            for edge, weight in edge_counts.items()
+            if edge[0] in neighbors and edge[1] in neighbors and weight >= 2
+        }
+        focused_edges = {**primary_edges, **secondary_edges}
+        if focused_edges:
+            edge_counts = focused_edges
+            degree = {}
+            for (a, b), weight in edge_counts.items():
+                degree[a] = degree.get(a, 0) + weight
+                degree[b] = degree.get(b, 0) + weight
+        else:
+            st.info("The selected institution has no co-affiliation edges in this result set.")
+            return
+
     top_nodes = set(sorted(degree, key=degree.get, reverse=True)[:max_nodes])
+    if selected_focus:
+        top_nodes.add(selected_focus)
     filtered_edges = {(a, b): w for (a, b), w in edge_counts.items() if a in top_nodes and b in top_nodes}
     if not filtered_edges:
         st.info("Co-affiliations exist but were filtered out by the top-node limit.")
@@ -3406,6 +3548,8 @@ def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> 
     for (a, b), weight in filtered_edges.items():
         graph.add_edge(a, b, weight=weight)
     pos = nx.spring_layout(graph, weight="weight", dim=3, seed=42)
+    if selected_focus and selected_focus in pos:
+        pos[selected_focus] = [0.0, 0.0, 0.0]
 
     edge_traces = []
     for (a, b), weight in filtered_edges.items():
@@ -3437,7 +3581,7 @@ def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> 
         node_z.append(float(z))
         node_sizes.append(10 + (deg / max_degree) * 25)
         node_text.append(
-            f"{node_labels.get(node, node)} · {pubs_per_node.get(node, 0)} publications · link-strength {deg}"
+            f"{label_by_node.get(node, node)} · {pubs_per_node.get(node, 0)} publications · link-strength {deg}"
         )
 
     node_trace = go.Scatter3d(
