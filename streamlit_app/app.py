@@ -3953,19 +3953,39 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
-    _col_icon, _col_btn = st.columns([0.07, 0.93])
-    with _col_icon:
-        st.markdown(
-            f'<img src="{_ANALYSIS_GIF_URL}" width="52" style="display:block;margin-top:8px">',
-            unsafe_allow_html=True,
-        )
-    with _col_btn:
-        st.write("")
-        fetch_clicked = st.button(
-            "Run Publication Analysis",
-            type="primary",
-            key="fetch_sdg_publications_button",
-        )
+    # Anchor div + CSS so the GIF icon is embedded inside this button only,
+    # without affecting other buttons elsewhere in the app.
+    st.markdown(
+        f"""
+<style>
+div#_run-analysis-anchor_ ~ div[data-testid="stButton"] button {{
+    background-color: white !important;
+    background-image: url('{_ANALYSIS_GIF_URL}') !important;
+    background-repeat: no-repeat !important;
+    background-size: 38px 38px !important;
+    background-position: 14px center !important;
+    padding-left: 62px !important;
+    color: #0f172a !important;
+    border: 1.5px solid #e2e8f0 !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.10) !important;
+    font-weight: 600 !important;
+    min-width: 220px;
+}}
+div#_run-analysis-anchor_ ~ div[data-testid="stButton"] button:hover {{
+    background-color: #f8fafc !important;
+    border-color: #94a3b8 !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.13) !important;
+}}
+</style>
+<div id="_run-analysis-anchor_"></div>
+""",
+        unsafe_allow_html=True,
+    )
+    fetch_clicked = st.button(
+        "Run Publication Analysis",
+        type="secondary",
+        key="fetch_sdg_publications_button",
+    )
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)
