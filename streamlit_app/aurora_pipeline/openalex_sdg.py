@@ -1204,8 +1204,10 @@ def enrich_append_openalex_work(
     if not abstract_text:
         stats.openalex_abstract_missing += 1
         if cached_abstract:
+            emit_progress(f"Using cached abstract for SDG classification: {detail_label}")
             abstract_text = cached_abstract
         elif doi:
+            emit_progress(f"OpenAlex abstract missing; checking Scopus Abstract API for DOI: {doi}")
             sc_abs = get_abstract_from_scopus(
                 doi,
                 session=session,
@@ -1217,6 +1219,7 @@ def enrich_append_openalex_work(
                 stats.scopus_abstract_retrieved += 1
     if enable_google_scholar and not abstract_text:
         if serpapi_api_key:
+            emit_progress(f"Checking Google Scholar abstract via SerpApi: {detail_label}")
             serpapi_abstract = get_abstract_from_serpapi_google_scholar(
                 title, authors_str, api_key=serpapi_api_key, session=session
             )
@@ -1224,6 +1227,7 @@ def enrich_append_openalex_work(
                 abstract_text = serpapi_abstract
                 stats.gs_abstract_retrieved += 1
         else:
+            emit_progress(f"Checking Google Scholar abstract: {detail_label}")
             scholarly_abs = get_abstract_from_scholarly(title, authors_str)
             if scholarly_abs:
                 abstract_text = scholarly_abs
@@ -1253,6 +1257,7 @@ def enrich_append_openalex_work(
             )
             should_reuse_sdg = bool(cached_sdg_entry) and not abstract_updated
             if should_reuse_sdg:
+                emit_progress(f"Using cached SDG classification: {detail_label}")
                 reused_sdg = True
                 raw_json = cached_sdg_entry.get("sdg_response") or ""
                 if raw_json:
@@ -1265,6 +1270,7 @@ def enrich_append_openalex_work(
                 if not sdg_formatted and sdg_json:
                     sdg_formatted = format_sdg_predictions(sdg_json)
             else:
+                emit_progress(f"Classifying SDGs with {model}: {detail_label}")
                 sdg_json, sdg_note = classify_text_aurora(
                     model, text_for_sdg, session=session, user_agent=user_agent
                 )
@@ -1384,6 +1390,7 @@ def fetch_author_publications_scopus_with_sdg(
             )
 
         query_str = build_scopus_author_publications_query(au_id, from_date, to_date, work_type)
+        emit_progress("Searching Scopus for candidate publications")
         headers = {"Accept": "text/xml, application/xml;q=0.9,*/*;q=0.8"}
         base_params = {
             "apiKey": scopus_api_key,
@@ -1404,6 +1411,7 @@ def fetch_author_publications_scopus_with_sdg(
             params = dict(base_params)
             params["start"] = start
             params["count"] = page_size
+            emit_progress(f"Searching Scopus records {start + 1:,}-{start + page_size:,}")
             resp = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=90)
             if resp.status_code == 400 and page_size > 25:
                 page_size = 25
@@ -1426,22 +1434,28 @@ def fetch_author_publications_scopus_with_sdg(
                 doi_norm = normalize_doi_for_openalex(doi_raw)
                 if not doi_norm:
                     stats.scopus_skipped_no_doi += 1
+                    emit_progress("Skipped Scopus record: no DOI available")
                     continue
                 doi_key = doi_norm.lower()
                 if doi_key in seen_dois:
                     stats.scopus_skipped_duplicate_doi += 1
+                    emit_progress(f"Skipped duplicate DOI: {doi_norm}")
                     continue
                 seen_dois.add(doi_key)
 
+                emit_progress(f"Locating DOI in OpenAlex: {doi_norm}")
                 work = fetch_openalex_work_by_doi(doi_norm, session, user_agent=user_agent)
                 if not work:
                     stats.scopus_doi_not_in_openalex += 1
+                    emit_progress(f"Skipped DOI not found in OpenAlex: {doi_norm}")
                     continue
                 if not _openalex_work_matches_type(work, work_type):
                     stats.scopus_skipped_type_mismatch += 1
+                    emit_progress(f"Skipped DOI outside selected document type: {doi_norm}")
                     continue
                 if not _openalex_work_in_publication_date_range(work, from_date, to_date):
                     stats.scopus_skipped_date_mismatch += 1
+                    emit_progress(f"Skipped DOI outside selected date range: {doi_norm}")
                     continue
 
                 cited_n = _scopus_entry_citedby_count(entry_el)

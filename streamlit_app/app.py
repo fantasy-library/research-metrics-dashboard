@@ -3207,6 +3207,7 @@ DOCUMENT_TYPE_CHART_COLORS = {
     "Conference papers": "#0d9488",
     "Books & book chapters": "#d97706",
     "Other": "#64748b",
+    "Other / residual": "#64748b",
 }
 
 SELF_CIT_RADIO_LABELS = {
@@ -3869,9 +3870,65 @@ def _render_pub_type_breakdown(rows: list[dict]) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-# GIF served via Streamlit static file serving (enableStaticServing = true in config.toml).
-# Files in streamlit_app/static/ are available at app/static/<filename>.
-_ANALYSIS_GIF_URL = "app/static/analysis.gif"
+def _render_fetch_transparency(stats: object, row_count: int) -> None:
+    """Render a compact one-line metadata summary matching the pipeline's counters."""
+    if not stats:
+        return
+
+    total_expected       = getattr(stats, "total_expected", None)
+    abstracts_available  = int(getattr(stats, "total_abstracts_available", 0) or 0)
+    openalex_missing     = int(getattr(stats, "openalex_abstract_missing", 0) or 0)
+    via_elsevier         = int(getattr(stats, "scopus_abstract_retrieved", 0) or 0)
+    via_gs               = int(getattr(stats, "gs_abstract_retrieved", 0) or 0)
+    skipped_no_doi       = int(getattr(stats, "scopus_skipped_no_doi", 0) or 0)
+    skipped_duplicate    = int(getattr(stats, "scopus_skipped_duplicate_doi", 0) or 0)
+    skipped_no_openalex  = int(getattr(stats, "scopus_doi_not_in_openalex", 0) or 0)
+    skipped_type         = int(getattr(stats, "scopus_skipped_type_mismatch", 0) or 0)
+    skipped_date         = int(getattr(stats, "scopus_skipped_date_mismatch", 0) or 0)
+
+    # ── Main stats sentence ────────────────────────────────────────────────
+    candidates = int(total_expected) if total_expected is not None else None
+    parts: list[str] = []
+    if candidates is not None:
+        parts.append(f"Scopus: **{candidates:,}** candidates → **{row_count:,}** rows written (via OpenAlex by DOI)")
+    else:
+        parts.append(f"Wrote **{row_count:,}** rows")
+
+    parts.append(
+        f"Abstracts available: **{abstracts_available:,}**. "
+        f"OpenAlex missing abstracts: **{openalex_missing:,}**; "
+        f"abstracts via Elsevier (DOI): **{via_elsevier:,}**; "
+        f"retrieved from Google Scholar: **{via_gs:,}**"
+    )
+
+    # ── Skipped breakdown ─────────────────────────────────────────────────
+    skipped_parts: list[str] = []
+    if skipped_no_doi:
+        skipped_parts.append(f"no DOI: {skipped_no_doi:,}")
+    if skipped_duplicate:
+        skipped_parts.append(f"duplicate DOI: {skipped_duplicate:,}")
+    if skipped_no_openalex:
+        skipped_parts.append(f"DOI not in OpenAlex: {skipped_no_openalex:,}")
+    if skipped_type:
+        skipped_parts.append(f"document type filter: {skipped_type:,}")
+    if skipped_date:
+        skipped_parts.append(f"publication date window: {skipped_date:,}")
+    if skipped_parts:
+        parts.append("· skipped (" + "; ".join(skipped_parts) + ")")
+
+    st.caption("  ·  ".join(parts))
+
+
+@st.cache_data(show_spinner=False)
+def _analysis_gif_data_url() -> str:
+    gif_path = Path(__file__).resolve().parent / "static" / "analysis.gif"
+    if not gif_path.is_file():
+        return ""
+    try:
+        encoded = base64.b64encode(gif_path.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+    return f"data:image/gif;base64,{encoded}"
 
 
 _SDG_MODEL_OPTIONS: dict[str, str] = {
@@ -3947,58 +4004,44 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
-    # Render a true HTML button with the GIF icon inside it.
-    # components.html runs in an isolated iframe so onclick JavaScript and
-    # window.parent.postMessage work reliably. The image URL is built at
-    # runtime from window.parent.location.origin so it works on any host/port.
-    # CSS anchor immediately before the button so :has() can scope styles
-    # to this button only, without affecting any other button in the app.
-    st.markdown(
-        """
-<style>
-div[data-testid="stMarkdown"]:has(#_sdg-run-btn-anchor_) ~ div[data-testid="stButton"] button {
-    background-color: white !important;
-    background-image: url('/app/static/analysis.gif') !important;
-    background-repeat: no-repeat !important;
-    background-size: 40px 40px !important;
-    background-position: 10px center !important;
-    padding-left: 62px !important;
-    padding-top: 8px !important;
-    padding-bottom: 8px !important;
-    color: #0f172a !important;
-    border: 1.5px solid #e2e8f0 !important;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
-    font-weight: 600 !important;
-    font-size: 15px !important;
-    min-width: 230px !important;
-    border-radius: 8px !important;
-    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s !important;
-}
-div[data-testid="stMarkdown"]:has(#_sdg-run-btn-anchor_) ~ div[data-testid="stButton"] button:hover {
-    background-color: #f8fafc !important;
-    border-color: #94a3b8 !important;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.12) !important;
-}
-</style>
-<div id="_sdg-run-btn-anchor_"></div>
-""",
-        unsafe_allow_html=True,
-    )
-    fetch_clicked = st.button(
-        "Run Publication Analysis",
-        type="secondary",
-        key="fetch_sdg_publications_button",
-    )
+    # Keep this as a native Streamlit button: custom components keep their
+    # last value across reruns and can re-trigger analysis when another widget changes.
+    _gif_data_url = _analysis_gif_data_url()
+    if _gif_data_url:
+        _icon_col, _button_col = st.columns([0.09, 0.91], vertical_alignment="center")
+        with _icon_col:
+            st.markdown(
+                f'<img src="{_gif_data_url}" alt="" '
+                'style="width:52px;height:52px;object-fit:contain;display:block;" />',
+                unsafe_allow_html=True,
+            )
+        with _button_col:
+            fetch_clicked = st.button(
+                "Run Publication Analysis",
+                type="secondary",
+                key="fetch_sdg_publications_button",
+                icon=":material/analytics:",
+            )
+    else:
+        fetch_clicked = st.button(
+            "Run Publication Analysis",
+            type="secondary",
+            key="fetch_sdg_publications_button",
+            icon=":material/analytics:",
+        )
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)
         progress_text = st.empty()
 
         def progress_callback(done: int, expected: int | None, message: str) -> None:
-            target = int(limit_rows) or expected or 1
+            target = expected or int(limit_rows) or 1
             progress_bar.progress(min(done / target, 1.0))
             detail = f" — {message}" if message else ""
-            progress_text.text(f"Processed {done:,} publications{detail}")
+            if expected:
+                progress_text.text(f"Accepted {done:,} of {expected:,} Scopus candidates{detail}")
+            else:
+                progress_text.text(f"Accepted {done:,} publications{detail}")
 
         try:
             with st.spinner("Fetching Scopus publications, OpenAlex metadata, and Aurora SDG labels..."):
@@ -4039,9 +4082,10 @@ div[data-testid="stMarkdown"]:has(#_sdg-run-btn-anchor_) ~ div[data-testid="stBu
     rows = list(getattr(result, "rows", []) or [])
     st.success(
         f"Loaded **{len(rows):,}** publication rows for **{payload.get('author_label')}** "
-        f"({getattr(result, 'from_date', '')} to {getattr(result, 'to_date', '')}). "
-        "Use the tabs below to explore publications, the co-affiliation network, SDG classifications, and Open Access status."
+        f"({getattr(result, 'from_date', '')} – {getattr(result, 'to_date', '')}). "
+        "Use the tabs below to explore publications, the co-affiliation network, SDG classifications, and OA status."
     )
+    _render_fetch_transparency(getattr(result, "stats", None), len(rows))
     if not rows:
         st.info("No publication rows were returned for the selected filters.")
         return
@@ -5545,6 +5589,7 @@ def _document_type_series_for_chart(
     series: list[dict] = []
     for label in labels:
         year_map = by_year.get(label) or {}
+        display_label = "Other / residual" if label == "Other" else label
         data: list[int | float] = []
         for y in years:
             val = year_map.get(str(y))
@@ -5554,11 +5599,11 @@ def _document_type_series_for_chart(
         if not any(data):
             continue
         entry: dict = {
-            "name": label,
+            "name": display_label,
             "type": chart_type.lower(),
             "stack": "publications",
             "data": data,
-            "itemStyle": {"color": DOCUMENT_TYPE_CHART_COLORS.get(label, "#64748b")},
+            "itemStyle": {"color": DOCUMENT_TYPE_CHART_COLORS.get(display_label, "#64748b")},
             "emphasis": {"focus": "series"},
         }
         if chart_type == "Line":
@@ -5566,6 +5611,24 @@ def _document_type_series_for_chart(
             entry["areaStyle"] = {"opacity": 0.2}
         series.append(entry)
     return series
+
+
+def _document_type_totals_df(breakdown: dict | None) -> pd.DataFrame:
+    if not breakdown:
+        return pd.DataFrame()
+    items = breakdown.get("items") or []
+    rows: list[dict[str, object]] = []
+    for item in items:
+        label = str(item.get("label") or "").strip()
+        if not label:
+            continue
+        rows.append(
+            {
+                "Document type": "Other / residual" if label == "Other" else label,
+                "Publications": item.get("count", 0),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
@@ -6284,6 +6347,20 @@ def main() -> None:
                                     height="500px",
                                     key=f"echarts_{aid}_{plot_metric}_doctype",
                                 )
+                                doc_type_totals_df = _document_type_totals_df(doc_type_breakdown)
+                                if not doc_type_totals_df.empty:
+                                    st.caption(
+                                        "Document type detail is derived from SciVal aggregate `includedDocs` buckets. "
+                                        "`Other / residual` means all publication types minus articles, reviews, "
+                                        "conference papers, and books/book chapters. It may include editorials, "
+                                        "letters, notes, reports, short surveys, data papers, and other indexed items. "
+                                        "Run Publication Analysis for publication-level OpenAlex types where available."
+                                    )
+                                    st.dataframe(
+                                        doc_type_totals_df,
+                                        use_container_width=True,
+                                        hide_index=True,
+                                    )
                             else:
                                 values = [by_year.get(str(y)) for y in years]
                                 values = [

@@ -156,7 +156,7 @@ def fetch_author_sdg_publications(
     from_date, to_date = year_key_to_date_range(year_key)
     work_types = docs_key_to_openalex_work_types(docs_key)
     all_rows: List[Dict[str, Any]] = []
-    last_stats = None
+    aggregate_stats = None
 
     for work_type in work_types:
         remaining = None if limit_rows is None else max(limit_rows - len(all_rows), 0)
@@ -177,12 +177,35 @@ def fetch_author_sdg_publications(
             serpapi_api_key=SERPAPI_API_KEY or None,
             progress_callback=progress_callback,
         )
-        last_stats = stats
+        if aggregate_stats is None:
+            aggregate_stats = stats
+        else:
+            aggregate_stats.total_processed += getattr(stats, "total_processed", 0) or 0
+            if aggregate_stats.total_expected is None or getattr(stats, "total_expected", None) is None:
+                aggregate_stats.total_expected = None
+            else:
+                aggregate_stats.total_expected += stats.total_expected
+            for attr in (
+                "openalex_abstract_missing",
+                "scopus_abstract_retrieved",
+                "gs_abstract_retrieved",
+                "total_abstracts_available",
+                "scopus_skipped_no_doi",
+                "scopus_skipped_duplicate_doi",
+                "scopus_doi_not_in_openalex",
+                "scopus_skipped_type_mismatch",
+                "scopus_skipped_date_mismatch",
+            ):
+                setattr(
+                    aggregate_stats,
+                    attr,
+                    (getattr(aggregate_stats, attr, 0) or 0) + (getattr(stats, attr, 0) or 0),
+                )
         all_rows.extend(dict(row) for row in rows)
 
     return SDGFetchResult(
         rows=dedupe_rows_by_work(all_rows),
-        stats=last_stats,
+        stats=aggregate_stats,
         from_date=from_date,
         to_date=to_date,
         work_types=work_types,
