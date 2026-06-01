@@ -3953,41 +3953,59 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
-    # Scope button styling to only the row that contains the analysis GIF.
-    st.markdown(
+    # Render a true HTML button with the GIF icon inside it.
+    # components.html runs in an isolated iframe so onclick JavaScript and
+    # window.parent.postMessage work reliably. The image URL is built at
+    # runtime from window.parent.location.origin so it works on any host/port.
+    _btn_clicked = components.html(
         """
+<!DOCTYPE html><html><head>
 <style>
-div[data-testid="stHorizontalBlock"]:has(img.analysis-run-icon) button {
-    background-color: white !important;
-    color: #0f172a !important;
-    border: 1.5px solid #e2e8f0 !important;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.10) !important;
-    font-weight: 600 !important;
-    min-width: 200px;
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:transparent; display:flex; align-items:center; padding:4px 0; }
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 7px 20px 7px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-family: 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
 }
-div[data-testid="stHorizontalBlock"]:has(img.analysis-run-icon) button:hover {
-    background-color: #f8fafc !important;
-    border-color: #94a3b8 !important;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.13) !important;
-}
+button:hover  { background:#f8fafc; border-color:#94a3b8; box-shadow:0 3px 10px rgba(0,0,0,0.12); }
+button:active { background:#f1f5f9; }
 </style>
+</head><body>
+<button id="b">
+  <img id="g" src="" width="40" style="display:block">
+  Run Publication Analysis
+</button>
+<script>
+(function(){
+  try { document.getElementById('g').src = window.parent.location.origin + '/app/static/analysis.gif'; }
+  catch(e) {}
+  document.getElementById('b').addEventListener('click', function(){
+    window.parent.postMessage(
+      { type:'streamlit:setComponentValue', value: +new Date(), dataType:'json' },
+      '*'
+    );
+  });
+})();
+</script>
+</body></html>
 """,
-        unsafe_allow_html=True,
+        height=58,
+        scrolling=False,
     )
-    _col_icon, _col_btn = st.columns([0.08, 0.92])
-    with _col_icon:
-        st.markdown(
-            '<img class="analysis-run-icon" src="/app/static/analysis.gif" '
-            'width="54" style="display:block;margin-top:6px">',
-            unsafe_allow_html=True,
-        )
-    with _col_btn:
-        st.write("")
-        fetch_clicked = st.button(
-            "Run Publication Analysis",
-            type="secondary",
-            key="fetch_sdg_publications_button",
-        )
+    fetch_clicked = bool(_btn_clicked)
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)
