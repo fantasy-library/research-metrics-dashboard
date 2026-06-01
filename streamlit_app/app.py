@@ -3273,38 +3273,89 @@ def _init_session() -> None:
         )
 
 
-def _sdg_codes_for_row(row: dict) -> list[str]:
+_SDG_THRESHOLD_PCT = 3.0  # matches Aurora's default SDG_THRESHOLD_PERCENT
+
+
+def _sdg_codes_for_row(row: dict, threshold: float = _SDG_THRESHOLD_PCT) -> list[str]:
+    """Return SDG codes whose score is at or above the threshold percentage.
+
+    Parses lines like '84% SDG 10 (Reduced inequalities)' from sdg_formatted.
+    Falls back to the sdg_response JSON when available.
+    """
+    import json as _json
+
+    valid: list[str] = []
+    seen: set[str] = set()
+
+    # --- primary path: parse scored lines from sdg_formatted ---
     formatted = str(row.get("sdg_formatted") or "")
-    codes = re.findall(r"\bSDG\s*0?(\d{1,2})\b", formatted, flags=re.I)
-    valid = []
-    for code in codes:
-        try:
-            n = int(code)
-        except ValueError:
+    for line in formatted.splitlines():
+        line = line.strip()
+        if not line:
             continue
-        if 1 <= n <= 17 and str(n) not in valid:
-            valid.append(str(n))
+        m = re.match(r"(\d+(?:\.\d+)?)\s*%\s+SDG\s*0?(\d{1,2})\b", line, flags=re.I)
+        if m:
+            try:
+                score = float(m.group(1))
+                n = int(m.group(2))
+            except ValueError:
+                continue
+            if score >= threshold and 1 <= n <= 17:
+                code = str(n)
+                if code not in seen:
+                    seen.add(code)
+                    valid.append(code)
+
+    if valid:
+        return valid
+
+    # --- fallback: parse sdg_response JSON directly ---
+    raw = row.get("sdg_response") or ""
+    if raw:
+        try:
+            sdg_json = _json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            sdg_json = None
+        if isinstance(sdg_json, dict):
+            preds = sdg_json.get("predictions") or []
+            for entry in preds:
+                sdg = entry.get("sdg") or {}
+                code_raw = str(sdg.get("code") or "").strip()
+                score_raw = entry.get("prediction")
+                if not code_raw or score_raw is None:
+                    continue
+                try:
+                    score = float(score_raw) * 100
+                    n = int(re.sub(r"\D", "", code_raw) or "0")
+                except ValueError:
+                    continue
+                if score >= threshold and 1 <= n <= 17:
+                    code = str(n)
+                    if code not in seen:
+                        seen.add(code)
+                        valid.append(code)
+
     return valid
 
 
 SDG_NAMES = {
-    "1": "No Poverty",
-    "2": "Zero Hunger",
-    "3": "Good Health and Well-being",
-    "4": "Quality Education",
-    "5": "Gender Equality",
-    "6": "Clean Water and Sanitation",
-    "7": "Affordable and Clean Energy",
-    "8": "Decent Work and Economic Growth",
-    "9": "Industry, Innovation and Infrastructure",
-    "10": "Reduced Inequalities",
-    "11": "Sustainable Cities and Communities",
-    "12": "Responsible Consumption and Production",
-    "13": "Climate Action",
-    "14": "Life Below Water",
-    "15": "Life on Land",
-    "16": "Peace, Justice and Strong Institutions",
-    "17": "Partnerships for the Goals",
+    "1": "No poverty",
+    "2": "Zero hunger",
+    "3": "Good health and well-being",
+    "4": "Quality education",
+    "5": "Gender equality",
+    "6": "Clean water and sanitation",
+    "7": "Affordable and clean energy",
+    "8": "Decent work and economic growth",
+    "9": "Industry, innovation and infrastructure",
+    "10": "Reduced inequalities",
+    "11": "Sustainable cities and communities",
+    "12": "Responsible consumption and production",
+    "13": "Climate action",
+    "14": "Life below water",
+    "15": "Life on land",
+    "16": "Peace, justice and strong institutions",
+    "17": "Partnerships for the goals",
 }
 
 SDG_COLORS = {
