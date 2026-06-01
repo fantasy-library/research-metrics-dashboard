@@ -53,6 +53,7 @@ def _resolve_scival_api_key() -> str:
     for name in (
         "VITE_SCIVAL_API_KEY",
         "SCIVAL_API_KEY",
+        "SCOPUS_API_KEY",
         "ELSEVIER_API_KEY",
         "ELS_API_KEY",
     ):
@@ -64,6 +65,24 @@ def _resolve_scival_api_key() -> str:
 
 # Prefer explicit SciVal key; do not hardcode keys in source.
 SCIVAL_API_KEY: str = _resolve_scival_api_key()
+
+
+def _resolve_scopus_content_api_key() -> str:
+    """API key used for Elsevier Scopus Content APIs such as AU-ID publication search."""
+    for name in (
+        "SCOPUS_API_KEY",
+        "ELSEVIER_API_KEY",
+        "ELS_API_KEY",
+        "VITE_SCIVAL_API_KEY",
+        "SCIVAL_API_KEY",
+    ):
+        v = _clean_scival_api_key(os.getenv(name))
+        if v:
+            return v
+    return ""
+
+
+SCOPUS_CONTENT_API_KEY: str = _resolve_scopus_content_api_key()
 
 
 def _resolve_insttoken() -> str:
@@ -81,6 +100,16 @@ def _resolve_insttoken() -> str:
 
 # Optional institutional token (Elsevier query param insttoken and/or header X-ELS-Insttoken)
 ELSEVIER_INSTTOKEN: str = _resolve_insttoken()
+
+# OpenAlex asks callers to identify themselves. Override in deployment with a contact email.
+OPENALEX_USER_AGENT: str = (
+    os.getenv("OPENALEX_USER_AGENT")
+    or os.getenv("HTTP_USER_AGENT")
+    or "HKUST Research Metrics Dashboard (mailto:library@ust.hk)"
+).strip()
+
+# Optional; currently reserved for future abstract backfill when Google Scholar is enabled.
+SERPAPI_API_KEY: str = (os.getenv("SERPAPI_API_KEY") or "").strip()
 
 # Optional HTTP(S) proxy for SciVal HTTP client only (Elsevier direct API + ORCID lookup).
 # Use when Cloudflare blocks your server's datacenter IP: point this at a library/campus proxy

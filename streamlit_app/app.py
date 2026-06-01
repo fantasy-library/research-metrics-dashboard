@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import html
+import json
 import re
 import sys
 import time
@@ -38,6 +39,12 @@ from streamlit_app.api_service import (
 )
 from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_API
 from streamlit_app.export_utils import export_docx_bytes, export_excel_bytes, export_pdf_bytes
+from streamlit_app.sdg_service import (
+    SDGServiceError,
+    fetch_author_sdg_publications,
+    rows_to_csv_bytes,
+    sdg_credentials_available,
+)
 
 st.set_page_config(
     page_title="Research Metrics Dashboard",
@@ -1285,6 +1292,10 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   font-family: Inter, Roboto, "Segoe UI", sans-serif;
   line-height: 1.45;
 }
+[class*="st-key-scopus_id_section"] .scopus-id-section-head .scopus-id-count {
+  color: #4f46e5;
+  font-variant-numeric: tabular-nums;
+}
 [class*="st-key-scopus_id_section"] .scopus-id-section-head .scopus-id-count--warn {
   color: #c2410c;
 }
@@ -2479,31 +2490,51 @@ footer.site-footer .site-footer-copy {
 }
 
 /* Scopus Author IDs textarea: magnifier middle-left (vertically centered on left strip); copy left-aligned */
-[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea {
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] [data-baseweb="textarea"] {
   border: 2px solid #cbd5e1 !important;
   border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.07),
+    0 1px 3px rgba(103, 58, 183, 0.06) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] [data-baseweb="textarea"]:focus-within {
+  border-color: #7c3aed !important;
+  box-shadow:
+    0 0 0 1px #7c3aed inset,
+    0 3px 10px rgba(15, 23, 42, 0.08) !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] [data-baseweb="textarea"] > div {
+  border: none !important;
+  border-radius: inherit !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea {
+  border: none !important;
+  border-radius: 10px !important;
   padding: 0.8rem 0.95rem 0.8rem 2.85rem !important;
-  background-color: #ffffff !important;
+  background-color: transparent !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important;
   background-position: 1rem center !important;
   background-size: 1.22rem 1.22rem !important;
-  box-shadow:
-    0 2px 8px rgba(15, 23, 42, 0.07),
-    0 1px 3px rgba(103, 58, 183, 0.06) !important;
+  box-shadow: none !important;
   min-height: 104px !important;
   text-align: left !important;
   box-sizing: border-box !important;
+  outline: none !important;
+  background-clip: padding-box !important;
 }
 /* Empty field: placeholder lines vertically centered as a block; still left-aligned */
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea:placeholder-shown {
   align-content: center !important;
 }
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea:focus {
-  border-color: #7c3aed !important;
-  box-shadow:
-    0 0 0 3px rgba(124, 58, 237, 0.2),
-    0 3px 10px rgba(15, 23, 42, 0.08) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea::placeholder {
   color: #64748b !important;
@@ -3232,10 +3263,339 @@ def _init_session() -> None:
         st.session_state.rate_limit_error = False
     if "scopus_author_ids" not in st.session_state:
         st.session_state.scopus_author_ids = ""
+    if "sdg_publication_result" not in st.session_state:
+        st.session_state.sdg_publication_result = None
+    if "sdg_publication_error" not in st.session_state:
+        st.session_state.sdg_publication_error = ""
     if "self_cit_radio" not in st.session_state:
         st.session_state.self_cit_radio = (
             "include" if st.session_state.get("self_cit_include", True) else "exclude"
         )
+
+
+def _sdg_codes_for_row(row: dict) -> list[str]:
+    formatted = str(row.get("sdg_formatted") or "")
+    codes = re.findall(r"\bSDG\s*0?(\d{1,2})\b", formatted, flags=re.I)
+    valid = []
+    for code in codes:
+        try:
+            n = int(code)
+        except ValueError:
+            continue
+        if 1 <= n <= 17 and str(n) not in valid:
+            valid.append(str(n))
+    return valid
+
+
+def _render_sdg_distribution(rows: list[dict]) -> None:
+    counts: dict[str, int] = {}
+    for row in rows:
+        for code in _sdg_codes_for_row(row):
+            counts[code] = counts.get(code, 0) + 1
+    if not counts:
+        st.info("No SDG labels were found in the fetched publication rows.")
+        return
+    chart_df = pd.DataFrame(
+        [{"SDG": f"SDG {code}", "Publications": count} for code, count in sorted(counts.items(), key=lambda item: int(item[0]))]
+    )
+    st.bar_chart(chart_df, x="SDG", y="Publications", use_container_width=True)
+
+
+def _publication_preview_df(rows: list[dict]) -> pd.DataFrame:
+    columns = [
+        "publication_date",
+        "title",
+        "authors",
+        "type",
+        "doi",
+        "citedby_count",
+        "institutions",
+        "sdg_formatted",
+    ]
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    keep = [col for col in columns if col in df.columns]
+    return df[keep].rename(
+        columns={
+            "publication_date": "Publication date",
+            "title": "Title",
+            "authors": "Authors",
+            "type": "Type",
+            "doi": "DOI",
+            "citedby_count": "Cited by",
+            "institutions": "Institutions",
+            "sdg_formatted": "SDG predictions",
+        }
+    )
+
+
+def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> None:
+    if not rows:
+        st.info("No publications available to build the co-affiliation network.")
+        return
+    try:
+        import itertools
+
+        import networkx as nx
+        import plotly.graph_objects as go
+    except ImportError as exc:
+        st.warning(f"Install network dependencies to render the SDG network: {exc}")
+        return
+
+    edge_counts: dict[tuple[str, str], int] = {}
+    node_labels: dict[str, str] = {}
+    pubs_per_node: dict[str, int] = {}
+
+    for row in rows:
+        aff_json = row.get("institution_affiliations_json")
+        affiliations = []
+        if aff_json:
+            try:
+                affiliations = json.loads(aff_json)
+            except Exception:
+                affiliations = []
+        if not affiliations:
+            raw_ids = str(row.get("institution_ids") or "").split(";")
+            raw_names = str(row.get("institution_names_raw") or row.get("institutions") or "").split(";")
+            raw_countries = str(row.get("institution_countries") or "").split(";")
+            for idx, inst_id in enumerate(raw_ids):
+                inst_id = inst_id.strip()
+                if not inst_id:
+                    continue
+                affiliations.append(
+                    {
+                        "id": inst_id,
+                        "name": raw_names[idx].strip() if idx < len(raw_names) else inst_id,
+                        "country": raw_countries[idx].strip().upper() if idx < len(raw_countries) else "",
+                    }
+                )
+
+        unique_nodes: list[str] = []
+        for aff in affiliations:
+            inst_id = str(aff.get("id") or aff.get("name") or "").strip()
+            if not inst_id or inst_id in unique_nodes:
+                continue
+            name = str(aff.get("name") or inst_id.split("/")[-1] or inst_id).strip()
+            country = str(aff.get("country") or "").strip().upper()
+            label = f"{name} ({country})" if country else name
+            node_labels[inst_id] = label
+            unique_nodes.append(inst_id)
+        for inst_id in set(unique_nodes):
+            pubs_per_node[inst_id] = pubs_per_node.get(inst_id, 0) + 1
+        for a, b in itertools.combinations(sorted(unique_nodes), 2):
+            edge_counts[(a, b)] = edge_counts.get((a, b), 0) + 1
+
+    if not edge_counts:
+        st.info("No co-affiliations found among the fetched publications.")
+        return
+
+    degree: dict[str, int] = {}
+    for (a, b), weight in edge_counts.items():
+        degree[a] = degree.get(a, 0) + weight
+        degree[b] = degree.get(b, 0) + weight
+    top_nodes = set(sorted(degree, key=degree.get, reverse=True)[:max_nodes])
+    filtered_edges = {(a, b): w for (a, b), w in edge_counts.items() if a in top_nodes and b in top_nodes}
+    if not filtered_edges:
+        st.info("Co-affiliations exist but were filtered out by the top-node limit.")
+        return
+
+    graph = nx.Graph()
+    for node in top_nodes:
+        graph.add_node(node)
+    for (a, b), weight in filtered_edges.items():
+        graph.add_edge(a, b, weight=weight)
+    pos = nx.spring_layout(graph, weight="weight", dim=3, seed=42)
+
+    edge_traces = []
+    for (a, b), weight in filtered_edges.items():
+        x0, y0, z0 = pos[a]
+        x1, y1, z1 = pos[b]
+        edge_traces.append(
+            go.Scatter3d(
+                x=[x0, x1, None],
+                y=[y0, y1, None],
+                z=[z0, z1, None],
+                mode="lines",
+                line=dict(width=max(1.0, min(8.0, weight * 1.5)), color="rgba(93,93,93,0.55)"),
+                hoverinfo="text",
+                text=[f"Co-authored works: {weight}", f"Co-authored works: {weight}", ""],
+            )
+        )
+
+    node_x: list[float] = []
+    node_y: list[float] = []
+    node_z: list[float] = []
+    node_sizes: list[float] = []
+    node_text: list[str] = []
+    max_degree = max(degree.get(node, 1) for node in top_nodes)
+    for node in top_nodes:
+        x, y, z = pos[node]
+        deg = degree.get(node, 1)
+        node_x.append(float(x))
+        node_y.append(float(y))
+        node_z.append(float(z))
+        node_sizes.append(10 + (deg / max_degree) * 25)
+        node_text.append(
+            f"{node_labels.get(node, node)} · {pubs_per_node.get(node, 0)} publications · link-strength {deg}"
+        )
+
+    node_trace = go.Scatter3d(
+        x=node_x,
+        y=node_y,
+        z=node_z,
+        mode="markers+text",
+        marker=dict(size=node_sizes, color=node_sizes, colorscale="Viridis", showscale=True, opacity=0.95),
+        text=[txt.split(" · ", 1)[0] for txt in node_text],
+        textposition="top center",
+        hovertext=node_text,
+        hoverinfo="text",
+    )
+    fig = go.Figure(data=edge_traces + [node_trace])
+    fig.update_layout(
+        height=650,
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False)),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_sdg_publications_section(valid_results: list[dict], year_key: str, docs_key: str) -> None:
+    st.markdown(
+        '<hr class="charts-export-divider" aria-hidden="true" />',
+        unsafe_allow_html=True,
+    )
+    st.markdown("### SDG Publications & Co-affiliation Network")
+    st.caption(
+        "Fetch publication records by Scopus Author ID, enrich them through OpenAlex, classify SDGs with Aurora, "
+        "and build a co-affiliation network from publication affiliations."
+    )
+
+    if not sdg_credentials_available():
+        st.info(
+            "To enable this section, set an Elsevier API key and `ELSEVIER_INSTTOKEN`. "
+            "Scopus publication search uses the Scopus Content API, which may require separate entitlement from SciVal."
+        )
+        return
+
+    author_options: dict[str, str] = {}
+    for item in valid_results:
+        aid = str(item.get("id") or "").strip()
+        if not aid:
+            continue
+        data = item.get("data") or {}
+        name = str(data.get("authorName") or f"Author {aid}")
+        author_options[f"{name} ({aid})"] = aid
+    if not author_options:
+        st.info("Analyze at least one valid Scopus Author ID before fetching SDG publications.")
+        return
+
+    c_author, c_model, c_limit = st.columns([2, 1, 1])
+    with c_author:
+        selected_label = st.selectbox(
+            "Author for SDG publication fetch",
+            options=list(author_options.keys()),
+            key="sdg_author_select",
+        )
+    with c_model:
+        sdg_model = st.selectbox(
+            "SDG model",
+            options=["aurora-sdg-multi", "aurora-sdg", "elsevier-sdg-multi", "osdg", "skip"],
+            index=0,
+            key="sdg_model_select",
+        )
+    with c_limit:
+        limit_rows = st.number_input(
+            "Max publications",
+            min_value=1,
+            max_value=500,
+            value=50,
+            step=25,
+            key="sdg_limit_rows",
+        )
+
+    selected_author_id = author_options[selected_label]
+    fetch_clicked = st.button(
+        "Fetch SDG publications & build network",
+        type="secondary",
+        key="fetch_sdg_publications_button",
+    )
+    if fetch_clicked:
+        st.session_state.sdg_publication_error = ""
+        progress_bar = st.progress(0)
+        progress_text = st.empty()
+
+        def progress_callback(done: int, expected: int | None, message: str) -> None:
+            target = int(limit_rows) or expected or 1
+            progress_bar.progress(min(done / target, 1.0))
+            detail = f" — {message}" if message else ""
+            progress_text.text(f"Processed {done:,} publications{detail}")
+
+        try:
+            with st.spinner("Fetching Scopus publications, OpenAlex metadata, and Aurora SDG labels..."):
+                result = fetch_author_sdg_publications(
+                    selected_author_id,
+                    year_key=year_key,
+                    docs_key=docs_key,
+                    model=sdg_model,
+                    limit_rows=int(limit_rows),
+                    progress_callback=progress_callback,
+                )
+            st.session_state.sdg_publication_result = {
+                "author_id": selected_author_id,
+                "author_label": selected_label,
+                "year_key": year_key,
+                "docs_key": docs_key,
+                "model": sdg_model,
+                "limit": int(limit_rows),
+                "result": result,
+            }
+            progress_bar.progress(1.0)
+            progress_text.text(f"Fetched {len(result.rows):,} publication rows.")
+        except (SDGServiceError, ValueError) as exc:
+            st.session_state.sdg_publication_error = str(exc)
+        except Exception as exc:
+            st.session_state.sdg_publication_error = f"SDG publication fetch failed: {exc}"
+        finally:
+            progress_bar.empty()
+            progress_text.empty()
+
+    if st.session_state.get("sdg_publication_error"):
+        st.error(st.session_state.sdg_publication_error)
+
+    payload = st.session_state.get("sdg_publication_result")
+    if not payload:
+        return
+    result = payload.get("result")
+    rows = list(getattr(result, "rows", []) or [])
+    st.success(
+        f"Loaded **{len(rows):,}** SDG publication rows for **{payload.get('author_label')}** "
+        f"({getattr(result, 'from_date', '')} to {getattr(result, 'to_date', '')})."
+    )
+    if not rows:
+        st.info("No publication rows were returned for the selected filters.")
+        return
+
+    tab_summary, tab_publications, tab_network = st.tabs(["SDG Summary", "Publications", "Network"])
+    with tab_summary:
+        _render_sdg_distribution(rows)
+    with tab_publications:
+        preview_df = _publication_preview_df(rows)
+        st.dataframe(preview_df, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Download SDG publication CSV",
+            rows_to_csv_bytes(rows),
+            file_name=f"sdg-publications-{payload.get('author_id')}.csv",
+            mime="text/csv",
+            key="download_sdg_publications_csv",
+        )
+    with tab_network:
+        st.caption(
+            "Nodes are institutions appearing in the fetched publications. Edges mean two institutions appear together "
+            "on at least one publication."
+        )
+        _render_sdg_coaffiliation_network(rows)
 
 
 def _enabled_metric_ids(metrics: list) -> list:
@@ -4822,9 +5182,10 @@ def main() -> None:
             with st.container(border=True, key="scopus_id_section"):
                 st.markdown(
                     '<div class="scopus-id-section">'
-                    '<div class="scopus-id-section-head">Scopus Author ID / '
-                    f'<span class="scopus-id-count{_count_cls}">'
-                    f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} entered"
+                    '<div class="scopus-id-section-head">Scopus Author ID: '
+                    f'<span class="scopus-id-count{_count_cls}" aria-live="polite" '
+                    f'title="Updates as you enter IDs in the field below">'
+                    f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} IDs entered"
                     "</span></div>"
                     '<ul class="scopus-id-section-list">'
                     "<li><strong>HKUST researchers</strong> &ndash; Look for your Scopus ID in your "
@@ -5557,6 +5918,8 @@ def main() -> None:
                             metrics=d.get("metrics"),
                             data_source=d.get("dataSource"),
                         )
+
+        _render_sdg_publications_section(valid, year_key, docs_key)
 
     elif results:
         for r in results:
