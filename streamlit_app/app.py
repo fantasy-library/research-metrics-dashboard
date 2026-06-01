@@ -3435,6 +3435,7 @@ def _publication_preview_df(rows: list[dict]) -> pd.DataFrame:
         "title",
         "authors",
         "type",
+        "oa_status",
         "doi",
         "citedby_count",
         "institutions",
@@ -3444,12 +3445,18 @@ def _publication_preview_df(rows: list[dict]) -> pd.DataFrame:
     if df.empty:
         return df
     keep = [col for col in columns if col in df.columns]
-    return df[keep].rename(
+    df = df[keep].copy()
+    if "type" in df.columns:
+        df["type"] = df["type"].apply(
+            lambda v: _WORK_TYPE_LABELS.get(str(v or "").lower().strip(), str(v or "").replace("-", " ").title())
+        )
+    return df.rename(
         columns={
             "publication_date": "Publication date",
             "title": "Title",
             "authors": "Authors",
             "type": "Type",
+            "oa_status": "OA status",
             "doi": "DOI",
             "citedby_count": "Cited by",
             "institutions": "Institutions",
@@ -3656,6 +3663,212 @@ def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> 
     st.plotly_chart(fig, use_container_width=True)
 
 
+_OA_STATUS_COLORS = {
+    "diamond": "#7dd3fc",
+    "gold": "#facc15",
+    "hybrid": "#efa046",
+    "green": "#22c55e",
+    "bronze": "#cd7f32",
+    "closed": "#6b7280",
+}
+_OA_STATUS_ORDER = ["diamond", "gold", "hybrid", "green", "bronze", "closed"]
+
+# Human-readable publication type labels (OpenAlex values -> display)
+_WORK_TYPE_LABELS: dict[str, str] = {
+    "article": "Article",
+    "review": "Review",
+    "book": "Book",
+    "book-chapter": "Book chapter",
+    "proceedings-article": "Conference paper",
+    "proceedings": "Conference proceedings",
+    "dissertation": "Dissertation",
+    "dataset": "Dataset",
+    "report": "Report",
+    "editorial": "Editorial",
+    "letter": "Letter",
+    "reference-entry": "Reference entry",
+    "standard": "Standard",
+    "other": "Other",
+}
+
+
+def _oa_label(row: dict) -> str:
+    status = str(row.get("oa_status") or "").lower().strip()
+    if status in _OA_STATUS_COLORS:
+        return status
+    is_oa = str(row.get("is_oa") or "").strip().lower()
+    return "gold" if is_oa in ("true", "1", "yes") else "closed"
+
+
+def _render_oa_by_author(rows: list[dict], max_authors: int = 20) -> None:
+    """Horizontal stacked bar: Open Access vs Closed per author (top N by publication count)."""
+    import plotly.graph_objects as go
+
+    author_open: dict[str, int] = {}
+    author_closed: dict[str, int] = {}
+    for row in rows:
+        for name in str(row.get("authors") or "").split(";"):
+            name = name.strip()
+            if not name:
+                continue
+            label = _oa_label(row)
+            if label == "closed":
+                author_closed[name] = author_closed.get(name, 0) + 1
+            else:
+                author_open[name] = author_open.get(name, 0) + 1
+
+    all_authors = set(author_open) | set(author_closed)
+    if not all_authors:
+        st.info("No author data available for OA distribution.")
+        return
+
+    totals = {a: author_open.get(a, 0) + author_closed.get(a, 0) for a in all_authors}
+    top = sorted(totals, key=totals.get, reverse=True)[:max_authors]
+    top_sorted = sorted(top, key=lambda a: totals[a])  # ascending for horizontal bar
+
+    st.markdown("#### OA distribution by author")
+    st.caption(f"OA status distribution for top {len(top_sorted)} authors")
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=top_sorted,
+        x=[author_open.get(a, 0) for a in top_sorted],
+        name="Open access",
+        orientation="h",
+        marker_color="#0c6b2f",
+    ))
+    fig.add_trace(go.Bar(
+        y=top_sorted,
+        x=[author_closed.get(a, 0) for a in top_sorted],
+        name="Closed",
+        orientation="h",
+        marker_color="#6b7280",
+    ))
+    fig.update_layout(
+        barmode="stack",
+        height=max(350, 28 * len(top_sorted) + 80),
+        margin=dict(l=0, r=10, t=10, b=30),
+        legend=dict(title="Open-Access status", orientation="v", x=1.01, xanchor="left", y=1),
+        xaxis_title="Publications",
+        yaxis_title="Author",
+        yaxis=dict(automargin=True),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_oa_ratio(rows: list[dict]) -> None:
+    """Donut chart: Open access vs Closed ratio."""
+    import plotly.graph_objects as go
+
+    open_count = sum(1 for row in rows if _oa_label(row) != "closed")
+    closed_count = sum(1 for row in rows if _oa_label(row) == "closed")
+    if open_count + closed_count == 0:
+        st.info("No OA status data found.")
+        return
+
+    st.markdown("#### Open Access — closed access ratio")
+    st.caption("Open access vs closed")
+
+    fig = go.Figure(data=[go.Pie(
+        labels=["Open access", "Closed"],
+        values=[open_count, closed_count],
+        hole=0.42,
+        sort=False,
+        marker=dict(colors=["#0c6b2f", "#6b7280"], line=dict(color="#ffffff", width=1)),
+        textinfo="none",
+        hovertemplate="%{label}<br>%{value} publications (%{percent})<extra></extra>",
+    )])
+    fig.update_layout(
+        height=370,
+        margin=dict(l=10, r=10, t=10, b=10),
+        legend=dict(title="Access status", orientation="v", x=1.01, xanchor="left", y=0.5, yanchor="middle"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_oa_volume_by_month(rows: list[dict]) -> None:
+    """Stacked bar: publication count by month, coloured by OA status."""
+    import plotly.graph_objects as go
+
+    month_status: dict[str, dict[str, int]] = {}
+    for row in rows:
+        raw_date = str(row.get("publication_date") or "").strip()
+        if not raw_date or len(raw_date) < 7:
+            continue
+        month = raw_date[:7]  # YYYY-MM
+        status = _oa_label(row)
+        month_status.setdefault(month, {})
+        month_status[month][status] = month_status[month].get(status, 0) + 1
+
+    if not month_status:
+        st.info("No publication date data found for the OA volume chart.")
+        return
+
+    months = sorted(month_status.keys())
+    present_statuses = [s for s in _OA_STATUS_ORDER if any(month_status[m].get(s, 0) for m in months)]
+
+    if not present_statuses:
+        st.info("No OA status data found for volume chart.")
+        return
+
+    earliest = pd.to_datetime(months[0] + "-01").strftime("%b %Y")
+    latest = pd.to_datetime(months[-1] + "-01").strftime("%b %Y")
+    st.markdown("#### Publication volume by OA status")
+    st.caption(f"Publications from {earliest} to {latest}")
+
+    fig = go.Figure()
+    for status in present_statuses:
+        fig.add_trace(go.Bar(
+            x=months,
+            y=[month_status[m].get(status, 0) for m in months],
+            name=status,
+            marker_color=_OA_STATUS_COLORS.get(status, "#64748b"),
+        ))
+    fig.update_layout(
+        barmode="stack",
+        height=380,
+        margin=dict(l=10, r=10, t=10, b=40),
+        legend=dict(title="Open-Access status", orientation="v", x=1.01, xanchor="left", y=1),
+        xaxis_title="Publication month",
+        yaxis_title="Publications",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_pub_type_breakdown(rows: list[dict]) -> None:
+    """Horizontal bar: specific publication type counts."""
+    import plotly.graph_objects as go
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        raw = str(row.get("type") or "other").strip().lower()
+        label = _WORK_TYPE_LABELS.get(raw, raw.replace("-", " ").title())
+        counts[label] = counts.get(label, 0) + 1
+
+    if not counts:
+        return
+
+    sorted_types = sorted(counts.items(), key=lambda item: item[1])
+    labels = [t for t, _ in sorted_types]
+    values = [v for _, v in sorted_types]
+
+    fig = go.Figure(go.Bar(
+        y=labels,
+        x=values,
+        orientation="h",
+        marker_color="#4f46e5",
+        text=values,
+        textposition="outside",
+    ))
+    fig.update_layout(
+        height=max(200, 30 * len(labels) + 60),
+        margin=dict(l=0, r=40, t=10, b=30),
+        xaxis_title="Publications",
+        yaxis=dict(automargin=True),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def _render_sdg_publications_section(valid_results: list[dict], year_key: str, docs_key: str) -> None:
     st.markdown(
         '<hr class="charts-export-divider" aria-hidden="true" />',
@@ -3772,10 +3985,21 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         st.info("No publication rows were returned for the selected filters.")
         return
 
-    tab_summary, tab_publications, tab_network = st.tabs(["SDG Summary", "Publications", "Network"])
+    tab_summary, tab_oa, tab_publications, tab_network = st.tabs(
+        ["SDG Summary", "OA Analysis", "Publications", "Network"]
+    )
     with tab_summary:
         _render_sdg_distribution(rows)
+    with tab_oa:
+        _render_oa_ratio(rows)
+        st.divider()
+        _render_oa_by_author(rows)
+        st.divider()
+        _render_oa_volume_by_month(rows)
     with tab_publications:
+        st.markdown("#### Publication type breakdown")
+        _render_pub_type_breakdown(rows)
+        st.divider()
         preview_df = _publication_preview_df(rows)
         st.dataframe(preview_df, use_container_width=True, hide_index=True)
         st.download_button(
