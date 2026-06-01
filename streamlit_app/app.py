@@ -3882,8 +3882,7 @@ _SDG_MODEL_OPTIONS: dict[str, str] = {
 _SDG_DISCLAIMER = (
     "This SDG classification tool has been generated using data provided by the Aurora SDG Classifier API. "
     "Please be aware that classification results presented in this tool are subject to change over time as "
-    "the underlying data is updated and refined. The accuracy of classifications depends on the quality and "
-    "relevance of the input text provided."
+    "the underlying data is updated and refined."
 )
 
 
@@ -3952,61 +3951,44 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     # components.html runs in an isolated iframe so onclick JavaScript and
     # window.parent.postMessage work reliably. The image URL is built at
     # runtime from window.parent.location.origin so it works on any host/port.
-    _btn_clicked = components.html(
+    # CSS anchor immediately before the button so :has() can scope styles
+    # to this button only, without affecting any other button in the app.
+    st.markdown(
         """
-<!DOCTYPE html><html><head>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:transparent; display:flex; align-items:center; padding:4px 0; }
-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: white;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 7px 20px 7px 10px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  font-family: 'Source Sans Pro', 'Helvetica Neue', sans-serif;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-  white-space: nowrap;
+div[data-testid="stMarkdown"]:has(#_sdg-run-btn-anchor_) ~ div[data-testid="stButton"] button {
+    background-color: white !important;
+    background-image: url('/app/static/analysis.gif') !important;
+    background-repeat: no-repeat !important;
+    background-size: 40px 40px !important;
+    background-position: 10px center !important;
+    padding-left: 62px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    color: #0f172a !important;
+    border: 1.5px solid #e2e8f0 !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    min-width: 230px !important;
+    border-radius: 8px !important;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s !important;
 }
-button:hover  { background:#f8fafc; border-color:#94a3b8; box-shadow:0 3px 10px rgba(0,0,0,0.12); }
-button:active { background:#f1f5f9; }
+div[data-testid="stMarkdown"]:has(#_sdg-run-btn-anchor_) ~ div[data-testid="stButton"] button:hover {
+    background-color: #f8fafc !important;
+    border-color: #94a3b8 !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.12) !important;
+}
 </style>
-</head><body>
-<button id="b">
-  <img id="g" src="" width="40" style="display:block">
-  Run Publication Analysis
-</button>
-<script>
-(function(){
-  try { document.getElementById('g').src = window.parent.location.origin + '/app/static/analysis.gif'; }
-  catch(e) {}
-  document.getElementById('b').addEventListener('click', function(){
-    window.parent.postMessage(
-      { type:'streamlit:setComponentValue', value: +new Date(), dataType:'json' },
-      '*'
-    );
-  });
-})();
-</script>
-</body></html>
+<div id="_sdg-run-btn-anchor_"></div>
 """,
-        height=58,
-        scrolling=False,
+        unsafe_allow_html=True,
     )
-    # components.html persists the last sent value across reruns, so compare
-    # against the previously handled timestamp to detect a genuine new click.
-    _last_click_key = "sdg_btn_last_click_ts"
-    _last_handled = st.session_state.get(_last_click_key, 0)
-    fetch_clicked = bool(_btn_clicked) and _btn_clicked != _last_handled
-    if fetch_clicked:
-        st.session_state[_last_click_key] = _btn_clicked
+    fetch_clicked = st.button(
+        "Run Publication Analysis",
+        type="secondary",
+        key="fetch_sdg_publications_button",
+    )
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)
@@ -4101,7 +4083,7 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
         preview_df = _publication_preview_df(rows)
         st.dataframe(preview_df, use_container_width=True, hide_index=True)
         st.download_button(
-            "Download SDG publication CSV",
+            "Download Publications CSV",
             rows_to_csv_bytes(rows),
             file_name=f"sdg-publications-{payload.get('author_id')}.csv",
             mime="text/csv",
