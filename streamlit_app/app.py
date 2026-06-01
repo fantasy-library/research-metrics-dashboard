@@ -3887,11 +3887,11 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         '<hr class="charts-export-divider" aria-hidden="true" />',
         unsafe_allow_html=True,
     )
-    st.markdown("### SDG Publications & Co-affiliation Network")
+    st.markdown("### Publication Analysis: Network, SDGs & OA Status")
     st.caption(
-        "Retrieve publication records by Scopus Author ID, enrich metadata through OpenAlex, "
-        "classify Sustainable Development Goals (SDGs) via the Aurora SDG Classifier API, "
-        "and visualise a co-authorship affiliation network."
+        "Fetch publication records for the selected author to unlock four analysis views: "
+        "**Publications** (type breakdown & full list), **Network** (co-affiliation graph), "
+        "**SDG Summary** (SDG classification donut), and **OA Analysis** (Open Access distribution)."
     )
 
     if not sdg_credentials_available():
@@ -3940,12 +3940,17 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             key="sdg_limit_rows",
         )
 
-    st.info(f"\u26a0\ufe0f **Disclaimer:** {_SDG_DISCLAIMER}", icon=None)
+    st.info(
+        "After fetching you will see four tabs:  \n"
+        "📄 **Publications** &nbsp;•&nbsp; 🔗 **Network** &nbsp;•&nbsp; 🌱 **SDG Summary** &nbsp;•&nbsp; ♻️ **OA Analysis**",
+        icon=None,
+    )
+    st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
     fetch_clicked = st.button(
-        "Fetch SDG publications & build network",
-        type="secondary",
+        "Fetch SDGs publications",
+        type="primary",
         key="fetch_sdg_publications_button",
     )
     if fetch_clicked:
@@ -3997,8 +4002,9 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     result = payload.get("result")
     rows = list(getattr(result, "rows", []) or [])
     st.success(
-        f"Loaded **{len(rows):,}** SDG publication rows for **{payload.get('author_label')}** "
-        f"({getattr(result, 'from_date', '')} to {getattr(result, 'to_date', '')})."
+        f"Loaded **{len(rows):,}** publication rows for **{payload.get('author_label')}** "
+        f"({getattr(result, 'from_date', '')} to {getattr(result, 'to_date', '')}). "
+        "Use the tabs below to explore publications, the co-affiliation network, SDG classifications, and Open Access status."
     )
     if not rows:
         st.info("No publication rows were returned for the selected filters.")
