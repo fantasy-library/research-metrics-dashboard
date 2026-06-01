@@ -3869,6 +3869,15 @@ def _render_pub_type_breakdown(rows: list[dict]) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
+@st.cache_data(show_spinner=False)
+def _load_gif_b64(path: str) -> str | None:
+    """Read a GIF from disk once and return its base64 string (cached across reruns)."""
+    p = Path(path).resolve()
+    if not p.exists():
+        return None
+    return base64.b64encode(p.read_bytes()).decode()
+
+
 _SDG_MODEL_OPTIONS: dict[str, str] = {
     "Elsevier SDG Multi-label (Recommended)": "elsevier-sdg-multi",
     "Aurora SDG Multi-label (Fast)": "aurora-sdg-multi",
@@ -3948,13 +3957,17 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
-    _analysis_gif = Path(__file__).parent.parent / "analysis.gif"
+    _gif_b64 = _load_gif_b64(str(Path(__file__).resolve().parent.parent / "analysis.gif"))
     _col_icon, _col_btn = st.columns([0.07, 0.93])
     with _col_icon:
-        if _analysis_gif.exists():
-            st.image(str(_analysis_gif), width=52)
+        if _gif_b64:
+            st.markdown(
+                f'<img src="data:image/gif;base64,{_gif_b64}" '
+                f'width="52" style="display:block;margin-top:8px">',
+                unsafe_allow_html=True,
+            )
     with _col_btn:
-        st.write("")  # nudge the button down to roughly align with the icon
+        st.write("")
         fetch_clicked = st.button(
             "Run Publication Analysis",
             type="primary",
