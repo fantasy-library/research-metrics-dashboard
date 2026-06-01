@@ -3985,17 +3985,9 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         st.info("No publication rows were returned for the selected filters.")
         return
 
-    tab_summary, tab_oa, tab_publications, tab_network = st.tabs(
-        ["SDG Summary", "OA Analysis", "Publications", "Network"]
+    tab_publications, tab_network, tab_summary, tab_oa = st.tabs(
+        ["Publications", "Network", "SDG Summary", "OA Analysis"]
     )
-    with tab_summary:
-        _render_sdg_distribution(rows)
-    with tab_oa:
-        _render_oa_ratio(rows)
-        st.divider()
-        _render_oa_by_author(rows)
-        st.divider()
-        _render_oa_volume_by_month(rows)
     with tab_publications:
         st.markdown("#### Publication type breakdown")
         _render_pub_type_breakdown(rows)
@@ -4010,11 +4002,24 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             key="download_sdg_publications_csv",
         )
     with tab_network:
+        st.markdown("#### Co-affiliation network")
         st.caption(
-            "Nodes are institutions appearing in the fetched publications. Edges mean two institutions appear together "
-            "on at least one publication."
+            "Each node is an institution (from OpenAlex authorship affiliations on each row). "
+            "An edge means two institutions appeared together on at least one publication. "
+            "When works were discovered via Scopus AU-ID, rows are still filled from OpenAlex by DOI, "
+            "so this view matches a direct OpenAlex fetch. "
+            "Link-strength on a node sums edge weights to partners (not the same as publication count — "
+            "see hover publications in this view)."
         )
         _render_sdg_coaffiliation_network(rows)
+    with tab_summary:
+        _render_sdg_distribution(rows)
+    with tab_oa:
+        _render_oa_ratio(rows)
+        st.divider()
+        _render_oa_by_author(rows)
+        st.divider()
+        _render_oa_volume_by_month(rows)
 
 
 def _enabled_metric_ids(metrics: list) -> list:
