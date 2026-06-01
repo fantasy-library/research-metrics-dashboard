@@ -4005,7 +4005,13 @@ button:active { background:#f1f5f9; }
         height=58,
         scrolling=False,
     )
-    fetch_clicked = bool(_btn_clicked)
+    # components.html persists the last sent value across reruns, so compare
+    # against the previously handled timestamp to detect a genuine new click.
+    _last_click_key = "sdg_btn_last_click_ts"
+    _last_handled = st.session_state.get(_last_click_key, 0)
+    fetch_clicked = bool(_btn_clicked) and _btn_clicked != _last_handled
+    if fetch_clicked:
+        st.session_state[_last_click_key] = _btn_clicked
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)
