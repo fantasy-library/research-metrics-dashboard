@@ -100,7 +100,8 @@ class FetchStats:
     openalex_abstract_missing: int
     scopus_abstract_retrieved: int
     gs_abstract_retrieved: int
-    total_abstracts_available: int = 0  # New field
+    total_abstracts_available: int = 0
+    cached_abstract_retrieved: int = 0   # recovered from local SQLite cache
     # Scopus AU-ID → DOI → OpenAlex bridge (optional; default 0)
     scopus_skipped_no_doi: int = 0
     scopus_skipped_duplicate_doi: int = 0
@@ -1206,6 +1207,7 @@ def enrich_append_openalex_work(
         if cached_abstract:
             emit_progress(f"Using cached abstract for SDG classification: {detail_label}")
             abstract_text = cached_abstract
+            stats.cached_abstract_retrieved += 1
         elif doi:
             emit_progress(f"OpenAlex abstract missing; checking Scopus Abstract API for DOI: {doi}")
             sc_abs = get_abstract_from_scopus(

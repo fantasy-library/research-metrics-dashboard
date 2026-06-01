@@ -3727,7 +3727,7 @@ def _render_oa_by_author(rows: list[dict], max_authors: int = 20) -> None:
     top = sorted(totals, key=totals.get, reverse=True)[:max_authors]
     top_sorted = sorted(top, key=lambda a: totals[a])  # ascending for horizontal bar
 
-    st.markdown("#### OA distribution by author")
+    st.markdown("#### OA distribution by Co-authors")
     st.caption(f"OA status distribution for top {len(top_sorted)} authors")
 
     fig = go.Figure()
@@ -3878,6 +3878,7 @@ def _render_fetch_transparency(stats: object, row_count: int) -> None:
     total_expected       = getattr(stats, "total_expected", None)
     abstracts_available  = int(getattr(stats, "total_abstracts_available", 0) or 0)
     openalex_missing     = int(getattr(stats, "openalex_abstract_missing", 0) or 0)
+    via_cache            = int(getattr(stats, "cached_abstract_retrieved", 0) or 0)
     via_elsevier         = int(getattr(stats, "scopus_abstract_retrieved", 0) or 0)
     via_gs               = int(getattr(stats, "gs_abstract_retrieved", 0) or 0)
     skipped_no_doi       = int(getattr(stats, "scopus_skipped_no_doi", 0) or 0)
@@ -3890,16 +3891,32 @@ def _render_fetch_transparency(stats: object, row_count: int) -> None:
     candidates = int(total_expected) if total_expected is not None else None
     parts: list[str] = []
     if candidates is not None:
-        parts.append(f"Scopus: **{candidates:,}** candidates → **{row_count:,}** rows written (via OpenAlex by DOI)")
+        parts.append(
+            f"Scopus: **{candidates:,}** candidates → **{row_count:,}** rows written (via OpenAlex by DOI)"
+        )
     else:
         parts.append(f"Wrote **{row_count:,}** rows")
 
-    parts.append(
-        f"Abstracts available: **{abstracts_available:,}**. "
-        f"OpenAlex missing abstracts: **{openalex_missing:,}**; "
-        f"abstracts via Elsevier (DOI): **{via_elsevier:,}**; "
-        f"retrieved from Google Scholar: **{via_gs:,}**"
-    )
+    # Abstract sourcing breakdown — show fallback chain: OpenAlex → cache → Elsevier → GS
+    still_missing = max(0, openalex_missing - via_cache - via_elsevier - via_gs)
+    abstract_parts: list[str] = [f"Abstracts available: **{abstracts_available:,}**"]
+    if openalex_missing:
+        fallback_bits: list[str] = []
+        if via_cache:
+            fallback_bits.append(f"**{via_cache:,}** from local cache")
+        if via_elsevier:
+            fallback_bits.append(f"**{via_elsevier:,}** via Elsevier (DOI)")
+        if via_gs:
+            fallback_bits.append(f"**{via_gs:,}** via Google Scholar")
+        recovered_str = (
+            ("; ".join(fallback_bits) + " recovered") if fallback_bits else "none recovered"
+        )
+        abstract_parts.append(
+            f"OpenAlex missing: **{openalex_missing:,}** ({recovered_str}"
+            + (f"; **{still_missing:,}** without abstract" if still_missing else "")
+            + ")"
+        )
+    parts.append("  ".join(abstract_parts))
 
     # ── Skipped breakdown ─────────────────────────────────────────────────
     skipped_parts: list[str] = []
@@ -3914,7 +3931,7 @@ def _render_fetch_transparency(stats: object, row_count: int) -> None:
     if skipped_date:
         skipped_parts.append(f"publication date window: {skipped_date:,}")
     if skipped_parts:
-        parts.append("· skipped (" + "; ".join(skipped_parts) + ")")
+        parts.append("skipped (" + "; ".join(skipped_parts) + ")")
 
     st.caption("  ·  ".join(parts))
 
@@ -3929,6 +3946,39 @@ def _analysis_gif_data_url() -> str:
     except OSError:
         return ""
     return f"data:image/gif;base64,{encoded}"
+
+
+def _inject_button_gif_icon_styles(
+    streamlit_key: str, gif_data_url: str, *, icon_size: str = "1.75rem"
+) -> None:
+    """Render a GIF inside a native ``st.button`` (left of label) via ``::before``."""
+    safe_url = gif_data_url.replace("\\", "\\\\").replace('"', '\\"')
+    key_sel = f'[class*="st-key-{streamlit_key}"]'
+    st.markdown(
+        f"""
+<style>
+{key_sel} button {{
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}}
+{key_sel} button > div {{
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}}
+{key_sel} button::before {{
+  content: "" !important;
+  display: block !important;
+  width: {icon_size} !important;
+  height: {icon_size} !important;
+  flex-shrink: 0 !important;
+  background: url("{safe_url}") center / contain no-repeat !important;
+}}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 _SDG_MODEL_OPTIONS: dict[str, str] = {
@@ -3951,8 +4001,7 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     st.markdown("### Publication Analysis: Network, SDGs & OA Status")
     st.caption(
         "Fetch publication records for the selected author to unlock four analysis views: "
-        "**Publications** (type breakdown & full list), **Network** (co-affiliation graph), "
-        "**SDG Summary** (SDG classification donut), and **OA Analysis** (Open Access distribution)."
+        "**Publications**, **Co-affiliation Network**, **SDG Summary**, and **OA Analysis**."
     )
 
     if not sdg_credentials_available():
@@ -4008,27 +4057,16 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     # last value across reruns and can re-trigger analysis when another widget changes.
     _gif_data_url = _analysis_gif_data_url()
     if _gif_data_url:
-        _icon_col, _button_col = st.columns([0.09, 0.91], vertical_alignment="center")
-        with _icon_col:
-            st.markdown(
-                f'<img src="{_gif_data_url}" alt="" '
-                'style="width:52px;height:52px;object-fit:contain;display:block;" />',
-                unsafe_allow_html=True,
-            )
-        with _button_col:
-            fetch_clicked = st.button(
-                "Run Publication Analysis",
-                type="secondary",
-                key="fetch_sdg_publications_button",
-                icon=":material/analytics:",
-            )
-    else:
-        fetch_clicked = st.button(
-            "Run Publication Analysis",
-            type="secondary",
-            key="fetch_sdg_publications_button",
-            icon=":material/analytics:",
+        _inject_button_gif_icon_styles(
+            "fetch_sdg_publications_button", _gif_data_url, icon_size="1.75rem"
         )
+    _fetch_btn_kwargs: dict = {
+        "type": "secondary",
+        "key": "fetch_sdg_publications_button",
+    }
+    if not _gif_data_url:
+        _fetch_btn_kwargs["icon"] = ":material/analytics:"
+    fetch_clicked = st.button("Run Publication Analysis", **_fetch_btn_kwargs)
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)

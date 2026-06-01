@@ -173,7 +173,7 @@ def fetch_author_sdg_publications(
             user_agent=OPENALEX_USER_AGENT,
             scopus_api_key=SCOPUS_CONTENT_API_KEY,
             scopus_insttoken=ELSEVIER_INSTTOKEN,
-            enable_google_scholar=False,
+            enable_google_scholar=bool(SERPAPI_API_KEY),
             serpapi_api_key=SERPAPI_API_KEY or None,
             progress_callback=progress_callback,
         )
@@ -190,6 +190,7 @@ def fetch_author_sdg_publications(
                 "scopus_abstract_retrieved",
                 "gs_abstract_retrieved",
                 "total_abstracts_available",
+                "cached_abstract_retrieved",
                 "scopus_skipped_no_doi",
                 "scopus_skipped_duplicate_doi",
                 "scopus_doi_not_in_openalex",
