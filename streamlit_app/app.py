@@ -3869,6 +3869,19 @@ def _render_pub_type_breakdown(rows: list[dict]) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
+_SDG_MODEL_OPTIONS: dict[str, str] = {
+    "Elsevier SDG Multi-label (Recommended)": "elsevier-sdg-multi",
+    "Aurora SDG Multi-label (Fast)": "aurora-sdg-multi",
+    "Aurora SDG (High Accuracy)": "aurora-sdg",
+}
+_SDG_DISCLAIMER = (
+    "This SDG classification tool has been generated using data provided by the Aurora SDG Classifier API. "
+    "Please be aware that classification results presented in this tool are subject to change over time as "
+    "the underlying data is updated and refined. The accuracy of classifications depends on the quality and "
+    "relevance of the input text provided."
+)
+
+
 def _render_sdg_publications_section(valid_results: list[dict], year_key: str, docs_key: str) -> None:
     st.markdown(
         '<hr class="charts-export-divider" aria-hidden="true" />',
@@ -3876,14 +3889,17 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     )
     st.markdown("### SDG Publications & Co-affiliation Network")
     st.caption(
-        "Fetch publication records by Scopus Author ID, enrich them through OpenAlex, classify SDGs with Aurora, "
-        "and build a co-affiliation network from publication affiliations."
+        "Retrieve publication records by Scopus Author ID, enrich metadata through OpenAlex, "
+        "classify Sustainable Development Goals (SDGs) via the Aurora SDG Classifier API, "
+        "and visualise a co-authorship affiliation network."
     )
 
     if not sdg_credentials_available():
         st.info(
-            "To enable this section, set an Elsevier API key and `ELSEVIER_INSTTOKEN`. "
-            "Scopus publication search uses the Scopus Content API, which may require separate entitlement from SciVal."
+            "To enable this section set an Elsevier API key (`SCOPUS_API_KEY` or `SCIVAL_API_KEY`) "
+            "and an `ELSEVIER_INSTTOKEN`. "
+            "Scopus publication search uses the Scopus Content API, which may require a separate "
+            "entitlement from SciVal."
         )
         return
 
@@ -3896,23 +3912,24 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         name = str(data.get("authorName") or f"Author {aid}")
         author_options[f"{name} ({aid})"] = aid
     if not author_options:
-        st.info("Analyze at least one valid Scopus Author ID before fetching SDG publications.")
+        st.info("Analyse at least one valid Scopus Author ID above before fetching SDG publications.")
         return
 
     c_author, c_model, c_limit = st.columns([2, 1, 1])
     with c_author:
         selected_label = st.selectbox(
-            "Author for SDG publication fetch",
+            "Author",
             options=list(author_options.keys()),
             key="sdg_author_select",
         )
     with c_model:
-        sdg_model = st.selectbox(
-            "SDG model",
-            options=["aurora-sdg-multi", "aurora-sdg", "elsevier-sdg-multi", "osdg", "skip"],
+        model_label = st.selectbox(
+            "Select Classification Model",
+            options=list(_SDG_MODEL_OPTIONS.keys()),
             index=0,
             key="sdg_model_select",
         )
+        sdg_model = _SDG_MODEL_OPTIONS[model_label]
     with c_limit:
         limit_rows = st.number_input(
             "Max publications",
@@ -3922,6 +3939,8 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             step=25,
             key="sdg_limit_rows",
         )
+
+    st.info(f"\u26a0\ufe0f **Disclaimer:** {_SDG_DISCLAIMER}", icon=None)
 
     selected_author_id = author_options[selected_label]
     fetch_clicked = st.button(
