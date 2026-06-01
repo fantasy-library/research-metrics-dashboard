@@ -4069,8 +4069,35 @@ button:active { background:#f1f5f9; }
         st.info("No publication rows were returned for the selected filters.")
         return
 
+    st.markdown(
+        """
+<style>
+/* Make the analysis-result tabs larger and more prominent */
+div[data-testid="stTabs"] button[data-baseweb="tab"] {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    padding: 10px 22px !important;
+    color: #475569 !important;
+    border-bottom: 3px solid transparent !important;
+    transition: color 0.15s, border-color 0.15s !important;
+    gap: 6px !important;
+}
+div[data-testid="stTabs"] button[data-baseweb="tab"]:hover {
+    color: #4f46e5 !important;
+    background: #f1f0fe !important;
+    border-radius: 8px 8px 0 0 !important;
+}
+div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
+    color: #4f46e5 !important;
+    border-bottom: 3px solid #4f46e5 !important;
+    background: transparent !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
     tab_publications, tab_network, tab_summary, tab_oa = st.tabs(
-        ["Publications", "Network", "SDG Summary", "OA Analysis"]
+        ["📄  Publications", "🔗  Network", "🌱  SDG Summary", "🔓  OA Analysis"]
     )
     with tab_publications:
         st.markdown("#### Publication type breakdown")
