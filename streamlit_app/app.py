@@ -3942,17 +3942,24 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
 
     st.info(
         "After fetching you will see four tabs:  \n"
-        "📄 **Publications** &nbsp;•&nbsp; 🔗 **Network** &nbsp;•&nbsp; 🌱 **SDG Summary** &nbsp;•&nbsp; ♻️ **OA Analysis**",
+        "📄 **Publications** &nbsp;•&nbsp; 🔗 **Network** &nbsp;•&nbsp; 🌱 **SDG Summary** &nbsp;•&nbsp; 🔓 **OA Analysis**",
         icon=None,
     )
     st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
-    fetch_clicked = st.button(
-        "Fetch SDGs publications",
-        type="primary",
-        key="fetch_sdg_publications_button",
-    )
+    _analysis_gif = Path(__file__).parent.parent / "analysis.gif"
+    _col_icon, _col_btn = st.columns([0.07, 0.93])
+    with _col_icon:
+        if _analysis_gif.exists():
+            st.image(str(_analysis_gif), width=52)
+    with _col_btn:
+        st.write("")  # nudge the button down to roughly align with the icon
+        fetch_clicked = st.button(
+            "Run Publication Analysis",
+            type="primary",
+            key="fetch_sdg_publications_button",
+        )
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)
