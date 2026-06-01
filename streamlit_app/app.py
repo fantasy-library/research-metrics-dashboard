@@ -3945,11 +3945,6 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             key="sdg_limit_rows",
         )
 
-    st.info(
-        "After fetching you will see four tabs:  \n"
-        "📄 **Publications** &nbsp;•&nbsp; 🔗 **Network** &nbsp;•&nbsp; 🌱 **SDG Summary** &nbsp;•&nbsp; 🔓 **OA Analysis**",
-        icon=None,
-    )
     st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
