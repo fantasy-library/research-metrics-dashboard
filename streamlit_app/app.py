@@ -3953,39 +3953,41 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
 
     selected_author_id = author_options[selected_label]
-    # Anchor div + CSS so the GIF icon is embedded inside this button only,
-    # without affecting other buttons elsewhere in the app.
+    # Scope button styling to only the row that contains the analysis GIF.
     st.markdown(
-        f"""
+        """
 <style>
-div#_run-analysis-anchor_ ~ div[data-testid="stButton"] button {{
+div[data-testid="stHorizontalBlock"]:has(img.analysis-run-icon) button {
     background-color: white !important;
-    background-image: url('{_ANALYSIS_GIF_URL}') !important;
-    background-repeat: no-repeat !important;
-    background-size: 38px 38px !important;
-    background-position: 14px center !important;
-    padding-left: 62px !important;
     color: #0f172a !important;
     border: 1.5px solid #e2e8f0 !important;
     box-shadow: 0 2px 6px rgba(0,0,0,0.10) !important;
     font-weight: 600 !important;
-    min-width: 220px;
-}}
-div#_run-analysis-anchor_ ~ div[data-testid="stButton"] button:hover {{
+    min-width: 200px;
+}
+div[data-testid="stHorizontalBlock"]:has(img.analysis-run-icon) button:hover {
     background-color: #f8fafc !important;
     border-color: #94a3b8 !important;
     box-shadow: 0 3px 10px rgba(0,0,0,0.13) !important;
-}}
+}
 </style>
-<div id="_run-analysis-anchor_"></div>
 """,
         unsafe_allow_html=True,
     )
-    fetch_clicked = st.button(
-        "Run Publication Analysis",
-        type="secondary",
-        key="fetch_sdg_publications_button",
-    )
+    _col_icon, _col_btn = st.columns([0.08, 0.92])
+    with _col_icon:
+        st.markdown(
+            '<img class="analysis-run-icon" src="/app/static/analysis.gif" '
+            'width="54" style="display:block;margin-top:6px">',
+            unsafe_allow_html=True,
+        )
+    with _col_btn:
+        st.write("")
+        fetch_clicked = st.button(
+            "Run Publication Analysis",
+            type="secondary",
+            key="fetch_sdg_publications_button",
+        )
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         progress_bar = st.progress(0)
