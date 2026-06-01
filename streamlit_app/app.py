@@ -3952,6 +3952,8 @@ def _inject_button_gif_icon_styles(
     streamlit_key: str, gif_data_url: str, *, icon_size: str = "1.75rem"
 ) -> None:
     """Render a GIF inside a native ``st.button`` (left of label) via ``::before``."""
+    if not gif_data_url.startswith("data:image/gif;base64,"):
+        return
     safe_url = gif_data_url.replace("\\", "\\\\").replace('"', '\\"')
     key_sel = f'[class*="st-key-{streamlit_key}"]'
     st.markdown(
@@ -4069,18 +4071,29 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     fetch_clicked = st.button("Run Publication Analysis", **_fetch_btn_kwargs)
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
+        # Clear previous result so stale data is never shown after a failed re-fetch
+        st.session_state.sdg_publication_result = None
         progress_bar = st.progress(0)
         progress_text = st.empty()
 
         def progress_callback(done: int, expected: int | None, message: str) -> None:
-            target = expected or int(limit_rows) or 1
-            progress_bar.progress(min(done / target, 1.0))
+            # Use candidates_scanned (from stats via closure) when available so the
+            # bar moves steadily even for skipped entries, not only accepted rows.
+            scanned = getattr(
+                getattr(st.session_state, "_sdg_fetch_stats_live", None),
+                "scopus_candidates_scanned", None,
+            )
+            denominator = scanned or expected or int(limit_rows) or 1
+            progress_bar.progress(min(done / denominator, 0.99))
             detail = f" — {message}" if message else ""
             if expected:
-                progress_text.text(f"Accepted {done:,} of {expected:,} Scopus candidates{detail}")
+                progress_text.text(
+                    f"Accepted {done:,} of up to {min(int(limit_rows), expected):,} publications{detail}"
+                )
             else:
                 progress_text.text(f"Accepted {done:,} publications{detail}")
 
+        fetch_error: str = ""
         try:
             with st.spinner("Fetching Scopus publications, OpenAlex metadata, and Aurora SDG labels..."):
                 result = fetch_author_sdg_publications(
@@ -4103,10 +4116,14 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             progress_bar.progress(1.0)
             progress_text.text(f"Fetched {len(result.rows):,} publication rows.")
         except (SDGServiceError, ValueError) as exc:
-            st.session_state.sdg_publication_error = str(exc)
+            fetch_error = str(exc)
         except Exception as exc:
-            st.session_state.sdg_publication_error = f"SDG publication fetch failed: {exc}"
-        finally:
+            fetch_error = (
+                "An unexpected error occurred while fetching publications. "
+                f"Details: {type(exc).__name__}: {exc}"
+            )
+        if fetch_error:
+            st.session_state.sdg_publication_error = fetch_error
             progress_bar.empty()
             progress_text.empty()
 
@@ -4118,6 +4135,22 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         return
     result = payload.get("result")
     rows = list(getattr(result, "rows", []) or [])
+
+    # Warn if the user has changed filters since the last fetch without re-running
+    _payload_year = payload.get("year_key")
+    _payload_docs = payload.get("docs_key")
+    _payload_author = payload.get("author_id")
+    if (
+        _payload_author != selected_author_id
+        or _payload_year != year_key
+        or _payload_docs != docs_key
+    ):
+        st.warning(
+            "The filters or author selection have changed since the last fetch. "
+            "Click **Run Publication Analysis** again to refresh the results.",
+            icon=":material/refresh:",
+        )
+
     st.success(
         f"Loaded **{len(rows):,}** publication rows for **{payload.get('author_label')}** "
         f"({getattr(result, 'from_date', '')} – {getattr(result, 'to_date', '')}). "

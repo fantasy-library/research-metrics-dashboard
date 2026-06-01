@@ -103,6 +103,7 @@ class FetchStats:
     total_abstracts_available: int = 0
     cached_abstract_retrieved: int = 0   # recovered from local SQLite cache
     # Scopus AU-ID → DOI → OpenAlex bridge (optional; default 0)
+    scopus_candidates_scanned: int = 0   # entries touched in the Scopus result set
     scopus_skipped_no_doi: int = 0
     scopus_skipped_duplicate_doi: int = 0
     scopus_doi_not_in_openalex: int = 0
@@ -1414,12 +1415,46 @@ def fetch_author_publications_scopus_with_sdg(
             params["start"] = start
             params["count"] = page_size
             emit_progress(f"Searching Scopus records {start + 1:,}-{start + page_size:,}")
-            resp = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=90)
-            if resp.status_code == 400 and page_size > 25:
-                page_size = 25
-                params["count"] = page_size
+            try:
                 resp = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=90)
-            resp.raise_for_status()
+                if resp.status_code == 400 and page_size > 25:
+                    page_size = 25
+                    params["count"] = page_size
+                    resp = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=90)
+                if resp.status_code in (401, 403):
+                    raise ValueError(
+                        "Scopus API credentials were rejected (HTTP "
+                        f"{resp.status_code}). Check that SCOPUS_API_KEY and "
+                        "ELSEVIER_INSTTOKEN are correct and have not expired."
+                    )
+                if resp.status_code == 429:
+                    raise ValueError(
+                        "Scopus API rate limit reached. Wait a minute and try again, "
+                        "or reduce the Max publications limit."
+                    )
+                if resp.status_code >= 500:
+                    raise ValueError(
+                        f"Scopus API returned a server error (HTTP {resp.status_code}). "
+                        "This is an Elsevier-side issue — please try again in a few minutes."
+                    )
+                resp.raise_for_status()
+            except requests.Timeout:
+                raise ValueError(
+                    "The Scopus API request timed out. Try reducing the Max publications "
+                    "limit or retry when the service is less busy."
+                )
+            except requests.ConnectionError:
+                raise ValueError(
+                    "Could not reach the Scopus API. Check your internet connection and "
+                    "try again."
+                )
+            except ValueError:
+                raise
+            except requests.RequestException as _http_exc:
+                raise ValueError(
+                    f"Scopus API request failed: {type(_http_exc).__name__}. "
+                    "Check your credentials and network connection."
+                ) from _http_exc
             total_page, entry_els = parse_scopus_search_xml_page(resp.content)
             if total_reported is None and total_page is not None:
                 total_reported = total_page
@@ -1432,6 +1467,7 @@ def fetch_author_publications_scopus_with_sdg(
                 if limit_rows is not None and stats.total_processed >= limit_rows:
                     break
 
+                stats.scopus_candidates_scanned += 1
                 doi_raw = _scopus_entry_first_text(entry_el, "doi")
                 doi_norm = normalize_doi_for_openalex(doi_raw)
                 if not doi_norm:
@@ -1542,7 +1578,10 @@ def format_sdg_predictions(sdg_json: Optional[dict]) -> str:
                 continue
             match = re.search(r"\bSDG\s*(\d+)", str(label), flags=re.I)
             code = match.group(1) if match else ""
-            items.append((float(score), code, str(label)))
+            try:
+                items.append((float(score), code, str(label)))
+            except (TypeError, ValueError):
+                continue
 
     if (
         not items
@@ -1555,7 +1594,10 @@ def format_sdg_predictions(sdg_json: Optional[dict]) -> str:
         for label, score in zip(labels, scores):
             match = re.search(r"\bSDG\s*(\d+)", str(label), flags=re.I)
             code = match.group(1) if match else ""
-            items.append((float(score), code, str(label)))
+            try:
+                items.append((float(score), code, str(label)))
+            except (TypeError, ValueError):
+                continue
 
     if not items and isinstance(sdg_json, dict):
         numeric_keys = [key for key in sdg_json.keys() if str(key).isdigit()]
@@ -1577,7 +1619,10 @@ def format_sdg_predictions(sdg_json: Optional[dict]) -> str:
             name = entry.get("name") or entry.get("label")
             if code is None or score is None:
                 continue
-            items.append((float(score), code, name))
+            try:
+                items.append((float(score), code, name))
+            except (TypeError, ValueError):
+                continue
 
     if not items:
         return ""

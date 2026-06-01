@@ -191,6 +191,7 @@ def fetch_author_sdg_publications(
                 "gs_abstract_retrieved",
                 "total_abstracts_available",
                 "cached_abstract_retrieved",
+                "scopus_candidates_scanned",
                 "scopus_skipped_no_doi",
                 "scopus_skipped_duplicate_doi",
                 "scopus_doi_not_in_openalex",
