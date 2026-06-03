@@ -434,6 +434,86 @@ def _inject_export_download_styles() -> None:
     )
 
 
+def _inject_publications_csv_download_styles() -> None:
+    """Green pill download button for Publications tab CSV (matches Export as Excel look)."""
+    from urllib.parse import quote
+
+    svg_doc = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff">'
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 1.4L18.6 9H14V3.4zM8 11h8v1.15H8V11zm0 2.65h8v1.15H8v-1.15zm0 2.65h6v1.15H8v-1.15z"/>'
+        "</svg>"
+    )
+    svg_dl = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
+        'stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M5 21h14"/>'
+        "</svg>"
+    )
+    u_doc, u_dl = quote(svg_doc, safe=""), quote(svg_dl, safe="")
+    scope = '[class*="st-key-download_publications_csv_row"]'
+    st.markdown(
+        f"""
+<style>
+{scope} {{
+  display: block !important;
+  width: 100% !important;
+  margin-top: 0.75rem !important;
+}}
+{scope} [data-testid="stDownloadButton"],
+{scope} .stDownloadButton {{
+  width: 100% !important;
+}}
+{scope} [data-testid="stDownloadButton"] button,
+{scope} .stDownloadButton > button {{
+  width: 100% !important;
+  min-height: 2.75rem !important;
+  height: auto !important;
+  padding: 0.65rem 1.35rem !important;
+  border-radius: 9999px !important;
+  border: none !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  font-weight: 700 !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.25 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 18px rgba(34, 197, 94, 0.35) !important;
+  background: linear-gradient(90deg, #bbf7d0 0%, #86efac 38%, #4ade80 72%, #22c55e 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
+  transition: filter 0.15s ease, box-shadow 0.15s ease !important;
+}}
+{scope} [data-testid="stDownloadButton"] button:hover,
+{scope} .stDownloadButton > button:hover {{
+  filter: brightness(1.04) saturate(1.06);
+  box-shadow: 0 6px 22px rgba(22, 163, 74, 0.42) !important;
+}}
+{scope} [data-testid="stDownloadButton"] button::before,
+{scope} .stDownloadButton > button::before {{
+  content: "" !important;
+  display: block !important;
+  width: 1.15rem !important;
+  height: 1.15rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_doc}") center / contain no-repeat !important;
+}}
+{scope} [data-testid="stDownloadButton"] button::after,
+{scope} .stDownloadButton > button::after {{
+  content: "" !important;
+  display: block !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
+}}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _inject_theme_css() -> None:
     """Approximate the original Tailwind look (gradients, glass cards, typography)."""
     st.markdown(
@@ -2833,6 +2913,7 @@ footer.site-footer .site-footer-copy {
         unsafe_allow_html=True,
     )
     _inject_export_download_styles()
+    _inject_publications_csv_download_styles()
 
 
 def _render_footer_html() -> None:
@@ -3394,7 +3475,7 @@ def _render_sdg_distribution(rows: list[dict]) -> None:
         st.warning(f"Install Plotly to render the SDG donut chart: {exc}")
         return
 
-    ordered = sorted(counts.items(), key=lambda item: int(item[0]))
+    ordered = sorted(counts.items(), key=lambda item: item[1], reverse=True)
     labels = [f"SDG {code} ({SDG_NAMES.get(code, 'Unknown')})" for code, _ in ordered]
     values = [count for _, count in ordered]
     colors = [SDG_COLORS.get(code, "#64748b") for code, _ in ordered]
@@ -4131,7 +4212,7 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
     if not inst_token:
         st.warning(
             "ASJC lookup requires **`ELSEVIER_INSTTOKEN`** (institutional token) in addition to your "
-            "Scopus API key — the same credentials used for **Run Publication Analysis**. "
+            "Scopus API key — the same credentials used for **Run Publications Analysis**. "
             "Without it, Elsevier Serial Title and Scopus Search calls are rejected.",
             icon=":material/key:",
         )
@@ -4193,10 +4274,10 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
         )
         with st.expander("Troubleshooting"):
             st.markdown(
-                "- Confirm **`SCOPUS_API_KEY`** and **`ELSEVIER_INSTTOKEN`** are set (same as Publication Analysis).\n"
+                "- Confirm **`SCOPUS_API_KEY`** and **`ELSEVIER_INSTTOKEN`** are set (same as Publications Analysis).\n"
                 "- Elsevier calls use **`apiKey`** + **`insttoken`** query parameters (see Scopus_Wos reference).\n"
                 "- DOIs are normalized from `https://doi.org/…` before lookup.\n"
-                "- Re-run **Run Publication Analysis** after changing credentials, then open this tab again."
+                "- Re-run **Run Publications Analysis** after changing credentials, then open this tab again."
             )
         return
 
@@ -4326,7 +4407,7 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         '<hr class="charts-export-divider" aria-hidden="true" />',
         unsafe_allow_html=True,
     )
-    st.markdown("### Publication Analysis: Network, SDGs & OA Status")
+    st.markdown("### Publications Analysis: Network, SDGs & OA Status")
     st.caption(
         "Fetch publication records for the selected author to unlock five analysis views: "
         "**Publications**, **Co-affiliation Network**, **SDG Summary**, **OA Analysis**, and **Subject (ASJC)**."
@@ -4394,7 +4475,7 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     }
     if not _gif_data_url:
         _fetch_btn_kwargs["icon"] = ":material/analytics:"
-    fetch_clicked = st.button("Run Publication Analysis", **_fetch_btn_kwargs)
+    fetch_clicked = st.button("Run Publications Analysis", **_fetch_btn_kwargs)
     if fetch_clicked:
         st.session_state.sdg_publication_error = ""
         # Clear previous result so stale data is never shown after a failed re-fetch
@@ -4473,7 +4554,7 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     ):
         st.warning(
             "The filters or author selection have changed since the last fetch. "
-            "Click **Run Publication Analysis** again to refresh the results.",
+            "Click **Run Publications Analysis** again to refresh the results.",
             icon=":material/refresh:",
         )
 
@@ -4523,13 +4604,15 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
         st.divider()
         preview_df = _publication_preview_df(rows)
         st.dataframe(preview_df, use_container_width=True, hide_index=True)
-        st.download_button(
-            "Download Publications CSV",
-            rows_to_csv_bytes(rows),
-            file_name=f"sdg-publications-{payload.get('author_id')}.csv",
-            mime="text/csv",
-            key="download_sdg_publications_csv",
-        )
+        with st.container(border=False, key="download_publications_csv_row"):
+            st.download_button(
+                "Download Publications CSV",
+                rows_to_csv_bytes(rows),
+                file_name=f"sdg-publications-{payload.get('author_id')}.csv",
+                mime="text/csv",
+                key="download_sdg_publications_csv",
+                use_container_width=True,
+            )
     with tab_asjc:
         _render_asjc_subjects(rows)
     with tab_network:
@@ -6014,24 +6097,6 @@ def _document_type_series_for_chart(
     return series
 
 
-def _document_type_totals_df(breakdown: dict | None) -> pd.DataFrame:
-    if not breakdown:
-        return pd.DataFrame()
-    items = breakdown.get("items") or []
-    rows: list[dict[str, object]] = []
-    for item in items:
-        label = str(item.get("label") or "").strip()
-        if not label:
-            continue
-        rows.append(
-            {
-                "Document type": "Other / residual" if label == "Other" else label,
-                "Publications": item.get("count", 0),
-            }
-        )
-    return pd.DataFrame(rows)
-
-
 def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
     """Centered Notice modal (warning | error | info); dismiss with OK."""
     st.session_state["_notice_dialog_body"] = body
@@ -6748,20 +6813,6 @@ def main() -> None:
                                     height="500px",
                                     key=f"echarts_{aid}_{plot_metric}_doctype",
                                 )
-                                doc_type_totals_df = _document_type_totals_df(doc_type_breakdown)
-                                if not doc_type_totals_df.empty:
-                                    st.caption(
-                                        "Document type detail is derived from SciVal aggregate `includedDocs` buckets. "
-                                        "`Other / residual` means all publication types minus articles, reviews, "
-                                        "conference papers, and books/book chapters. It may include editorials, "
-                                        "letters, notes, reports, short surveys, data papers, and other indexed items. "
-                                        "Run Publication Analysis for publication-level OpenAlex types where available."
-                                    )
-                                    st.dataframe(
-                                        doc_type_totals_df,
-                                        use_container_width=True,
-                                        hide_index=True,
-                                    )
                             else:
                                 values = [by_year.get(str(y)) for y in years]
                                 values = [
