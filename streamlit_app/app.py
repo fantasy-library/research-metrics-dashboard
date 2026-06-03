@@ -37,7 +37,7 @@ from streamlit_app.api_service import (
     is_scival_authentication_error,
     resolve_author_ids_for_metrics_safe,
 )
-from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_API
+from streamlit_app.config import ELSEVIER_INSTTOKEN, SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, SCOPUS_CONTENT_API_KEY, USE_DIRECT_API
 from streamlit_app.export_utils import export_docx_bytes, export_excel_bytes, export_pdf_bytes
 from streamlit_app.sdg_service import (
     SDGServiceError,
@@ -3995,6 +3995,231 @@ _SDG_DISCLAIMER = (
 )
 
 
+# ── ASJC Subject Area helpers ──────────────────────────────────────────────
+
+def _get_issn_from_doi(doi: str, api_key: str) -> str | None:
+    """Return the ISSN (or EISSN) of the journal for a given DOI via Scopus Search API."""
+    import requests as _req
+
+    try:
+        resp = _req.get(
+            "https://api.elsevier.com/content/search/scopus",
+            headers={"Accept": "application/json", "X-ELS-APIKey": api_key},
+            params={"query": f"DOI({doi})", "count": 1},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            entries = resp.json().get("search-results", {}).get("entry", [])
+            if entries:
+                return entries[0].get("prism:issn") or entries[0].get("prism:eissn") or None
+    except Exception:
+        pass
+    return None
+
+
+def _get_asjc_subjects_by_issn(issn: str, api_key: str) -> list[tuple[str, str]]:
+    """Return list of (code, name) ASJC subject areas for a journal ISSN."""
+    import requests as _req
+
+    try:
+        resp = _req.get(
+            f"https://api.elsevier.com/content/serial/title/issn/{issn}",
+            headers={"Accept": "application/json", "X-ELS-APIKey": api_key},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            entries = resp.json().get("serial-metadata-response", {}).get("entry", [])
+            if entries:
+                areas = entries[0].get("subject-area", [])
+                if isinstance(areas, dict):
+                    areas = [areas]
+                return [(a.get("@code", ""), a.get("$", "Unknown")) for a in areas if a.get("$")]
+    except Exception:
+        pass
+    return []
+
+
+def _render_asjc_subjects(rows: list[dict]) -> None:
+    """Fetch ASJC subject areas via DOI → ISSN → Serial Title API and render charts."""
+    import plotly.graph_objects as go
+
+    api_key = SCOPUS_CONTENT_API_KEY
+    if not api_key:
+        st.warning(
+            "An Elsevier API key (`SCOPUS_API_KEY` or equivalent) is required to fetch ASJC subjects. "
+            "Set it in your `.env` file.",
+            icon=":material/key:",
+        )
+        return
+
+    dois = [str(r.get("doi") or "").strip() for r in rows if r.get("doi")]
+    dois = list(dict.fromkeys(d for d in dois if d))  # unique, preserve order
+
+    if not dois:
+        st.info("No DOIs were found in the fetched publications — cannot look up ASJC subjects.")
+        return
+
+    cache_key = "asjc_subject_cache"
+    if cache_key not in st.session_state:
+        st.session_state[cache_key] = {}
+
+    cached: dict = st.session_state[cache_key]
+    uncached_dois = [d for d in dois if d not in cached]
+
+    if uncached_dois:
+        prog = st.progress(0, text="Fetching journal subjects from Scopus…")
+        total = len(uncached_dois)
+        for i, doi in enumerate(uncached_dois):
+            issn = _get_issn_from_doi(doi, api_key)
+            subjects: list[tuple[str, str]] = []
+            if issn:
+                issn_clean = issn.replace("-", "")
+                if issn_clean not in st.session_state.get("asjc_issn_cache", {}):
+                    subjects = _get_asjc_subjects_by_issn(issn_clean, api_key)
+                    if "asjc_issn_cache" not in st.session_state:
+                        st.session_state["asjc_issn_cache"] = {}
+                    st.session_state["asjc_issn_cache"][issn_clean] = subjects
+                else:
+                    subjects = st.session_state["asjc_issn_cache"][issn_clean]
+            cached[doi] = {"issn": issn, "subjects": subjects}
+            prog.progress((i + 1) / total, text=f"Fetching journal subjects… {i+1}/{total}")
+        prog.empty()
+        st.session_state[cache_key] = cached
+
+    # Aggregate subject area counts across all publications
+    subject_counts: dict[str, int] = {}
+    for doi in dois:
+        for _code, name in (cached.get(doi) or {}).get("subjects", []):
+            subject_counts[name] = subject_counts.get(name, 0) + 1
+
+    if not subject_counts:
+        st.info(
+            "No ASJC subject areas were retrieved. "
+            "This may be because the DOIs could not be matched in the Scopus journal index."
+        )
+        return
+
+    sorted_subjects = sorted(subject_counts.items(), key=lambda x: x[1], reverse=True)
+    top_subjects = sorted_subjects[:30]  # cap at 30 for readability
+
+    labels = [s for s, _ in reversed(top_subjects)]
+    values = [v for _, v in reversed(top_subjects)]
+
+    total_pubs = len(dois)
+    st.markdown("#### ASJC Subject Area distribution")
+    st.caption(
+        f"ASJC (All Science Journal Classification) codes resolved for **{total_pubs}** publications "
+        f"via Scopus Serial Title API. A publication may span multiple subject areas."
+    )
+
+    palette = [
+        "#4f46e5", "#7c3aed", "#db2777", "#ea580c", "#d97706",
+        "#16a34a", "#0891b2", "#2563eb", "#9333ea", "#c026d3",
+    ]
+    bar_colors = [palette[i % len(palette)] for i in range(len(labels))]
+
+    fig = go.Figure(go.Bar(
+        y=labels,
+        x=values,
+        orientation="h",
+        marker_color=list(reversed(bar_colors)),
+        text=values,
+        textposition="outside",
+        hovertemplate="%{y}<br>%{x} publications<extra></extra>",
+    ))
+    fig.update_layout(
+        height=max(300, 26 * len(labels) + 80),
+        margin=dict(l=0, r=60, t=10, b=30),
+        xaxis_title="Number of publications",
+        yaxis=dict(automargin=True, tickfont=dict(size=11)),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ── Donut chart of top-10 for a quick overview ─────────────────────────
+    top10 = sorted_subjects[:10]
+    st.markdown("#### Top 10 subject areas (share)")
+    pie_colors = [
+        "#4f46e5", "#7c3aed", "#db2777", "#ea580c", "#d97706",
+        "#16a34a", "#0891b2", "#2563eb", "#9333ea", "#c026d3",
+    ]
+    fig2 = go.Figure(go.Pie(
+        labels=[s for s, _ in top10],
+        values=[v for _, v in top10],
+        hole=0.42,
+        marker=dict(colors=pie_colors[:len(top10)], line=dict(color="#ffffff", width=1.5)),
+        textinfo="none",
+        hovertemplate="%{label}<br>%{value} publications<extra></extra>",
+    ))
+    fig2.update_layout(
+        height=400,
+        margin=dict(l=10, r=10, t=10, b=10),
+        legend=dict(
+            orientation="v",
+            y=0.5,
+            yanchor="middle",
+            x=1.02,
+            xanchor="left",
+            font=dict(size=11),
+        ),
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
+
+def _render_abstract_wordcloud(rows: list[dict]) -> None:
+    """Generate and display a word cloud from publication abstracts."""
+    abstracts = [str(r.get("abstract") or "").strip() for r in rows]
+    combined = " ".join(a for a in abstracts if a)
+
+    if not combined:
+        st.info("No abstracts were found in the fetched publications — cannot generate a word cloud.")
+        return
+
+    try:
+        from wordcloud import WordCloud, STOPWORDS
+    except ImportError:
+        st.warning("Install `wordcloud` (`pip install wordcloud`) to generate the abstract word cloud.")
+        return
+
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        st.warning("Install `matplotlib` to display the word cloud.")
+        return
+
+    st.markdown("#### Abstract word cloud")
+    st.caption("Most frequent terms across all available abstracts (common English stop-words removed).")
+
+    extra_stops = {
+        "study", "research", "results", "result", "findings", "finding",
+        "paper", "using", "used", "use", "based", "analysis", "data",
+        "also", "however", "show", "shows", "shown", "two", "three",
+        "proposed", "present", "presented", "method", "methods",
+        "approach", "approaches", "model", "models",
+    }
+    stopwords = STOPWORDS | extra_stops
+
+    wc = WordCloud(
+        width=1200,
+        height=540,
+        background_color="white",
+        colormap="RdYlBu",
+        stopwords=stopwords,
+        max_words=120,
+        collocations=False,
+        prefer_horizontal=0.85,
+        min_font_size=10,
+    ).generate(combined)
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
+    fig.tight_layout(pad=0)
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
 def _render_sdg_publications_section(valid_results: list[dict], year_key: str, docs_key: str) -> None:
     st.markdown(
         '<hr class="charts-export-divider" aria-hidden="true" />',
@@ -4002,8 +4227,8 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     )
     st.markdown("### Publication Analysis: Network, SDGs & OA Status")
     st.caption(
-        "Fetch publication records for the selected author to unlock four analysis views: "
-        "**Publications**, **Co-affiliation Network**, **SDG Summary**, and **OA Analysis**."
+        "Fetch publication records for the selected author to unlock five analysis views: "
+        "**Publications**, **Co-affiliation Network**, **SDG Summary**, **OA Analysis**, and **Subject (ASJC)**."
     )
 
     if not sdg_credentials_available():
@@ -4188,8 +4413,8 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
 """,
         unsafe_allow_html=True,
     )
-    tab_publications, tab_network, tab_summary, tab_oa = st.tabs(
-        ["📄  Publications", "🔗  Network", "🌱  SDG Summary", "🔓  OA Analysis"]
+    tab_publications, tab_asjc, tab_network, tab_summary, tab_oa = st.tabs(
+        ["📄  Publications", "🏷️  Subject (ASJC)", "🔗  Network", "🌱  SDG Summary", "🔓  OA Analysis"]
     )
     with tab_publications:
         st.markdown("#### Publication type breakdown")
@@ -4204,6 +4429,10 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
             mime="text/csv",
             key="download_sdg_publications_csv",
         )
+    with tab_asjc:
+        _render_asjc_subjects(rows)
+        st.divider()
+        _render_abstract_wordcloud(rows)
     with tab_network:
         st.markdown("#### Co-affiliation network")
         st.caption(
