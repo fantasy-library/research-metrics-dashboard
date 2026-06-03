@@ -3995,45 +3995,121 @@ _SDG_DISCLAIMER = (
 )
 
 
-# ── ASJC Subject Area helpers ──────────────────────────────────────────────
+# ── ASJC Subject Area helpers (aligned with Scopus_Wos Serial Title API usage) ──
 
-def _get_issn_from_doi(doi: str, api_key: str) -> str | None:
-    """Return the ISSN (or EISSN) of the journal for a given DOI via Scopus Search API."""
+def _normalize_doi_for_elsevier(doi: str) -> str:
+    """Bare DOI (10.x/…) for Elsevier Scopus queries — rows often store https://doi.org/…"""
+    if not doi:
+        return ""
+    cleaned = doi.strip()
+    for prefix in (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi:",
+    ):
+        if cleaned.lower().startswith(prefix.lower()):
+            cleaned = cleaned[len(prefix) :].strip()
+    return cleaned.strip()
+
+
+def _clean_issn_for_scopus(issn: str | None) -> str | None:
+    """8-character ISSN without hyphen (Scopus_Wos ``clean_issn``)."""
+    if not issn or not isinstance(issn, str):
+        return None
+    cleaned = re.sub(r"[-\s]", "", issn.strip().upper())
+    return cleaned if len(cleaned) == 8 else None
+
+
+def _elsevier_scopus_params(api_key: str, inst_token: str) -> dict[str, str]:
+    """Query params for Elsevier Scopus / Serial Title APIs (apiKey + insttoken)."""
+    params: dict[str, str] = {"apiKey": api_key.strip(), "httpAccept": "application/json"}
+    inst = (inst_token or "").strip()
+    if inst:
+        params["insttoken"] = inst
+    return params
+
+
+def _scopus_search_entries(payload: dict) -> list[dict]:
+    """Normalize Scopus Search ``entry`` (single dict when count=1, else list)."""
+    raw = payload.get("search-results", {}).get("entry", [])
+    if isinstance(raw, dict):
+        return [raw]
+    if isinstance(raw, list):
+        return [e for e in raw if isinstance(e, dict)]
+    return []
+
+
+def _serial_title_entries(payload: dict) -> list[dict]:
+    raw = payload.get("serial-metadata-response", {}).get("entry", [])
+    if isinstance(raw, dict):
+        return [raw]
+    if isinstance(raw, list):
+        return [e for e in raw if isinstance(e, dict)]
+    return []
+
+
+def _get_issn_from_doi(doi: str, api_key: str, inst_token: str) -> str | None:
+    """Return journal ISSN (or EISSN) for a DOI via Scopus Search API."""
     import requests as _req
+
+    cleaned = _normalize_doi_for_elsevier(doi)
+    if not cleaned or not cleaned.startswith("10.") or "/" not in cleaned:
+        return None
+    if not (inst_token or "").strip():
+        return None
+
+    params = _elsevier_scopus_params(api_key, inst_token)
+    params["query"] = f'DOI("{cleaned}")'
+    params["count"] = "1"
 
     try:
         resp = _req.get(
             "https://api.elsevier.com/content/search/scopus",
-            headers={"Accept": "application/json", "X-ELS-APIKey": api_key},
-            params={"query": f"DOI({doi})", "count": 1},
-            timeout=15,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=20,
         )
-        if resp.status_code == 200:
-            entries = resp.json().get("search-results", {}).get("entry", [])
-            if entries:
-                return entries[0].get("prism:issn") or entries[0].get("prism:eissn") or None
+        if resp.status_code != 200:
+            return None
+        for entry in _scopus_search_entries(resp.json()):
+            issn = entry.get("prism:issn") or entry.get("prism:eissn")
+            normalized = _clean_issn_for_scopus(issn)
+            if normalized:
+                return normalized
     except Exception:
         pass
     return None
 
 
-def _get_asjc_subjects_by_issn(issn: str, api_key: str) -> list[tuple[str, str]]:
-    """Return list of (code, name) ASJC subject areas for a journal ISSN."""
+def _get_asjc_subjects_by_issn(issn: str, api_key: str, inst_token: str) -> list[tuple[str, str]]:
+    """ASJC subject areas for a journal ISSN via Elsevier Serial Title API."""
     import requests as _req
 
+    issn_clean = _clean_issn_for_scopus(issn)
+    if not issn_clean or not (inst_token or "").strip():
+        return []
+
+    params = _elsevier_scopus_params(api_key, inst_token)
     try:
         resp = _req.get(
-            f"https://api.elsevier.com/content/serial/title/issn/{issn}",
-            headers={"Accept": "application/json", "X-ELS-APIKey": api_key},
-            timeout=15,
+            f"https://api.elsevier.com/content/serial/title/issn/{issn_clean}",
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=20,
         )
-        if resp.status_code == 200:
-            entries = resp.json().get("serial-metadata-response", {}).get("entry", [])
-            if entries:
-                areas = entries[0].get("subject-area", [])
-                if isinstance(areas, dict):
-                    areas = [areas]
-                return [(a.get("@code", ""), a.get("$", "Unknown")) for a in areas if a.get("$")]
+        if resp.status_code != 200:
+            return []
+        for entry in _serial_title_entries(resp.json()):
+            areas = entry.get("subject-area") or []
+            if isinstance(areas, dict):
+                areas = [areas]
+            return [
+                (str(a.get("@code", "")), str(a.get("$", "Unknown")))
+                for a in areas
+                if isinstance(a, dict) and a.get("$")
+            ]
     except Exception:
         pass
     return []
@@ -4044,6 +4120,7 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
     import plotly.graph_objects as go
 
     api_key = SCOPUS_CONTENT_API_KEY
+    inst_token = (ELSEVIER_INSTTOKEN or "").strip()
     if not api_key:
         st.warning(
             "An Elsevier API key (`SCOPUS_API_KEY` or equivalent) is required to fetch ASJC subjects. "
@@ -4051,15 +4128,27 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
             icon=":material/key:",
         )
         return
+    if not inst_token:
+        st.warning(
+            "ASJC lookup requires **`ELSEVIER_INSTTOKEN`** (institutional token) in addition to your "
+            "Scopus API key — the same credentials used for **Run Publication Analysis**. "
+            "Without it, Elsevier Serial Title and Scopus Search calls are rejected.",
+            icon=":material/key:",
+        )
+        return
 
-    dois = [str(r.get("doi") or "").strip() for r in rows if r.get("doi")]
-    dois = list(dict.fromkeys(d for d in dois if d))  # unique, preserve order
+    dois: list[str] = []
+    for row in rows:
+        norm = _normalize_doi_for_elsevier(str(row.get("doi") or ""))
+        if norm.startswith("10.") and "/" in norm:
+            dois.append(norm)
+    dois = list(dict.fromkeys(dois))
 
     if not dois:
         st.info("No DOIs were found in the fetched publications — cannot look up ASJC subjects.")
         return
 
-    cache_key = "asjc_subject_cache"
+    cache_key = "asjc_subject_cache_v2"
     if cache_key not in st.session_state:
         st.session_state[cache_key] = {}
 
@@ -4070,33 +4159,45 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
         prog = st.progress(0, text="Fetching journal subjects from Scopus…")
         total = len(uncached_dois)
         for i, doi in enumerate(uncached_dois):
-            issn = _get_issn_from_doi(doi, api_key)
+            issn = _get_issn_from_doi(doi, api_key, inst_token)
             subjects: list[tuple[str, str]] = []
             if issn:
-                issn_clean = issn.replace("-", "")
-                if issn_clean not in st.session_state.get("asjc_issn_cache", {}):
-                    subjects = _get_asjc_subjects_by_issn(issn_clean, api_key)
+                if issn not in st.session_state.get("asjc_issn_cache", {}):
+                    subjects = _get_asjc_subjects_by_issn(issn, api_key, inst_token)
                     if "asjc_issn_cache" not in st.session_state:
                         st.session_state["asjc_issn_cache"] = {}
-                    st.session_state["asjc_issn_cache"][issn_clean] = subjects
+                    st.session_state["asjc_issn_cache"][issn] = subjects
                 else:
-                    subjects = st.session_state["asjc_issn_cache"][issn_clean]
+                    subjects = st.session_state["asjc_issn_cache"][issn]
             cached[doi] = {"issn": issn, "subjects": subjects}
-            prog.progress((i + 1) / total, text=f"Fetching journal subjects… {i+1}/{total}")
+            prog.progress((i + 1) / total, text=f"Fetching journal subjects… {i + 1}/{total}")
         prog.empty()
         st.session_state[cache_key] = cached
 
     # Aggregate subject area counts across all publications
     subject_counts: dict[str, int] = {}
+    issn_hits = 0
     for doi in dois:
-        for _code, name in (cached.get(doi) or {}).get("subjects", []):
+        entry = cached.get(doi) or {}
+        if entry.get("issn"):
+            issn_hits += 1
+        for _code, name in entry.get("subjects", []):
             subject_counts[name] = subject_counts.get(name, 0) + 1
 
     if not subject_counts:
         st.info(
             "No ASJC subject areas were retrieved. "
-            "This may be because the DOIs could not be matched in the Scopus journal index."
+            f"Resolved ISSN for **{issn_hits}** of **{len(dois)}** DOIs. "
+            "Common causes: missing or invalid `ELSEVIER_INSTTOKEN`, DOIs not indexed in Scopus, "
+            "or journals without subject-area metadata in the Serial Title API."
         )
+        with st.expander("Troubleshooting"):
+            st.markdown(
+                "- Confirm **`SCOPUS_API_KEY`** and **`ELSEVIER_INSTTOKEN`** are set (same as Publication Analysis).\n"
+                "- Elsevier calls use **`apiKey`** + **`insttoken`** query parameters (see Scopus_Wos reference).\n"
+                "- DOIs are normalized from `https://doi.org/…` before lookup.\n"
+                "- Re-run **Run Publication Analysis** after changing credentials, then open this tab again."
+            )
         return
 
     sorted_subjects = sorted(subject_counts.items(), key=lambda x: x[1], reverse=True)
@@ -4431,8 +4532,6 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
         )
     with tab_asjc:
         _render_asjc_subjects(rows)
-        st.divider()
-        _render_abstract_wordcloud(rows)
     with tab_network:
         st.markdown("#### Co-affiliation network")
         st.caption(
@@ -4446,6 +4545,8 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
         _render_sdg_coaffiliation_network(rows)
     with tab_summary:
         _render_sdg_distribution(rows)
+        st.divider()
+        _render_abstract_wordcloud(rows)
     with tab_oa:
         _render_oa_ratio(rows)
         st.divider()
