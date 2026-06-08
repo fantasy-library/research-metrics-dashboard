@@ -4450,26 +4450,29 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     )
 
     if "sdg_publications_expanded" not in st.session_state:
-        st.session_state.sdg_publications_expanded = False
+        st.session_state.sdg_publications_expanded = True
 
     _title_gif_url = _analysis_gif_data_url()
     if _title_gif_url:
         _inject_button_gif_icon_styles(
             "sdg_publications_title_toggle", _title_gif_url, icon_size="2.35rem"
         )
+    _title_radius = "18px 18px 0 0" if st.session_state.sdg_publications_expanded else "18px"
+    _title_border_bottom = "none" if st.session_state.sdg_publications_expanded else "1px solid #e5e7eb"
     st.markdown(
-        """
+        f"""
 <style>
 [class*="st-key-sdg_publications_title_toggle"] button {
   width: 100% !important;
   justify-content: flex-start !important;
-  min-height: 4rem !important;
-  padding: 0.7rem 1rem !important;
-  border-radius: 14px !important;
+  min-height: 4.4rem !important;
+  padding: 0.85rem 1.15rem !important;
+  border-radius: {_title_radius} !important;
   border: 1px solid #e5e7eb !important;
+  border-bottom: {_title_border_bottom} !important;
   background: #ffffff !important;
   color: #111827 !important;
-  box-shadow: 0 2px 14px rgba(15, 23, 42, 0.06) !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07) !important;
 }
 [class*="st-key-sdg_publications_title_toggle"] button:hover {
   background: #ffffff !important;
@@ -4480,6 +4483,20 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
   font-size: 1.55rem !important;
   font-weight: 800 !important;
   line-height: 1.25 !important;
+}
+[class*="st-key-sdg_publications_body"] {
+  margin-top: -0.85rem !important;
+}
+[class*="st-key-sdg_publications_body"],
+[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlockBorderWrapper"] {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  border-radius: 0 0 18px 18px !important;
+  border-top: none !important;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07) !important;
+}
+[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlock"] {
+  gap: 1rem !important;
 }
 </style>
 """,
@@ -4496,7 +4513,7 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     if not st.session_state.sdg_publications_expanded:
         return
 
-    with st.container(border=True):
+    with st.container(border=True, key="sdg_publications_body"):
         st.caption(
             "Fetch publication records for the selected author to unlock five analysis views: "
             "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis"
