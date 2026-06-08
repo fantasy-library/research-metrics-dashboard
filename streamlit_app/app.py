@@ -4462,7 +4462,7 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
     st.markdown(
         f"""
 <style>
-[class*="st-key-sdg_publications_title_toggle"] button {
+[class*="st-key-sdg_publications_title_toggle"] button {{
   width: 100% !important;
   justify-content: flex-start !important;
   min-height: 4.4rem !important;
@@ -4473,31 +4473,31 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
   background: #ffffff !important;
   color: #111827 !important;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07) !important;
-}
-[class*="st-key-sdg_publications_title_toggle"] button:hover {
+}}
+[class*="st-key-sdg_publications_title_toggle"] button:hover {{
   background: #ffffff !important;
   border-color: #c7d2fe !important;
   box-shadow: 0 5px 22px rgba(79, 70, 229, 0.13) !important;
-}
-[class*="st-key-sdg_publications_title_toggle"] button p {
+}}
+[class*="st-key-sdg_publications_title_toggle"] button p {{
   font-size: 1.55rem !important;
   font-weight: 800 !important;
   line-height: 1.25 !important;
-}
-[class*="st-key-sdg_publications_body"] {
+}}
+[class*="st-key-sdg_publications_body"] {{
   margin-top: -0.85rem !important;
-}
+}}
 [class*="st-key-sdg_publications_body"],
-[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlockBorderWrapper"] {
+[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlockBorderWrapper"] {{
   background: #ffffff !important;
   border-color: #e5e7eb !important;
   border-radius: 0 0 18px 18px !important;
   border-top: none !important;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07) !important;
-}
-[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlock"] {
+}}
+[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlock"] {{
   gap: 1rem !important;
-}
+}}
 </style>
 """,
         unsafe_allow_html=True,
