@@ -4029,6 +4029,17 @@ def _analysis_gif_data_url() -> str:
     return f"data:image/gif;base64,{encoded}"
 
 
+def _info_gif_data_url() -> str:
+    gif_path = Path(__file__).resolve().parent / "static" / "info.gif"
+    if not gif_path.is_file():
+        return ""
+    try:
+        encoded = base64.b64encode(gif_path.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+    return f"data:image/gif;base64,{encoded}"
+
+
 def _inject_button_gif_icon_styles(
     streamlit_key: str, gif_data_url: str, *, icon_size: str = "1.75rem"
 ) -> None:
@@ -4448,178 +4459,284 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         '<hr class="charts-export-divider" aria-hidden="true" />',
         unsafe_allow_html=True,
     )
-    st.markdown("### Publications Analysis: Subjects, Networks, SDGs, & OA Status")
-    st.caption(
+
+    # ── Section header with info GIF ────────────────────────────────────────
+    _info_url = _info_gif_data_url()
+    if _info_url:
+        st.markdown(
+            f"""
+<style>
+.sdg-section-header {{
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}}
+.sdg-section-header h3 {{
+  margin: 0 !important;
+  line-height: 1.3 !important;
+}}
+.sdg-info-gif {{
+  width: 2.4rem;
+  height: 2.4rem;
+  flex-shrink: 0;
+}}
+</style>
+<div class="sdg-section-header">
+  <img src="{_info_url}" class="sdg-info-gif" alt="info" />
+  <h3>Publications Analysis: Subjects, Networks, SDGs, &amp; OA Status</h3>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown("### Publications Analysis: Subjects, Networks, SDGs, & OA Status")
+
+    with st.expander(
         "Fetch publication records for the selected author to unlock five analysis views: "
-        "**Publications**, **Co-affiliation Network**, **SDG Summary**, **OA Analysis**, and **Subject (ASJC)**."
-    )
-
-    if not sdg_credentials_available():
-        st.info(
-            "To enable this section set an Elsevier API key (`SCOPUS_API_KEY` or `SCIVAL_API_KEY`) "
-            "and an `ELSEVIER_INSTTOKEN`. "
-            "Scopus publication search uses the Scopus Content API, which may require a separate "
-            "entitlement from SciVal."
-        )
-        return
-
-    author_options: dict[str, str] = {}
-    for item in valid_results:
-        aid = str(item.get("id") or "").strip()
-        if not aid:
-            continue
-        data = item.get("data") or {}
-        name = str(data.get("authorName") or f"Author {aid}")
-        author_options[f"{name} ({aid})"] = aid
-    if not author_options:
-        st.info("Analyse at least one valid Scopus Author ID above before fetching SDG publications.")
-        return
-
-    c_author, c_model, c_limit = st.columns([2, 1, 1])
-    with c_author:
-        selected_label = st.selectbox(
-            "Author",
-            options=list(author_options.keys()),
-            key="sdg_author_select",
-        )
-    with c_model:
-        model_label = st.selectbox(
-            "Select Classification Model",
-            options=list(_SDG_MODEL_OPTIONS.keys()),
-            index=0,
-            key="sdg_model_select",
-        )
-        sdg_model = _SDG_MODEL_OPTIONS[model_label]
-    with c_limit:
-        limit_rows = st.number_input(
-            "Max publications",
-            min_value=1,
-            max_value=500,
-            value=50,
-            step=25,
-            key="sdg_limit_rows",
-        )
-
-    st.caption(f"**Disclaimer:** {_SDG_DISCLAIMER}")
-
-    selected_author_id = author_options[selected_label]
-    # Keep this as a native Streamlit button: custom components keep their
-    # last value across reruns and can re-trigger analysis when another widget changes.
-    _gif_data_url = _analysis_gif_data_url()
-    if _gif_data_url:
-        _inject_button_gif_icon_styles(
-            "fetch_sdg_publications_button", _gif_data_url, icon_size="1.75rem"
-        )
-    _fetch_btn_kwargs: dict = {
-        "type": "secondary",
-        "key": "fetch_sdg_publications_button",
-    }
-    if not _gif_data_url:
-        _fetch_btn_kwargs["icon"] = ":material/analytics:"
-    fetch_clicked = st.button("Run Publications Analysis", **_fetch_btn_kwargs)
-    if fetch_clicked:
-        st.session_state.sdg_publication_error = ""
-        # Clear previous result so stale data is never shown after a failed re-fetch
-        st.session_state.sdg_publication_result = None
-        st.session_state.pop("asjc_subject_cache_v2", None)
-        st.session_state.pop("asjc_issn_cache", None)
-        progress_bar = st.progress(0)
-        progress_text = st.empty()
-
-        def progress_callback(done: int, expected: int | None, message: str) -> None:
-            # Use candidates_scanned (from stats via closure) when available so the
-            # bar moves steadily even for skipped entries, not only accepted rows.
-            scanned = getattr(
-                getattr(st.session_state, "_sdg_fetch_stats_live", None),
-                "scopus_candidates_scanned", None,
-            )
-            denominator = scanned or expected or int(limit_rows) or 1
-            progress_bar.progress(min(done / denominator, 0.99))
-            detail = f" — {message}" if message else ""
-            if expected:
-                progress_text.text(
-                    f"Accepted {done:,} of up to {min(int(limit_rows), expected):,} publications{detail}"
-                )
-            else:
-                progress_text.text(f"Accepted {done:,} publications{detail}")
-
-        fetch_error: str = ""
-        try:
-            with st.spinner(
-                "Fetching Scopus publications, OpenAlex metadata, Aurora SDG labels, and ASJC subjects..."
-            ):
-                result = fetch_author_sdg_publications(
-                    selected_author_id,
-                    year_key=year_key,
-                    docs_key=docs_key,
-                    model=sdg_model,
-                    limit_rows=int(limit_rows),
-                    progress_callback=progress_callback,
-                )
-                st.session_state.sdg_publication_result = {
-                    "author_id": selected_author_id,
-                    "author_label": selected_label,
-                    "year_key": year_key,
-                    "docs_key": docs_key,
-                    "model": sdg_model,
-                    "limit": int(limit_rows),
-                    "result": result,
-                }
-                if result.rows:
-                    progress_text.text(
-                        f"Fetched {len(result.rows):,} publication rows. Resolving ASJC subjects…"
-                    )
-                    _ensure_asjc_subject_cache(result.rows, show_progress=True)
-            progress_bar.progress(1.0)
-            progress_text.text(f"Fetched {len(result.rows):,} publication rows.")
-        except (SDGServiceError, ValueError) as exc:
-            fetch_error = str(exc)
-        except Exception as exc:
-            fetch_error = (
-                "An unexpected error occurred while fetching publications. "
-                f"Details: {type(exc).__name__}: {exc}"
-            )
-        if fetch_error:
-            st.session_state.sdg_publication_error = fetch_error
-            progress_bar.empty()
-            progress_text.empty()
-
-    if st.session_state.get("sdg_publication_error"):
-        st.error(st.session_state.sdg_publication_error)
-
-    payload = st.session_state.get("sdg_publication_result")
-    if not payload:
-        return
-    result = payload.get("result")
-    rows = list(getattr(result, "rows", []) or [])
-
-    # Warn if the user has changed filters since the last fetch without re-running
-    _payload_year = payload.get("year_key")
-    _payload_docs = payload.get("docs_key")
-    _payload_author = payload.get("author_id")
-    if (
-        _payload_author != selected_author_id
-        or _payload_year != year_key
-        or _payload_docs != docs_key
+        "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis",
+        expanded=st.session_state.get("sdg_expander_open", True),
     ):
-        st.warning(
-            "The filters or author selection have changed since the last fetch. "
-            "Click **Run Publications Analysis** again to refresh the results.",
-            icon=":material/refresh:",
+        if not sdg_credentials_available():
+            st.info(
+                "To enable this section set an Elsevier API key (`SCOPUS_API_KEY` or `SCIVAL_API_KEY`) "
+                "and an `ELSEVIER_INSTTOKEN`. "
+                "Scopus publication search uses the Scopus Content API, which may require a separate "
+                "entitlement from SciVal."
+            )
+            return
+
+        author_options: dict[str, str] = {}
+        for item in valid_results:
+            aid = str(item.get("id") or "").strip()
+            if not aid:
+                continue
+            data = item.get("data") or {}
+            name = str(data.get("authorName") or f"Author {aid}")
+            author_options[f"{name} ({aid})"] = aid
+        if not author_options:
+            st.info("Analyse at least one valid Scopus Author ID above before fetching SDG publications.")
+            return
+
+        _disclaimer_tooltip = (
+            "This SDG classification tool is generated using data provided by the Aurora SDG Classifier API "
+            "(https://aurora-universities.eu/sdg-research/sdg-api/). "
+            "The results displayed may differ from SDG classifications shown in Scopus or other platforms. "
+            "Please note that classifications are subject to change over time as the underlying data and "
+            "methodologies are updated and refined."
         )
+        _disclaimer_html = f"""
+<style>
+.sdg-model-row {{
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}}
+.sdg-disclaimer-tooltip {{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.45rem;
+  cursor: default;
+}}
+.sdg-disclaimer-tooltip .sdg-tooltip-icon {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 1.5px solid #a5b4fc;
+  flex-shrink: 0;
+  user-select: none;
+}}
+.sdg-disclaimer-tooltip .sdg-tooltip-box {{
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.18s;
+  position: absolute;
+  bottom: 130%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  width: 22rem;
+  max-width: 90vw;
+  z-index: 9999;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+  pointer-events: none;
+  white-space: normal;
+}}
+.sdg-disclaimer-tooltip .sdg-tooltip-box a {{
+  color: #93c5fd;
+}}
+.sdg-disclaimer-tooltip:hover .sdg-tooltip-box {{
+  visibility: visible;
+  opacity: 1;
+}}
+</style>
+<span class="sdg-disclaimer-tooltip">
+  <span class="sdg-tooltip-icon">?</span>
+  <span class="sdg-tooltip-box">
+    {_disclaimer_tooltip.replace("(https://aurora-universities.eu/sdg-research/sdg-api/)",
+      '(<a href="https://aurora-universities.eu/sdg-research/sdg-api/" target="_blank">aurora-universities.eu</a>)')}
+  </span>
+</span>
+"""
 
-    st.success(
-        f"Loaded **{len(rows):,}** publication rows for **{payload.get('author_label')}** "
-        f"({getattr(result, 'from_date', '')} – {getattr(result, 'to_date', '')}). "
-        "Use the tabs below to explore publications, the co-affiliation network, SDG classifications, and OA status."
-    )
-    _render_fetch_transparency(getattr(result, "stats", None), len(rows))
-    if not rows:
-        st.info("No publication rows were returned for the selected filters.")
-        return
+        c_author, c_model, c_limit = st.columns([2, 1, 1])
+        with c_author:
+            selected_label = st.selectbox(
+                "Author",
+                options=list(author_options.keys()),
+                key="sdg_author_select",
+            )
+        with c_model:
+            model_label = st.selectbox(
+                "Select Classification Model",
+                options=list(_SDG_MODEL_OPTIONS.keys()),
+                index=0,
+                key="sdg_model_select",
+            )
+            sdg_model = _SDG_MODEL_OPTIONS[model_label]
+            st.markdown(_disclaimer_html, unsafe_allow_html=True)
+        with c_limit:
+            limit_rows = st.number_input(
+                "Max publications",
+                min_value=1,
+                max_value=500,
+                value=50,
+                step=25,
+                key="sdg_limit_rows",
+            )
 
-    st.markdown(
-        """
+        selected_author_id = author_options[selected_label]
+        # Keep this as a native Streamlit button: custom components keep their
+        # last value across reruns and can re-trigger analysis when another widget changes.
+        _gif_data_url = _analysis_gif_data_url()
+        if _gif_data_url:
+            _inject_button_gif_icon_styles(
+                "fetch_sdg_publications_button", _gif_data_url, icon_size="1.75rem"
+            )
+        _fetch_btn_kwargs: dict = {
+            "type": "secondary",
+            "key": "fetch_sdg_publications_button",
+        }
+        if not _gif_data_url:
+            _fetch_btn_kwargs["icon"] = ":material/analytics:"
+        fetch_clicked = st.button("Run Publications Analysis", **_fetch_btn_kwargs)
+        if fetch_clicked:
+            st.session_state.sdg_publication_error = ""
+            # Clear previous result so stale data is never shown after a failed re-fetch
+            st.session_state.sdg_publication_result = None
+            st.session_state.pop("asjc_subject_cache_v2", None)
+            st.session_state.pop("asjc_issn_cache", None)
+            progress_bar = st.progress(0)
+            progress_text = st.empty()
+
+            def progress_callback(done: int, expected: int | None, message: str) -> None:
+                # Use candidates_scanned (from stats via closure) when available so the
+                # bar moves steadily even for skipped entries, not only accepted rows.
+                scanned = getattr(
+                    getattr(st.session_state, "_sdg_fetch_stats_live", None),
+                    "scopus_candidates_scanned", None,
+                )
+                denominator = scanned or expected or int(limit_rows) or 1
+                progress_bar.progress(min(done / denominator, 0.99))
+                detail = f" — {message}" if message else ""
+                if expected:
+                    progress_text.text(
+                        f"Accepted {done:,} of up to {min(int(limit_rows), expected):,} publications{detail}"
+                    )
+                else:
+                    progress_text.text(f"Accepted {done:,} publications{detail}")
+
+            fetch_error: str = ""
+            try:
+                with st.spinner(
+                    "Fetching Scopus publications, OpenAlex metadata, Aurora SDG labels, and ASJC subjects..."
+                ):
+                    result = fetch_author_sdg_publications(
+                        selected_author_id,
+                        year_key=year_key,
+                        docs_key=docs_key,
+                        model=sdg_model,
+                        limit_rows=int(limit_rows),
+                        progress_callback=progress_callback,
+                    )
+                    st.session_state.sdg_publication_result = {
+                        "author_id": selected_author_id,
+                        "author_label": selected_label,
+                        "year_key": year_key,
+                        "docs_key": docs_key,
+                        "model": sdg_model,
+                        "limit": int(limit_rows),
+                        "result": result,
+                    }
+                    if result.rows:
+                        progress_text.text(
+                            f"Fetched {len(result.rows):,} publication rows. Resolving ASJC subjects…"
+                        )
+                        _ensure_asjc_subject_cache(result.rows, show_progress=True)
+                progress_bar.progress(1.0)
+                progress_text.text(f"Fetched {len(result.rows):,} publication rows.")
+            except (SDGServiceError, ValueError) as exc:
+                fetch_error = str(exc)
+            except Exception as exc:
+                fetch_error = (
+                    "An unexpected error occurred while fetching publications. "
+                    f"Details: {type(exc).__name__}: {exc}"
+                )
+            if fetch_error:
+                st.session_state.sdg_publication_error = fetch_error
+                progress_bar.empty()
+                progress_text.empty()
+
+        if st.session_state.get("sdg_publication_error"):
+            st.error(st.session_state.sdg_publication_error)
+
+        payload = st.session_state.get("sdg_publication_result")
+        if not payload:
+            return
+        result = payload.get("result")
+        rows = list(getattr(result, "rows", []) or [])
+
+        # Warn if the user has changed filters since the last fetch without re-running
+        _payload_year = payload.get("year_key")
+        _payload_docs = payload.get("docs_key")
+        _payload_author = payload.get("author_id")
+        if (
+            _payload_author != selected_author_id
+            or _payload_year != year_key
+            or _payload_docs != docs_key
+        ):
+            st.warning(
+                "The filters or author selection have changed since the last fetch. "
+                "Click **Run Publications Analysis** again to refresh the results.",
+                icon=":material/refresh:",
+            )
+
+        st.success(
+            f"Loaded **{len(rows):,}** publication rows for **{payload.get('author_label')}** "
+            f"({getattr(result, 'from_date', '')} – {getattr(result, 'to_date', '')}). "
+            "Use the tabs below to explore publications, the co-affiliation network, SDG classifications, and OA status."
+        )
+        _render_fetch_transparency(getattr(result, "stats", None), len(rows))
+        if not rows:
+            st.info("No publication rows were returned for the selected filters.")
+            return
+
+        st.markdown(
+            """
 <style>
 /* Make the analysis-result tabs larger and more prominent */
 div[data-testid="stTabs"] button[data-baseweb="tab"] {
@@ -4643,49 +4760,49 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
 }
 </style>
 """,
-        unsafe_allow_html=True,
-    )
-    tab_publications, tab_asjc, tab_network, tab_summary, tab_oa = st.tabs(
-        ["📄  Publications", "🏷️  Subject (ASJC)", "🔗  Network", "🌱  SDG Summary", "🔓  OA Analysis"]
-    )
-    with tab_publications:
-        st.markdown("#### Publication type breakdown")
-        _render_pub_type_breakdown(rows)
-        st.divider()
-        preview_df = _publication_preview_df(rows)
-        st.dataframe(preview_df, use_container_width=True, hide_index=True)
-        with st.container(border=False, key="download_publications_csv_row"):
-            st.download_button(
-                "Download Publications CSV",
-                rows_to_csv_bytes(_enrich_publication_rows_with_asjc(rows)),
-                file_name=f"sdg-publications-{payload.get('author_id')}.csv",
-                mime="text/csv",
-                key="download_sdg_publications_csv",
-                use_container_width=True,
-            )
-    with tab_asjc:
-        _render_asjc_subjects(rows)
-    with tab_network:
-        st.markdown("#### Co-affiliation network")
-        st.caption(
-            "Each node is an institution (from OpenAlex authorship affiliations on each row). "
-            "An edge means two institutions appeared together on at least one publication. "
-            "When works were discovered via Scopus AU-ID, rows are still filled from OpenAlex by DOI, "
-            "so this view matches a direct OpenAlex fetch. "
-            "Link-strength on a node sums edge weights to partners (not the same as publication count — "
-            "see hover publications in this view)."
+            unsafe_allow_html=True,
         )
-        _render_sdg_coaffiliation_network(rows)
-    with tab_summary:
-        _render_sdg_distribution(rows)
-        st.divider()
-        _render_abstract_wordcloud(rows)
-    with tab_oa:
-        _render_oa_ratio(rows)
-        st.divider()
-        _render_oa_by_author(rows)
-        st.divider()
-        _render_oa_volume_by_month(rows)
+        tab_publications, tab_asjc, tab_network, tab_summary, tab_oa = st.tabs(
+            ["📄  Publications", "🏷️  Subject (ASJC)", "🔗  Network", "🌱  SDG Summary", "🔓  OA Analysis"]
+        )
+        with tab_publications:
+            st.markdown("#### Publication type breakdown")
+            _render_pub_type_breakdown(rows)
+            st.divider()
+            preview_df = _publication_preview_df(rows)
+            st.dataframe(preview_df, use_container_width=True, hide_index=True)
+            with st.container(border=False, key="download_publications_csv_row"):
+                st.download_button(
+                    "Download Publications CSV",
+                    rows_to_csv_bytes(_enrich_publication_rows_with_asjc(rows)),
+                    file_name=f"sdg-publications-{payload.get('author_id')}.csv",
+                    mime="text/csv",
+                    key="download_sdg_publications_csv",
+                    use_container_width=True,
+                )
+        with tab_asjc:
+            _render_asjc_subjects(rows)
+        with tab_network:
+            st.markdown("#### Co-affiliation network")
+            st.caption(
+                "Each node is an institution (from OpenAlex authorship affiliations on each row). "
+                "An edge means two institutions appeared together on at least one publication. "
+                "When works were discovered via Scopus AU-ID, rows are still filled from OpenAlex by DOI, "
+                "so this view matches a direct OpenAlex fetch. "
+                "Link-strength on a node sums edge weights to partners (not the same as publication count — "
+                "see hover publications in this view)."
+            )
+            _render_sdg_coaffiliation_network(rows)
+        with tab_summary:
+            _render_sdg_distribution(rows)
+            st.divider()
+            _render_abstract_wordcloud(rows)
+        with tab_oa:
+            _render_oa_ratio(rows)
+            st.divider()
+            _render_oa_by_author(rows)
+            st.divider()
+            _render_oa_volume_by_month(rows)
 
 
 def _enabled_metric_ids(metrics: list) -> list:
