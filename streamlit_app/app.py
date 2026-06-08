@@ -350,7 +350,7 @@ def _inject_export_download_styles() -> None:
   line-height: 1.2 !important;
   color: #ffffff !important;
   box-shadow: 0 2px 12px rgba(59, 130, 246, 0.35) !important;
-  background: linear-gradient(145deg, #dbeafe 0%, #93c5fd 42%, #3b82f6 100%) !important;
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 55%, #2563eb 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.12) !important;
 }}
 [class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button:hover,
@@ -397,7 +397,7 @@ def _inject_export_download_styles() -> None:
   line-height: 1.2 !important;
   color: #ffffff !important;
   box-shadow: 0 2px 12px rgba(34, 197, 94, 0.28) !important;
-  background: linear-gradient(145deg, #d1fae5 0%, #86efac 45%, #22c55e 100%) !important;
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 55%, #16a34a 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
 }}
 [class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button:hover,
@@ -481,7 +481,7 @@ def _inject_publications_csv_download_styles() -> None:
   line-height: 1.25 !important;
   color: #ffffff !important;
   box-shadow: 0 4px 18px rgba(34, 197, 94, 0.35) !important;
-  background: linear-gradient(90deg, #bbf7d0 0%, #86efac 38%, #4ade80 72%, #22c55e 100%) !important;
+  background: linear-gradient(90deg, #4ade80 0%, #22c55e 50%, #16a34a 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
   transition: filter 0.15s ease, box-shadow 0.15s ease !important;
 }}
@@ -4196,6 +4196,75 @@ def _get_asjc_subjects_by_issn(issn: str, api_key: str, inst_token: str) -> list
     return []
 
 
+def _extract_publication_dois(rows: list[dict]) -> list[str]:
+    dois: list[str] = []
+    for row in rows:
+        norm = _normalize_doi_for_elsevier(str(row.get("doi") or ""))
+        if norm.startswith("10.") and "/" in norm:
+            dois.append(norm)
+    return list(dict.fromkeys(dois))
+
+
+def _ensure_asjc_subject_cache(rows: list[dict], *, show_progress: bool = False) -> dict:
+    """Resolve DOI → ISSN → ASJC subjects and store in session state."""
+    api_key = SCOPUS_CONTENT_API_KEY
+    inst_token = (ELSEVIER_INSTTOKEN or "").strip()
+    if not api_key or not inst_token:
+        return {}
+
+    dois = _extract_publication_dois(rows)
+    if not dois:
+        return {}
+
+    cache_key = "asjc_subject_cache_v2"
+    if cache_key not in st.session_state:
+        st.session_state[cache_key] = {}
+
+    cached: dict = st.session_state[cache_key]
+    uncached_dois = [d for d in dois if d not in cached]
+
+    if uncached_dois:
+        prog = st.progress(0, text="Fetching journal subjects from Scopus…") if show_progress else None
+        total = len(uncached_dois)
+        for i, doi in enumerate(uncached_dois):
+            issn = _get_issn_from_doi(doi, api_key, inst_token)
+            subjects: list[tuple[str, str]] = []
+            if issn:
+                if "asjc_issn_cache" not in st.session_state:
+                    st.session_state["asjc_issn_cache"] = {}
+                issn_cache = st.session_state["asjc_issn_cache"]
+                if issn not in issn_cache:
+                    issn_cache[issn] = _get_asjc_subjects_by_issn(issn, api_key, inst_token)
+                subjects = issn_cache[issn]
+            cached[doi] = {"issn": issn, "subjects": subjects}
+            if prog is not None:
+                prog.progress((i + 1) / total, text=f"Fetching journal subjects… {i + 1}/{total}")
+        if prog is not None:
+            prog.empty()
+        st.session_state[cache_key] = cached
+
+    return cached
+
+
+def _enrich_publication_rows_with_asjc(rows: list[dict]) -> list[dict]:
+    """Attach cached ASJC ISSN and subject fields for CSV export."""
+    if not rows:
+        return []
+    _ensure_asjc_subject_cache(rows, show_progress=False)
+    cached = st.session_state.get("asjc_subject_cache_v2", {})
+    enriched: list[dict] = []
+    for row in rows:
+        export_row = dict(row)
+        doi = _normalize_doi_for_elsevier(str(row.get("doi") or ""))
+        entry = cached.get(doi, {})
+        subjects: list[tuple[str, str]] = entry.get("subjects") or []
+        export_row["asjc_issn"] = entry.get("issn") or ""
+        export_row["asjc_subject_codes"] = "; ".join(code for code, _ in subjects if code)
+        export_row["asjc_subjects"] = "; ".join(name for _, name in subjects if name)
+        enriched.append(export_row)
+    return enriched
+
+
 def _render_asjc_subjects(rows: list[dict]) -> None:
     """Fetch ASJC subject areas via DOI → ISSN → Serial Title API and render charts."""
     import plotly.graph_objects as go
@@ -4218,42 +4287,14 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
         )
         return
 
-    dois: list[str] = []
-    for row in rows:
-        norm = _normalize_doi_for_elsevier(str(row.get("doi") or ""))
-        if norm.startswith("10.") and "/" in norm:
-            dois.append(norm)
-    dois = list(dict.fromkeys(dois))
+    dois = _extract_publication_dois(rows)
 
     if not dois:
         st.info("No DOIs were found in the fetched publications — cannot look up ASJC subjects.")
         return
 
-    cache_key = "asjc_subject_cache_v2"
-    if cache_key not in st.session_state:
-        st.session_state[cache_key] = {}
-
-    cached: dict = st.session_state[cache_key]
-    uncached_dois = [d for d in dois if d not in cached]
-
-    if uncached_dois:
-        prog = st.progress(0, text="Fetching journal subjects from Scopus…")
-        total = len(uncached_dois)
-        for i, doi in enumerate(uncached_dois):
-            issn = _get_issn_from_doi(doi, api_key, inst_token)
-            subjects: list[tuple[str, str]] = []
-            if issn:
-                if issn not in st.session_state.get("asjc_issn_cache", {}):
-                    subjects = _get_asjc_subjects_by_issn(issn, api_key, inst_token)
-                    if "asjc_issn_cache" not in st.session_state:
-                        st.session_state["asjc_issn_cache"] = {}
-                    st.session_state["asjc_issn_cache"][issn] = subjects
-                else:
-                    subjects = st.session_state["asjc_issn_cache"][issn]
-            cached[doi] = {"issn": issn, "subjects": subjects}
-            prog.progress((i + 1) / total, text=f"Fetching journal subjects… {i + 1}/{total}")
-        prog.empty()
-        st.session_state[cache_key] = cached
+    uncached_dois = [d for d in dois if d not in st.session_state.get("asjc_subject_cache_v2", {})]
+    cached = _ensure_asjc_subject_cache(rows, show_progress=bool(uncached_dois))
 
     # Aggregate subject area counts across all publications
     subject_counts: dict[str, int] = {}
@@ -4407,7 +4448,7 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         '<hr class="charts-export-divider" aria-hidden="true" />',
         unsafe_allow_html=True,
     )
-    st.markdown("### Publications Analysis: Network, SDGs & OA Status")
+    st.markdown("### Publications Analysis: Subjects, Networks, SDGs, & OA Status")
     st.caption(
         "Fetch publication records for the selected author to unlock five analysis views: "
         "**Publications**, **Co-affiliation Network**, **SDG Summary**, **OA Analysis**, and **Subject (ASJC)**."
@@ -4480,6 +4521,8 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         st.session_state.sdg_publication_error = ""
         # Clear previous result so stale data is never shown after a failed re-fetch
         st.session_state.sdg_publication_result = None
+        st.session_state.pop("asjc_subject_cache_v2", None)
+        st.session_state.pop("asjc_issn_cache", None)
         progress_bar = st.progress(0)
         progress_text = st.empty()
 
@@ -4502,7 +4545,9 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
 
         fetch_error: str = ""
         try:
-            with st.spinner("Fetching Scopus publications, OpenAlex metadata, and Aurora SDG labels..."):
+            with st.spinner(
+                "Fetching Scopus publications, OpenAlex metadata, Aurora SDG labels, and ASJC subjects..."
+            ):
                 result = fetch_author_sdg_publications(
                     selected_author_id,
                     year_key=year_key,
@@ -4511,15 +4556,20 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
                     limit_rows=int(limit_rows),
                     progress_callback=progress_callback,
                 )
-            st.session_state.sdg_publication_result = {
-                "author_id": selected_author_id,
-                "author_label": selected_label,
-                "year_key": year_key,
-                "docs_key": docs_key,
-                "model": sdg_model,
-                "limit": int(limit_rows),
-                "result": result,
-            }
+                st.session_state.sdg_publication_result = {
+                    "author_id": selected_author_id,
+                    "author_label": selected_label,
+                    "year_key": year_key,
+                    "docs_key": docs_key,
+                    "model": sdg_model,
+                    "limit": int(limit_rows),
+                    "result": result,
+                }
+                if result.rows:
+                    progress_text.text(
+                        f"Fetched {len(result.rows):,} publication rows. Resolving ASJC subjects…"
+                    )
+                    _ensure_asjc_subject_cache(result.rows, show_progress=True)
             progress_bar.progress(1.0)
             progress_text.text(f"Fetched {len(result.rows):,} publication rows.")
         except (SDGServiceError, ValueError) as exc:
@@ -4607,7 +4657,7 @@ div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
         with st.container(border=False, key="download_publications_csv_row"):
             st.download_button(
                 "Download Publications CSV",
-                rows_to_csv_bytes(rows),
+                rows_to_csv_bytes(_enrich_publication_rows_with_asjc(rows)),
                 file_name=f"sdg-publications-{payload.get('author_id')}.csv",
                 mime="text/csv",
                 key="download_sdg_publications_csv",
