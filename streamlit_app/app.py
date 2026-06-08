@@ -3118,7 +3118,7 @@ METRIC_INFO_TEXT: dict[str, str] = {
         "Values are grouped by publication year."
     ),
     "fwci": (
-        "Citations on a researcher’s papers vs. the average for similar papers worldwide "
+        "Citations on a researcher’s papers vs. the average for similar papers worldwide. "
         "1.0 means it matches that peer-group average."
     ),
     "topJournal": (
@@ -3131,7 +3131,7 @@ METRIC_INFO_TEXT: dict[str, str] = {
     ),
     "hIndex": (
         "The value of h is equal to the number of papers (N) in the list that have N or more citations.\n\n"
-        "Example: H-index of 10, means that of all a researcher’s indexed articles, "
+        "Example: H-index of 10, means that of all a researcher’s Scopus-indexed publications, "
         "at least 10 have been cited 10 or more times.\n\n"
         "This measure seeks to combine productivity and impact in a single number."
     ),
@@ -6426,7 +6426,7 @@ def main() -> None:
       <li>Regularly check &amp; verify your profile so citations &amp; publications are correct.</li>
     </ul>
     <p>
-      <strong>Do NOT</strong> rely on this tool for issues relating to hiring, reappointment, tenure, or promotion, etc.
+      Do <strong>NOT</strong> rely on this tool as the sole source of evidence for decisions relating to recruitment, reappointment, tenure, promotion, or other personnel matters.
       Instead, follow unit and university-approved evidence &amp; procedures.
     </p>
     <div class="disclaimer-links">
@@ -6478,9 +6478,9 @@ def main() -> None:
                     "<li><strong>HKUST researchers</strong> &ndash; Look for your Scopus ID in your "
                     '<a href="https://researchportal.hkust.edu.hk/en/persons/" '
                     'target="_blank" rel="noopener noreferrer">Research Portal profile</a></li>'
-                    "<li>Not there, or not an HKUST researcher? Try "
+                    "<li>Not there, or not an HKUST researcher? Try searching "
                     '<a href="https://www.scopus.com/home.uri" '
-                    'target="_blank" rel="noopener noreferrer">searching Scopus itself</a> '
+                    'target="_blank" rel="noopener noreferrer">Scopus</a> itself '
                     "(<a href=\"https://libguides.hkust.edu.hk/research-impact/author-impact\" "
                     'target="_blank" rel="noopener noreferrer">guide</a>).</li>'
                     "</ul>"
