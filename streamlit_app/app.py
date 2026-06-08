@@ -4614,6 +4614,51 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
   visibility: visible;
   opacity: 1;
 }}
+[class*="st-key-sdg_author_select"] div[data-baseweb="select"] > div,
+[class*="st-key-sdg_model_select"] div[data-baseweb="select"] > div {{
+  border: 1.6px solid #a5b4fc !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.08) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}}
+[class*="st-key-sdg_author_select"] div[data-baseweb="select"] > div:hover,
+[class*="st-key-sdg_model_select"] div[data-baseweb="select"] > div:hover {{
+  border-color: #7c3aed !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.14) !important;
+}}
+[class*="st-key-sdg_limit_rows"] [data-testid="stNumberInput"] input,
+[class*="st-key-sdg_limit_rows"] input {{
+  border: 1.6px solid #86efac !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(22, 163, 74, 0.08) !important;
+}}
+[class*="st-key-sdg_limit_rows"] [data-testid="stNumberInput"] input:focus,
+[class*="st-key-sdg_limit_rows"] input:focus {{
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16) !important;
+}}
+[class*="st-key-fetch_sdg_publications_button"] button {{
+  min-height: 2.75rem !important;
+  padding: 0.68rem 1.15rem !important;
+  border-radius: 999px !important;
+  border: none !important;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #db2777 100%) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.3) !important;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease !important;
+}}
+[class*="st-key-fetch_sdg_publications_button"] button:hover {{
+  filter: brightness(1.04) saturate(1.08) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 12px 28px rgba(124, 58, 237, 0.38) !important;
+}}
+[class*="st-key-fetch_sdg_publications_button"] button p,
+[class*="st-key-fetch_sdg_publications_button"] button span {{
+  color: #ffffff !important;
+}}
 </style>
 """,
             unsafe_allow_html=True,
