@@ -4449,13 +4449,58 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         unsafe_allow_html=True,
     )
 
-    st.markdown("### Publications Analysis: Subjects, Networks, SDGs, & OA Status")
+    if "sdg_publications_expanded" not in st.session_state:
+        st.session_state.sdg_publications_expanded = False
 
-    with st.expander(
-        "Fetch publication records for the selected author to unlock five analysis views: "
-        "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis",
-        expanded=False,
+    _title_gif_url = _analysis_gif_data_url()
+    if _title_gif_url:
+        _inject_button_gif_icon_styles(
+            "sdg_publications_title_toggle", _title_gif_url, icon_size="2.35rem"
+        )
+    st.markdown(
+        """
+<style>
+[class*="st-key-sdg_publications_title_toggle"] button {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  min-height: 4rem !important;
+  padding: 0.7rem 1rem !important;
+  border-radius: 14px !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  box-shadow: 0 2px 14px rgba(15, 23, 42, 0.06) !important;
+}
+[class*="st-key-sdg_publications_title_toggle"] button:hover {
+  background: #ffffff !important;
+  border-color: #c7d2fe !important;
+  box-shadow: 0 5px 22px rgba(79, 70, 229, 0.13) !important;
+}
+[class*="st-key-sdg_publications_title_toggle"] button p {
+  font-size: 1.55rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "Publications Analysis: Subjects, Networks, SDGs, & OA Status",
+        key="sdg_publications_title_toggle",
+        type="secondary",
+        use_container_width=True,
     ):
+        st.session_state.sdg_publications_expanded = not st.session_state.sdg_publications_expanded
+
+    if not st.session_state.sdg_publications_expanded:
+        return
+
+    with st.container(border=True):
+        st.caption(
+            "Fetch publication records for the selected author to unlock five analysis views: "
+            "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis"
+        )
         if not sdg_credentials_available():
             st.info(
                 "To enable this section set an Elsevier API key (`SCOPUS_API_KEY` or `SCIVAL_API_KEY`) "
@@ -4600,17 +4645,11 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         selected_author_id = author_options[selected_label]
         # Keep this as a native Streamlit button: custom components keep their
         # last value across reruns and can re-trigger analysis when another widget changes.
-        _gif_data_url = _analysis_gif_data_url()
-        if _gif_data_url:
-            _inject_button_gif_icon_styles(
-                "fetch_sdg_publications_button", _gif_data_url, icon_size="1.75rem"
-            )
         _fetch_btn_kwargs: dict = {
             "type": "secondary",
             "key": "fetch_sdg_publications_button",
+            "icon": ":material/analytics:",
         }
-        if not _gif_data_url:
-            _fetch_btn_kwargs["icon"] = ":material/analytics:"
         fetch_clicked = st.button("Run Publications Analysis", **_fetch_btn_kwargs)
         if fetch_clicked:
             st.session_state.sdg_publication_error = ""
