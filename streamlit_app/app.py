@@ -4029,17 +4029,6 @@ def _analysis_gif_data_url() -> str:
     return f"data:image/gif;base64,{encoded}"
 
 
-def _info_gif_data_url() -> str:
-    gif_path = Path(__file__).resolve().parent / "static" / "info.gif"
-    if not gif_path.is_file():
-        return ""
-    try:
-        encoded = base64.b64encode(gif_path.read_bytes()).decode("ascii")
-    except OSError:
-        return ""
-    return f"data:image/gif;base64,{encoded}"
-
-
 def _inject_button_gif_icon_styles(
     streamlit_key: str, gif_data_url: str, *, icon_size: str = "1.75rem"
 ) -> None:
@@ -4460,42 +4449,12 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         unsafe_allow_html=True,
     )
 
-    # ── Section header with info GIF ────────────────────────────────────────
-    _info_url = _info_gif_data_url()
-    if _info_url:
-        st.markdown(
-            f"""
-<style>
-.sdg-section-header {{
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  flex-wrap: wrap;
-}}
-.sdg-section-header h3 {{
-  margin: 0 !important;
-  line-height: 1.3 !important;
-}}
-.sdg-info-gif {{
-  width: 2.4rem;
-  height: 2.4rem;
-  flex-shrink: 0;
-}}
-</style>
-<div class="sdg-section-header">
-  <img src="{_info_url}" class="sdg-info-gif" alt="info" />
-  <h3>Publications Analysis: Subjects, Networks, SDGs, &amp; OA Status</h3>
-</div>
-""",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown("### Publications Analysis: Subjects, Networks, SDGs, & OA Status")
+    st.markdown("### Publications Analysis: Subjects, Networks, SDGs, & OA Status")
 
     with st.expander(
         "Fetch publication records for the selected author to unlock five analysis views: "
         "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis",
-        expanded=st.session_state.get("sdg_expander_open", True),
+        expanded=False,
     ):
         if not sdg_credentials_available():
             st.info(
@@ -4525,18 +4484,28 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             "Please note that classifications are subject to change over time as the underlying data and "
             "methodologies are updated and refined."
         )
-        _disclaimer_html = f"""
+        _disclaimer_tooltip_body = _disclaimer_tooltip.replace(
+            "(https://aurora-universities.eu/sdg-research/sdg-api/)",
+            '(<a href="https://aurora-universities.eu/sdg-research/sdg-api/" target="_blank">aurora-universities.eu</a>)',
+        )
+        st.markdown(
+            f"""
 <style>
-.sdg-model-row {{
-  display: flex;
-  align-items: flex-end;
-  gap: 0.4rem;
+.sdg-model-label-row {{
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #31333f;
+  margin-bottom: 0.35rem;
+}}
+.sdg-model-label-with-tip {{
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }}
 .sdg-disclaimer-tooltip {{
   position: relative;
   display: inline-flex;
   align-items: center;
-  margin-bottom: 0.45rem;
   cursor: default;
 }}
 .sdg-disclaimer-tooltip .sdg-tooltip-icon {{
@@ -4584,14 +4553,9 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
   opacity: 1;
 }}
 </style>
-<span class="sdg-disclaimer-tooltip">
-  <span class="sdg-tooltip-icon">?</span>
-  <span class="sdg-tooltip-box">
-    {_disclaimer_tooltip.replace("(https://aurora-universities.eu/sdg-research/sdg-api/)",
-      '(<a href="https://aurora-universities.eu/sdg-research/sdg-api/" target="_blank">aurora-universities.eu</a>)')}
-  </span>
-</span>
-"""
+""",
+            unsafe_allow_html=True,
+        )
 
         c_author, c_model, c_limit = st.columns([2, 1, 1])
         with c_author:
@@ -4601,14 +4565,28 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
                 key="sdg_author_select",
             )
         with c_model:
+            st.markdown(
+                f"""
+<div class="sdg-model-label-row">
+  <span class="sdg-model-label-with-tip">
+    <span>Select Classification Model</span>
+    <span class="sdg-disclaimer-tooltip">
+      <span class="sdg-tooltip-icon">?</span>
+      <span class="sdg-tooltip-box">{_disclaimer_tooltip_body}</span>
+    </span>
+  </span>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
             model_label = st.selectbox(
                 "Select Classification Model",
                 options=list(_SDG_MODEL_OPTIONS.keys()),
                 index=0,
                 key="sdg_model_select",
+                label_visibility="collapsed",
             )
             sdg_model = _SDG_MODEL_OPTIONS[model_label]
-            st.markdown(_disclaimer_html, unsafe_allow_html=True)
         with c_limit:
             limit_rows = st.number_input(
                 "Max publications",
