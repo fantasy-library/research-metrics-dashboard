@@ -6607,9 +6607,9 @@ def main() -> None:
                     "<li><strong>HKUST researchers</strong> &ndash; Look for your Scopus ID in your "
                     '<a href="https://researchportal.hkust.edu.hk/en/persons/" '
                     'target="_blank" rel="noopener noreferrer">Research Portal profile</a></li>'
-                    "<li>Not there, or not an HKUST researcher? "
+                    "<li>Not there, or not an HKUST researcher? Try searching "
                     '<a href="https://lbdiscover.hkust.edu.hk/bib/991000319279703412" '
-                    'target="_blank" rel="noopener noreferrer">Try searching Scopus itself (guide).</a></li>'
+                    'target="_blank" rel="noopener noreferrer">Scopus</a> itself (guide).</li>'
                     "</ul>"
                     "</div>",
                     unsafe_allow_html=True,
