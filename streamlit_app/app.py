@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import html
+import io
 import json
 import re
 import sys
@@ -2886,6 +2887,43 @@ footer.site-footer .site-footer-copy {
   padding: 0.55rem 0.75rem !important;
 }
 
+/* SDG network: institution search — inline help + visible input border */
+[class*="st-key-sdg_network_institution_search_shell"] .sdg-network-search-label {
+  display: flex;
+  align-items: center;
+  margin: 0 0 0.4rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  overflow: visible !important;
+  position: relative;
+  z-index: 2;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] {
+  margin-bottom: 0 !important;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] div[data-baseweb="input"] {
+  border: 1px solid #64748b !important;
+  border-radius: 10px !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  min-height: 2.65rem !important;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+  border-color: #673ab7 !important;
+  box-shadow: 0 0 0 2px rgba(103, 58, 183, 0.2) !important;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] div[data-baseweb="input"] input {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  font-size: 0.95rem !important;
+  padding: 0.55rem 0.75rem !important;
+}
+
 /* Validation toasts — amber styling if ``st.toast`` is used elsewhere */
 [data-testid="stToast"] {
   background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%) !important;
@@ -3547,18 +3585,11 @@ def _publication_preview_df(rows: list[dict]) -> pd.DataFrame:
     )
 
 
-def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> None:
-    if not rows:
-        st.info("No publications available to build the co-affiliation network.")
-        return
-    try:
-        import itertools
-
-        import networkx as nx
-        import plotly.graph_objects as go
-    except ImportError as exc:
-        st.warning(f"Install network dependencies to render the SDG network: {exc}")
-        return
+def _build_coaffiliation_edges(
+    rows: list[dict],
+) -> tuple[dict[tuple[str, str], int], dict[str, str], dict[str, int]] | None:
+    """Build co-affiliation edge weights and institution labels from publication rows."""
+    import itertools
 
     edge_counts: dict[tuple[str, str], int] = {}
     node_labels: dict[str, str] = {}
@@ -3604,25 +3635,110 @@ def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> 
             edge_counts[(a, b)] = edge_counts.get((a, b), 0) + 1
 
     if not edge_counts:
+        return None
+    return edge_counts, node_labels, pubs_per_node
+
+
+def _render_top_coaffiliation_histogram(
+    edge_counts: dict[tuple[str, str], int],
+    label_by_node: dict[str, str],
+    *,
+    top_n: int = 10,
+) -> None:
+    """Horizontal bar chart of the strongest institution-pair co-affiliations."""
+    import plotly.graph_objects as go
+
+    ranked = sorted(edge_counts.items(), key=lambda item: item[1], reverse=True)[:top_n]
+    if not ranked:
+        return
+
+    pair_labels: list[str] = []
+    pair_values: list[int] = []
+    for (a, b), weight in ranked:
+        label_a = label_by_node.get(a, a)
+        label_b = label_by_node.get(b, b)
+        pair_labels.append(f"{label_a} — {label_b}")
+        pair_values.append(weight)
+
+    # Ascending y order so the highest collaboration appears at the top.
+    ordered = sorted(zip(pair_labels, pair_values), key=lambda item: item[1])
+    labels = [label for label, _ in ordered]
+    values = [value for _, value in ordered]
+
+    st.markdown("#### Top co-affiliation pairs")
+    st.caption(f"Top {len(ranked)} institution pairs by co-authored publications (sorted highest to lowest).")
+
+    fig = go.Figure(
+        go.Bar(
+            y=labels,
+            x=values,
+            orientation="h",
+            marker_color="#4f46e5",
+            text=values,
+            textposition="outside",
+            hovertemplate="%{y}<br>Co-authored works: %{x}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        height=max(280, 32 * len(labels) + 80),
+        margin=dict(l=0, r=40, t=10, b=30),
+        xaxis_title="Co-authored works",
+        yaxis=dict(automargin=True),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> None:
+    if not rows:
+        st.info("No publications available to build the co-affiliation network.")
+        return
+    try:
+        import networkx as nx
+        import plotly.graph_objects as go
+    except ImportError as exc:
+        st.warning(f"Install network dependencies to render the SDG network: {exc}")
+        return
+
+    built = _build_coaffiliation_edges(rows)
+    if not built:
         st.info("No co-affiliations found among the fetched publications.")
         return
+    edge_counts, node_labels, pubs_per_node = built
 
     label_by_node = {node: node_labels.get(node, node) for node in node_labels}
     for edge in edge_counts:
         for node in edge:
             label_by_node.setdefault(node, node_labels.get(node, node))
 
+    _render_top_coaffiliation_histogram(edge_counts, label_by_node, top_n=10)
+    st.divider()
+
     degree: dict[str, int] = {}
     for (a, b), weight in edge_counts.items():
         degree[a] = degree.get(a, 0) + weight
         degree[b] = degree.get(b, 0) + weight
 
-    focus_query = st.text_input(
-        "Search institution to center the network (optional)",
-        value="",
-        key="sdg_network_institution_search",
-        help="Type part of an institution name from the fetched publication set.",
-    ).strip()
+    with st.container(border=True, key="sdg_network_institution_search_shell"):
+        st.markdown(
+            '<div class="sdg-network-search-label">'
+            '<span class="year-filter-label-with-tip">'
+            "<span>Search institution to center the network (optional)</span>"
+            '<span class="year-filter-tip" tabindex="0" role="button" '
+            'aria-label="Institution search information, details in tooltip">'
+            '<span class="minimal-filter-icon-badge minimal-filter-icon-badge--compact '
+            'minimal-filter-icon-badge--info year-filter-tip-marker" aria-hidden="true">'
+            f"{_FILTER_ICON_INFO_SMALL}</span>"
+            '<span class="year-filter-tip-popup" role="tooltip">'
+            "Type part of an institution name from the fetched publication set."
+            "</span></span></span></div>",
+            unsafe_allow_html=True,
+        )
+        focus_query = st.text_input(
+            "Search institution to center the network (optional)",
+            value="",
+            key="sdg_network_institution_search",
+            label_visibility="collapsed",
+        ).strip()
     selected_focus: str | None = None
     if focus_query:
         q = focus_query.lower()
@@ -4439,8 +4555,21 @@ def _render_abstract_wordcloud(rows: list[dict]) -> None:
     ax.imshow(wc, interpolation="bilinear")
     ax.axis("off")
     fig.tight_layout(pad=0)
+
+    png_buf = io.BytesIO()
+    fig.savefig(png_buf, format="png", bbox_inches="tight", pad_inches=0, dpi=150)
+    png_bytes = png_buf.getvalue()
+
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
+
+    st.download_button(
+        "Download PNG",
+        data=png_bytes,
+        file_name="abstract-wordcloud.png",
+        mime="image/png",
+        key="download_abstract_wordcloud_png",
+    )
 
 
 def _render_sdg_publications_section(valid_results: list[dict], year_key: str, docs_key: str) -> None:
@@ -6478,11 +6607,9 @@ def main() -> None:
                     "<li><strong>HKUST researchers</strong> &ndash; Look for your Scopus ID in your "
                     '<a href="https://researchportal.hkust.edu.hk/en/persons/" '
                     'target="_blank" rel="noopener noreferrer">Research Portal profile</a></li>'
-                    "<li>Not there, or not an HKUST researcher? Try searching "
-                    '<a href="https://www.scopus.com/home.uri" '
-                    'target="_blank" rel="noopener noreferrer">Scopus</a> itself '
-                    "(<a href=\"https://libguides.hkust.edu.hk/research-impact/author-impact\" "
-                    'target="_blank" rel="noopener noreferrer">guide</a>).</li>'
+                    "<li>Not there, or not an HKUST researcher? "
+                    '<a href="https://lbdiscover.hkust.edu.hk/bib/991000319279703412" '
+                    'target="_blank" rel="noopener noreferrer">Try searching Scopus itself (guide).</a></li>'
                     "</ul>"
                     "</div>",
                     unsafe_allow_html=True,
