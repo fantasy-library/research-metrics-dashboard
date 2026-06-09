@@ -3634,39 +3634,37 @@ def _build_coaffiliation_edges(
         for a, b in itertools.combinations(sorted(unique_nodes), 2):
             edge_counts[(a, b)] = edge_counts.get((a, b), 0) + 1
 
-    if not edge_counts:
+    if not pubs_per_node:
         return None
     return edge_counts, node_labels, pubs_per_node
 
 
 def _render_top_coaffiliation_histogram(
-    edge_counts: dict[tuple[str, str], int],
     label_by_node: dict[str, str],
+    pubs_per_node: dict[str, int],
     *,
     top_n: int = 10,
 ) -> None:
-    """Horizontal bar chart of the strongest institution-pair co-affiliations."""
+    """Horizontal bar chart of the most-published institutions in the co-affiliation set."""
     import plotly.graph_objects as go
 
-    ranked = sorted(edge_counts.items(), key=lambda item: item[1], reverse=True)[:top_n]
+    ranked = sorted(pubs_per_node.items(), key=lambda item: item[1], reverse=True)[:top_n]
     if not ranked:
         return
 
-    pair_labels: list[str] = []
-    pair_values: list[int] = []
-    for (a, b), weight in ranked:
-        label_a = label_by_node.get(a, a)
-        label_b = label_by_node.get(b, b)
-        pair_labels.append(f"{label_a} — {label_b}")
-        pair_values.append(weight)
+    labels = [label_by_node.get(node, node) for node, _ in ranked]
+    values = [count for _, count in ranked]
 
-    # Ascending y order so the highest collaboration appears at the top.
-    ordered = sorted(zip(pair_labels, pair_values), key=lambda item: item[1])
+    # Ascending y order so the highest publication count appears at the top.
+    ordered = sorted(zip(labels, values), key=lambda item: item[1])
     labels = [label for label, _ in ordered]
     values = [value for _, value in ordered]
 
     st.markdown("#### Top co-affiliation pairs")
-    st.caption(f"Top {len(ranked)} institution pairs by co-authored publications (sorted highest to lowest).")
+    st.caption(
+        f"Top {len(ranked)} most-published institutions in this result set "
+        "(sorted highest to lowest)."
+    )
 
     fig = go.Figure(
         go.Bar(
@@ -3676,13 +3674,13 @@ def _render_top_coaffiliation_histogram(
             marker_color="#4f46e5",
             text=values,
             textposition="outside",
-            hovertemplate="%{y}<br>Co-authored works: %{x}<extra></extra>",
+            hovertemplate="%{y}<br>Publications: %{x}<extra></extra>",
         )
     )
     fig.update_layout(
         height=max(280, 32 * len(labels) + 80),
         margin=dict(l=0, r=40, t=10, b=30),
-        xaxis_title="Co-authored works",
+        xaxis_title="Publications",
         yaxis=dict(automargin=True),
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -3701,7 +3699,7 @@ def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> 
 
     built = _build_coaffiliation_edges(rows)
     if not built:
-        st.info("No co-affiliations found among the fetched publications.")
+        st.info("No institution affiliations found among the fetched publications.")
         return
     edge_counts, node_labels, pubs_per_node = built
 
@@ -3710,8 +3708,12 @@ def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> 
         for node in edge:
             label_by_node.setdefault(node, node_labels.get(node, node))
 
-    _render_top_coaffiliation_histogram(edge_counts, label_by_node, top_n=10)
+    _render_top_coaffiliation_histogram(label_by_node, pubs_per_node, top_n=10)
     st.divider()
+
+    if not edge_counts:
+        st.info("No co-affiliations found among the fetched publications.")
+        return
 
     degree: dict[str, int] = {}
     for (a, b), weight in edge_counts.items():
