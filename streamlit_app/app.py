@@ -4649,6 +4649,13 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             "Fetch publication records for the selected author to unlock five analysis views: "
             "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis"
         )
+        st.caption(
+            "Note: Scopus discovers candidate publications (AU-ID search); a row is included only when "
+            "its DOI matches an OpenAlex record—metadata shown here comes from OpenAlex. SDG labels use "
+            "the Aurora classifier; ASJC uses Elsevier's Serial Title API (DOI → ISSN). Document-type "
+            "and date filters may also exclude Scopus candidates. Because of this pipeline, counts and "
+            "labels may differ from Scopus or SciVal. Results are provided for reference only."
+        )
         if not sdg_credentials_available():
             st.info(
                 "To enable this section set an Elsevier API key (`SCOPUS_API_KEY` or `SCIVAL_API_KEY`) "
