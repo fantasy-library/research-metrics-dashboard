@@ -4629,6 +4629,40 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
 [class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlock"] {{
   gap: 1rem !important;
 }}
+.sdg-pipeline-note {{
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: #6b7280;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}}
+.sdg-pipeline-note-icon {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 1.5px solid #a5b4fc;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  user-select: none;
+}}
+.sdg-pipeline-note-text strong {{
+  color: #475569;
+  font-weight: 600;
+}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -4649,12 +4683,18 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             "Fetch publication records for the selected author to unlock five analysis views: "
             "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis"
         )
-        st.caption(
-            "Note: Scopus discovers candidate publications (AU-ID search); a row is included only when "
-            "its DOI matches an OpenAlex record—metadata shown here comes from OpenAlex. SDG labels use "
-            "the Aurora classifier; ASJC uses Elsevier's Serial Title API (DOI → ISSN). Document-type "
-            "and date filters may also exclude Scopus candidates. Because of this pipeline, counts and "
-            "labels may differ from Scopus or SciVal. Results are provided for reference only."
+        st.markdown(
+            """
+<div class="sdg-pipeline-note">
+  <span class="sdg-pipeline-note-icon" aria-hidden="true">i</span>
+  <span class="sdg-pipeline-note-text"><strong>Note:</strong> Scopus identifies candidate publications
+  (AU-ID search), but only records with DOIs matched in OpenAlex are included; metadata is sourced from
+  OpenAlex. SDGs use the Aurora classifier, and ASJC subjects are assigned via Elsevier's Serial Title
+  API (DOI → ISSN). Document type and date filters may apply. Number of Publications may differ from
+  Scopus/SciVal. For reference only.</span>
+</div>
+""",
+            unsafe_allow_html=True,
         )
         if not sdg_credentials_available():
             st.info(
