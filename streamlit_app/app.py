@@ -1394,12 +1394,12 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 [class*="st-key-scopus_id_section"] .scopus-id-section-list li + li {
   margin-top: 0.3rem;
 }
-[class*="st-key-scopus_id_section"] .scopus-id-section-list a {
+[class*="st-key-scopus_id_section"] a {
   color: #1d4ed8;
   font-weight: 600;
   text-decoration: none;
 }
-[class*="st-key-scopus_id_section"] .scopus-id-section-list a:hover {
+[class*="st-key-scopus_id_section"] a:hover {
   text-decoration: underline;
 }
 [class*="st-key-scopus_id_section"] [class*="st-key-scopus_author_ids"] textarea {
@@ -6645,7 +6645,7 @@ def main() -> None:
                 else ""
             )
             with st.container(border=True, key="scopus_id_section"):
-                st.markdown(
+                st.html(
                     '<div class="scopus-id-section">'
                     '<div class="scopus-id-section-head">Scopus Author ID: '
                     f'<span class="scopus-id-count{_count_cls}" aria-live="polite" '
@@ -6663,7 +6663,6 @@ def main() -> None:
                     'target="_blank" rel="noopener noreferrer">guide</a>).</li>'
                     "</ul>"
                     "</div>",
-                    unsafe_allow_html=True,
                 )
                 author_ids = st.text_area(
                     "Scopus Author ID",
