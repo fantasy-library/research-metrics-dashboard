@@ -6658,7 +6658,9 @@ def main() -> None:
                     'target="_blank" rel="noopener noreferrer">Research Portal profile</a></li>'
                     "<li>Not there, or not an HKUST researcher? Try searching "
                     '<a href="https://lbdiscover.hkust.edu.hk/bib/991000319279703412" '
-                    'target="_blank" rel="noopener noreferrer">Scopus</a> itself (guide).</li>'
+                    'target="_blank" rel="noopener noreferrer">Scopus</a> itself ('
+                    '<a href="https://elsevier.libguides.com/Scopus/author-profile" '
+                    'target="_blank" rel="noopener noreferrer">guide</a>).</li>'
                     "</ul>"
                     "</div>",
                     unsafe_allow_html=True,
