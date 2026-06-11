@@ -6661,8 +6661,8 @@ def main() -> None:
                     "- **HKUST researchers** &ndash; Look for your Scopus ID in your "
                     "[Research Portal profile](https://researchportal.hkust.edu.hk/en/persons/)\n"
                     "- Not there, or not an HKUST researcher? Try searching "
-                    "[Scopus](https://lbdiscover.hkust.edu.hk/bib/991000319279703412) itself "
-                    "[(guide)](https://elsevier.libguides.com/Scopus/author-profile)."
+                    "[Scopus](https://lbdiscover.hkust.edu.hk/bib/991000319279703412) itself and the "
+                    "[guide](https://elsevier.libguides.com/Scopus/author-profile) from Elsevier."
                 )
                 author_ids = st.text_area(
                     "Scopus Author ID",
