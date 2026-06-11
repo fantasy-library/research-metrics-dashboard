@@ -1380,7 +1380,8 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 [class*="st-key-scopus_id_section"] .scopus-id-section-head .scopus-id-count--warn {
   color: #c2410c;
 }
-[class*="st-key-scopus_id_section"] .scopus-id-section-list {
+[class*="st-key-scopus_id_section"] .scopus-id-section-list,
+[class*="st-key-scopus_id_section"] [data-testid="stMarkdownContainer"] ul {
   margin: 0;
   padding-left: 1.25rem;
   font-size: 0.875rem;
@@ -1388,10 +1389,12 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   color: #374151;
   font-family: Inter, Roboto, "Segoe UI", sans-serif;
 }
-[class*="st-key-scopus_id_section"] .scopus-id-section-list li {
+[class*="st-key-scopus_id_section"] .scopus-id-section-list li,
+[class*="st-key-scopus_id_section"] [data-testid="stMarkdownContainer"] li {
   margin: 0;
 }
-[class*="st-key-scopus_id_section"] .scopus-id-section-list li + li {
+[class*="st-key-scopus_id_section"] .scopus-id-section-list li + li,
+[class*="st-key-scopus_id_section"] [data-testid="stMarkdownContainer"] li + li {
   margin-top: 0.3rem;
 }
 [class*="st-key-scopus_id_section"] a {
@@ -6645,24 +6648,21 @@ def main() -> None:
                 else ""
             )
             with st.container(border=True, key="scopus_id_section"):
-                st.html(
+                st.markdown(
                     '<div class="scopus-id-section">'
                     '<div class="scopus-id-section-head">Scopus Author ID: '
                     f'<span class="scopus-id-count{_count_cls}" aria-live="polite" '
                     f'title="Updates as you enter IDs in the field below">'
                     f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} IDs entered"
-                    "</span></div>"
-                    '<ul class="scopus-id-section-list">'
-                    "<li><strong>HKUST researchers</strong> &ndash; Look for your Scopus ID in your "
-                    '<a href="https://researchportal.hkust.edu.hk/en/persons/" '
-                    'target="_blank" rel="noopener noreferrer">Research Portal profile</a></li>'
-                    "<li>Not there, or not an HKUST researcher? Try searching "
-                    '<a href="https://lbdiscover.hkust.edu.hk/bib/991000319279703412" '
-                    'target="_blank" rel="noopener noreferrer">Scopus</a> itself ('
-                    '<a href="https://elsevier.libguides.com/Scopus/author-profile" '
-                    'target="_blank" rel="noopener noreferrer">guide</a>).</li>'
-                    "</ul>"
-                    "</div>",
+                    "</span></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "- **HKUST researchers** &ndash; Look for your Scopus ID in your "
+                    "[Research Portal profile](https://researchportal.hkust.edu.hk/en/persons/)\n"
+                    "- Not there, or not an HKUST researcher? Try searching "
+                    "[Scopus](https://lbdiscover.hkust.edu.hk/bib/991000319279703412) itself "
+                    "[(guide)](https://elsevier.libguides.com/Scopus/author-profile)."
                 )
                 author_ids = st.text_area(
                     "Scopus Author ID",
