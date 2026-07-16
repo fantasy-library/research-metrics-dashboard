@@ -158,7 +158,7 @@ _rate_limiter = _RateLimiter()
 
 
 def _retry_with_backoff(operation):
-    """Retry rate-limited SciVal calls. Do not retry read/connect timeouts (avoids long silent spinners)."""
+    """Retry rate-limited SciVal calls only. Auth / other API errors fail immediately (no sleep)."""
     last_err: Optional[Exception] = None
     max_attempts = RATE_LIMIT_CONFIG["retry_attempts"]
     base_delay = RATE_LIMIT_CONFIG["retry_delay"]
@@ -168,7 +168,8 @@ def _retry_with_backoff(operation):
             return operation()
         except APIError as e:
             last_err = e
-            if not e.is_rate_limit_error and attempt > 1:
+            # Never backoff on invalid keys — caller may switch to SCIVAL_API_KEY_1/2 immediately.
+            if not e.is_rate_limit_error:
                 raise
         except httpx.TimeoutException as e:
             last_err = e
@@ -181,6 +182,7 @@ def _retry_with_backoff(operation):
             break
         except Exception as e:
             last_err = e
+            raise APIError(str(e)) from e
         if attempt >= max_attempts:
             break
         delay = base_delay * (mult ** (attempt - 1)) + random.random()
@@ -214,6 +216,8 @@ def is_missing_scival_api_key_error(message: str) -> bool:
 def is_scival_authentication_error(message: str) -> bool:
     """HTTP 401 / invalid key — same message for every author; show once, skip per-author retries."""
     low = message.lower()
+    if "apikey_invalid" in low or "provided apikey is invalid" in low:
+        return True
     if "api error (401)" in low:
         return True
     if "api authentication failed" in low:
@@ -227,6 +231,14 @@ def is_scival_authentication_error(message: str) -> bool:
     ):
         return True
     return False
+
+
+def _is_apikey_invalid_response(status_code: int, body: str) -> bool:
+    """Elsevier often returns APIKEY_INVALID with 401 (sometimes other 4xx)."""
+    if status_code == 401:
+        return True
+    low = (body or "").lower()
+    return "apikey_invalid" in low or "provided apikey is invalid" in low
 
 
 def _extract_scival_error_detail(body: str) -> str:
@@ -547,9 +559,44 @@ class APIService:
             trust_env=True,
             verify=scival_httpx_verify(),
         )
+        # After the first successful key, reuse it for later metric calls in this session.
+        self._preferred_key: Optional[tuple[str, bool]] = None  # (api_key, use_insttoken)
+        self._rejected_keys: set[str] = set()
 
     def close(self) -> None:
         self._client.close()
+
+    def _ordered_key_candidates(
+        self, custom_api_key: Optional[str]
+    ) -> list[tuple[str, bool, str]]:
+        """Prefer a known-good key; skip keys that already returned APIKEY_INVALID this session."""
+        candidates = scival_api_key_candidates(custom_api_key)
+        if self._rejected_keys:
+            candidates = [
+                (k, use_inst, label)
+                for k, use_inst, label in candidates
+                if k not in self._rejected_keys
+            ]
+        if not candidates:
+            # All tried keys failed auth — allow a fresh pass (e.g. user updated Settings).
+            self._rejected_keys.clear()
+            self._preferred_key = None
+            candidates = scival_api_key_candidates(custom_api_key)
+        if self._preferred_key:
+            pk, pu = self._preferred_key
+            preferred = [
+                (k, use_inst, label)
+                for k, use_inst, label in candidates
+                if k == pk and use_inst == pu
+            ]
+            rest = [
+                (k, use_inst, label)
+                for k, use_inst, label in candidates
+                if not (k == pk and use_inst == pu)
+            ]
+            if preferred:
+                return preferred + rest
+        return candidates
 
     def _make_supabase_request(
         self,
@@ -645,6 +692,12 @@ class APIService:
                             "Rate limit exceeded. The system will automatically retry. "
                             "Please wait..."
                         )
+                    elif _is_apikey_invalid_response(r.status_code, text):
+                        detail = _extract_scival_error_detail(text)
+                        msg = format_error_message_for_user(
+                            f"API Error (401): {detail or text[:900]}"
+                        )
+                        raise APIError(msg, 401, is_ent, is_rl)
                     elif (
                         "ENTITLEMENTS_ERROR" in text
                         or "Not entitled to the resource" in text
@@ -688,7 +741,7 @@ class APIService:
         include_self_citations: str,
         included_docs: str,
     ) -> Any:
-        candidates = scival_api_key_candidates(custom_api_key)
+        candidates = self._ordered_key_candidates(custom_api_key)
         if not candidates:
             raise APIError(
                 "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
@@ -698,7 +751,7 @@ class APIService:
         last_err: Optional[APIError] = None
         for i, (api_key, use_insttoken, _label) in enumerate(candidates):
             try:
-                return self._fetch_direct_metric_once(
+                result = self._fetch_direct_metric_once(
                     author_id,
                     metric_type,
                     by_year,
@@ -708,11 +761,15 @@ class APIService:
                     included_docs,
                     use_insttoken,
                 )
+                self._preferred_key = (api_key, use_insttoken)
+                return result
             except APIError as e:
                 last_err = e
                 auth_fail = e.status_code == 401 or is_scival_authentication_error(str(e))
-                if auth_fail and i < len(candidates) - 1:
-                    continue
+                if auth_fail:
+                    self._rejected_keys.add(api_key)
+                    if i < len(candidates) - 1:
+                        continue
                 raise
         assert last_err is not None
         raise last_err

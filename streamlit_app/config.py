@@ -146,6 +146,42 @@ def _resolve_insttoken() -> str:
 # Optional institutional token (Elsevier query param insttoken and/or header X-ELS-Insttoken)
 ELSEVIER_INSTTOKEN: str = _resolve_insttoken()
 
+
+def elsevier_credential_candidates(
+    custom_api_key: str | None = None,
+) -> list[tuple[str, str, str]]:
+    """Ordered (api_key, insttoken_or_empty, label) for Scopus Content / Publication Analysis.
+
+    Primary / Settings may include ELSEVIER_INSTTOKEN when set.
+    SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 never include insttoken.
+    """
+    out: list[tuple[str, str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    inst = (ELSEVIER_INSTTOKEN or "").strip()
+
+    def add(key: str | None, use_insttoken: bool, label: str) -> None:
+        k = (key or "").strip()
+        if not k:
+            return
+        tok = inst if use_insttoken else ""
+        sig = (k, tok)
+        if sig in seen:
+            return
+        seen.add(sig)
+        out.append((k, tok, label))
+
+    custom = (custom_api_key or "").strip()
+    if custom:
+        add(custom, bool(inst), "settings")
+    else:
+        add(SCOPUS_CONTENT_API_KEY, bool(inst), "scopus_primary")
+        add(SCIVAL_API_KEY, bool(inst), "primary")
+
+    add(SCIVAL_API_KEY_1, False, "SCIVAL_API_KEY_1")
+    add(SCIVAL_API_KEY_2, False, "SCIVAL_API_KEY_2")
+    return out
+
+
 # OpenAlex asks callers to identify themselves. Override in deployment with a contact email.
 OPENALEX_USER_AGENT: str = (
     os.getenv("OPENALEX_USER_AGENT")

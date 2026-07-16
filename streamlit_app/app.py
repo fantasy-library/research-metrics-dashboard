@@ -4259,7 +4259,7 @@ def _get_issn_from_doi(doi: str, api_key: str, inst_token: str) -> str | None:
     cleaned = _normalize_doi_for_elsevier(doi)
     if not cleaned or not cleaned.startswith("10.") or "/" not in cleaned:
         return None
-    if not (inst_token or "").strip():
+    if not (api_key or "").strip():
         return None
 
     params = _elsevier_scopus_params(api_key, inst_token)
@@ -4290,7 +4290,7 @@ def _get_asjc_subjects_by_issn(issn: str, api_key: str, inst_token: str) -> list
     import requests as _req
 
     issn_clean = _clean_issn_for_scopus(issn)
-    if not issn_clean or not (inst_token or "").strip():
+    if not issn_clean or not (api_key or "").strip():
         return []
 
     params = _elsevier_scopus_params(api_key, inst_token)
@@ -4328,10 +4328,17 @@ def _extract_publication_dois(rows: list[dict]) -> list[str]:
 
 def _ensure_asjc_subject_cache(rows: list[dict], *, show_progress: bool = False) -> dict:
     """Resolve DOI → ISSN → ASJC subjects and store in session state."""
-    api_key = SCOPUS_CONTENT_API_KEY
-    inst_token = (ELSEVIER_INSTTOKEN or "").strip()
-    if not api_key or not inst_token:
+    import streamlit_app.sdg_service as _sdg
+
+    creds = _sdg._ordered_scopus_credentials()
+    if not creds:
         return {}
+
+    preferred = _sdg._preferred_scopus_creds
+    if preferred:
+        api_key, inst_token = preferred
+    else:
+        api_key, inst_token, _label = creds[0]
 
     dois = _extract_publication_dois(rows)
     if not dois:
@@ -4349,6 +4356,15 @@ def _ensure_asjc_subject_cache(rows: list[dict], *, show_progress: bool = False)
         total = len(uncached_dois)
         for i, doi in enumerate(uncached_dois):
             issn = _get_issn_from_doi(doi, api_key, inst_token)
+            # On first miss, try remaining credential candidates once (invalid primary key).
+            if issn is None and i == 0 and not preferred:
+                for try_key, try_inst, _ in creds[1:]:
+                    issn = _get_issn_from_doi(doi, try_key, try_inst)
+                    if issn:
+                        api_key, inst_token = try_key, try_inst
+                        _sdg._preferred_scopus_creds = (try_key, try_inst)
+                        preferred = (try_key, try_inst)
+                        break
             subjects: list[tuple[str, str]] = []
             if issn:
                 if "asjc_issn_cache" not in st.session_state:
@@ -4390,20 +4406,10 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
     """Fetch ASJC subject areas via DOI → ISSN → Serial Title API and render charts."""
     import plotly.graph_objects as go
 
-    api_key = SCOPUS_CONTENT_API_KEY
-    inst_token = (ELSEVIER_INSTTOKEN or "").strip()
-    if not api_key:
+    if not sdg_credentials_available():
         st.warning(
-            "An Elsevier API key (`SCOPUS_API_KEY` or equivalent) is required to fetch ASJC subjects. "
-            "Set it in your `.env` file.",
-            icon=":material/key:",
-        )
-        return
-    if not inst_token:
-        st.warning(
-            "ASJC lookup requires **`ELSEVIER_INSTTOKEN`** (institutional token) in addition to your "
-            "Scopus API key — the same credentials used for **Run Publications Analysis**. "
-            "Without it, Elsevier Serial Title and Scopus Search calls are rejected.",
+            "An Elsevier API key (`SCOPUS_API_KEY`, `SCIVAL_API_KEY`, or "
+            "`SCIVAL_API_KEY_1` / `SCIVAL_API_KEY_2`) is required to fetch ASJC subjects.",
             icon=":material/key:",
         )
         return
@@ -4431,13 +4437,14 @@ def _render_asjc_subjects(rows: list[dict]) -> None:
         st.info(
             "No ASJC subject areas were retrieved. "
             f"Resolved ISSN for **{issn_hits}** of **{len(dois)}** DOIs. "
-            "Common causes: missing or invalid `ELSEVIER_INSTTOKEN`, DOIs not indexed in Scopus, "
-            "or journals without subject-area metadata in the Serial Title API."
+            "Common causes: invalid API key, missing `ELSEVIER_INSTTOKEN` (when required), "
+            "DOIs not indexed in Scopus, or journals without subject-area metadata."
         )
         with st.expander("Troubleshooting"):
             st.markdown(
-                "- Confirm **`SCOPUS_API_KEY`** and **`ELSEVIER_INSTTOKEN`** are set (same as Publications Analysis).\n"
-                "- Elsevier calls use **`apiKey`** + **`insttoken`** query parameters (see Scopus_Wos reference).\n"
+                "- Confirm **`SCOPUS_API_KEY` / `SCIVAL_API_KEY`** or backup **`SCIVAL_API_KEY_1` / `SCIVAL_API_KEY_2`** "
+                "(same as Publications Analysis).\n"
+                "- Institutional keys may also need **`ELSEVIER_INSTTOKEN`**; backup keys usually do not.\n"
                 "- DOIs are normalized from `https://doi.org/…` before lookup.\n"
                 "- Re-run **Run Publications Analysis** after changing credentials, then open this tab again."
             )
@@ -4701,8 +4708,9 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
         )
         if not sdg_credentials_available():
             st.info(
-                "To enable this section set an Elsevier API key (`SCOPUS_API_KEY` or `SCIVAL_API_KEY`) "
-                "and an `ELSEVIER_INSTTOKEN`. "
+                "To enable this section set an Elsevier API key (`SCOPUS_API_KEY`, `SCIVAL_API_KEY`, "
+                "or backup `SCIVAL_API_KEY_1` / `SCIVAL_API_KEY_2`). "
+                "`ELSEVIER_INSTTOKEN` is optional when using the backup keys. "
                 "Scopus publication search uses the Scopus Content API, which may require a separate "
                 "entitlement from SciVal."
             )

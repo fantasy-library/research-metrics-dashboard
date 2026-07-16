@@ -824,9 +824,9 @@ def get_abstract_from_scopus(
 ) -> Optional[str]:
     """
     Fetch abstract via Elsevier Scopus / Abstract Retrieval API (by DOI).
-    Requires both apiKey and insttoken (query params).
+    ``insttoken`` is optional (backup keys often work without it).
     """
-    if not doi or not api_key or not (insttoken or "").strip():
+    if not doi or not api_key:
         return None
     cleaned = doi.strip()
     for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
@@ -836,11 +836,13 @@ def get_abstract_from_scopus(
         return None
     path_doi = quote(cleaned, safe="")
     url = ELSEVIER_ABSTRACT_BY_DOI.format(doi=path_doi)
-    params = {
+    params: Dict[str, str] = {
         "apiKey": api_key,
         "httpAccept": "text/xml",
-        "insttoken": insttoken.strip(),
     }
+    inst = (insttoken or "").strip()
+    if inst:
+        params["insttoken"] = inst
     headers = {"Accept": "text/xml, application/xml;q=0.9,*/*;q=0.8"}
     requester = session or requests
     for attempt in range(1, retries + 1):
@@ -1351,10 +1353,10 @@ def fetch_author_publications_scopus_with_sdg(
     when present. Entries with no DOI, duplicate DOIs, no OpenAlex match, or type/date outside your
     filters increment counters on ``FetchStats``.
     """
-    if not scopus_api_key or not (scopus_insttoken or "").strip():
+    if not scopus_api_key:
         raise ValueError(
-            "Scopus publication source requires non-empty scopus_api_key and scopus_insttoken "
-            "(secrets.toml or SCOPUS_API_KEY / SCOPUS_INSTTOKEN)."
+            "Scopus publication source requires a non-empty scopus_api_key "
+            "(SCOPUS_API_KEY / SCIVAL_API_KEY or SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2)."
         )
 
     stats = FetchStats(
@@ -1395,12 +1397,14 @@ def fetch_author_publications_scopus_with_sdg(
         query_str = build_scopus_author_publications_query(au_id, from_date, to_date, work_type)
         emit_progress("Searching Scopus for candidate publications")
         headers = {"Accept": "text/xml, application/xml;q=0.9,*/*;q=0.8"}
-        base_params = {
+        base_params: Dict[str, Any] = {
             "apiKey": scopus_api_key,
-            "insttoken": (scopus_insttoken or "").strip(),
             "query": query_str,
             "httpAccept": "text/xml",
         }
+        inst = (scopus_insttoken or "").strip()
+        if inst:
+            base_params["insttoken"] = inst
 
         start = 0
         page_size = 200
@@ -1421,11 +1425,16 @@ def fetch_author_publications_scopus_with_sdg(
                     page_size = 25
                     params["count"] = page_size
                     resp = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=90)
-                if resp.status_code in (401, 403):
+                body_low = (resp.text or "").lower()
+                auth_rejected = resp.status_code in (401, 403) or (
+                    "apikey_invalid" in body_low or "provided apikey is invalid" in body_low
+                )
+                if auth_rejected:
                     raise ValueError(
                         "Scopus API credentials were rejected (HTTP "
                         f"{resp.status_code}). Check that SCOPUS_API_KEY and "
-                        "ELSEVIER_INSTTOKEN are correct and have not expired."
+                        "ELSEVIER_INSTTOKEN are correct and have not expired "
+                        "(or use SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 without insttoken)."
                     )
                 if resp.status_code == 429:
                     raise ValueError(

@@ -11,15 +11,18 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from streamlit_app.config import (
-    ELSEVIER_INSTTOKEN,
     OPENALEX_USER_AGENT,
-    SCOPUS_CONTENT_API_KEY,
     SERPAPI_API_KEY,
+    elsevier_credential_candidates,
 )
 
 _ROOT = Path(__file__).resolve().parent.parent
 _AURORA_DIR = Path(__file__).resolve().parent / "aurora_pipeline"
 _CACHE_PATH = _ROOT / "data" / "aurora_sdg_cache.sqlite3"
+
+# Sticky Elsevier credentials for Publication Analysis (skip invalid keys after first 401).
+_preferred_scopus_creds: Optional[tuple[str, str]] = None  # (api_key, insttoken)
+_rejected_scopus_keys: set[str] = set()
 
 
 class SDGServiceError(RuntimeError):
@@ -61,7 +64,56 @@ def _load_aurora_modules():
 
 
 def sdg_credentials_available() -> bool:
-    return bool(SCOPUS_CONTENT_API_KEY and ELSEVIER_INSTTOKEN)
+    """True when any Elsevier key candidate exists (backups do not need insttoken)."""
+    return bool(elsevier_credential_candidates())
+
+
+def _is_scopus_auth_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return (
+        "credentials were rejected" in msg
+        or "apikey_invalid" in msg
+        or "provided apikey is invalid" in msg
+        or ("http 401" in msg and ("scopus" in msg or "api" in msg))
+        or ("http 403" in msg and "credential" in msg)
+    )
+
+
+def _ordered_scopus_credentials(
+    custom_api_key: Optional[str] = None,
+) -> List[Tuple[str, str, str]]:
+    """Prefer a known-good key; skip keys rejected earlier this process."""
+    global _preferred_scopus_creds, _rejected_scopus_keys
+
+    candidates = elsevier_credential_candidates(custom_api_key)
+    if _rejected_scopus_keys:
+        filtered = [
+            (k, tok, label)
+            for k, tok, label in candidates
+            if k not in _rejected_scopus_keys
+        ]
+        if filtered:
+            candidates = filtered
+        else:
+            _rejected_scopus_keys.clear()
+            _preferred_scopus_creds = None
+            candidates = elsevier_credential_candidates(custom_api_key)
+
+    if _preferred_scopus_creds:
+        pk, pt = _preferred_scopus_creds
+        preferred = [
+            (k, tok, label)
+            for k, tok, label in candidates
+            if k == pk and tok == pt
+        ]
+        rest = [
+            (k, tok, label)
+            for k, tok, label in candidates
+            if not (k == pk and tok == pt)
+        ]
+        if preferred:
+            return preferred + rest
+    return candidates
 
 
 def year_key_to_date_range(year_key: str, today: Optional[date] = None) -> Tuple[str, str]:
@@ -147,12 +199,15 @@ def fetch_author_sdg_publications(
     progress_callback: Optional[Callable[[int, Optional[int], str], None]] = None,
 ) -> SDGFetchResult:
     """Fetch publications for one Scopus AU-ID and enrich them with SDG predictions."""
+    global _preferred_scopus_creds, _rejected_scopus_keys
+
     if not author_id or not str(author_id).strip().isdigit():
         raise SDGServiceError("Select a numeric Scopus Author ID before fetching SDG publications.")
     if not sdg_credentials_available():
         raise SDGServiceError(
-            "Scopus publication search requires an Elsevier API key and insttoken. "
-            "Set SCOPUS_API_KEY (or an existing Elsevier/SciVal key) and ELSEVIER_INSTTOKEN."
+            "Scopus publication search requires an Elsevier API key. "
+            "Set SCOPUS_API_KEY / SCIVAL_API_KEY, and optionally ELSEVIER_INSTTOKEN, "
+            "or backup keys SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 (no insttoken needed)."
         )
 
     openalex_sdg = _load_aurora_modules()
@@ -160,26 +215,77 @@ def fetch_author_sdg_publications(
     work_types = docs_key_to_openalex_work_types(docs_key)
     all_rows: List[Dict[str, Any]] = []
     aggregate_stats = None
+    working_creds: Optional[Tuple[str, str]] = _preferred_scopus_creds
 
     for work_type in work_types:
         remaining = None if limit_rows is None else max(limit_rows - len(all_rows), 0)
         if remaining == 0:
             break
-        rows, stats = openalex_sdg.fetch_author_publications_scopus_with_sdg(
-            from_date,
-            work_type,
-            model,
-            author_openalex_id="",
-            author_raw_identifier=str(author_id).strip(),
-            to_date=to_date,
-            limit_rows=remaining,
-            user_agent=OPENALEX_USER_AGENT,
-            scopus_api_key=SCOPUS_CONTENT_API_KEY,
-            scopus_insttoken=ELSEVIER_INSTTOKEN,
-            enable_google_scholar=bool(SERPAPI_API_KEY),
-            serpapi_api_key=SERPAPI_API_KEY or None,
-            progress_callback=progress_callback,
-        )
+
+        rows = None
+        stats = None
+        if working_creds is not None:
+            api_key, inst = working_creds
+            try:
+                rows, stats = openalex_sdg.fetch_author_publications_scopus_with_sdg(
+                    from_date,
+                    work_type,
+                    model,
+                    author_openalex_id="",
+                    author_raw_identifier=str(author_id).strip(),
+                    to_date=to_date,
+                    limit_rows=remaining,
+                    user_agent=OPENALEX_USER_AGENT,
+                    scopus_api_key=api_key,
+                    scopus_insttoken=inst or None,
+                    enable_google_scholar=bool(SERPAPI_API_KEY),
+                    serpapi_api_key=SERPAPI_API_KEY or None,
+                    progress_callback=progress_callback,
+                )
+            except ValueError as e:
+                if not _is_scopus_auth_error(e):
+                    raise SDGServiceError(str(e)) from e
+                _rejected_scopus_keys.add(api_key)
+                working_creds = None
+                _preferred_scopus_creds = None
+                rows = None
+
+        if rows is None:
+            last_err: Optional[BaseException] = None
+            for api_key, inst, _label in _ordered_scopus_credentials():
+                try:
+                    rows, stats = openalex_sdg.fetch_author_publications_scopus_with_sdg(
+                        from_date,
+                        work_type,
+                        model,
+                        author_openalex_id="",
+                        author_raw_identifier=str(author_id).strip(),
+                        to_date=to_date,
+                        limit_rows=remaining,
+                        user_agent=OPENALEX_USER_AGENT,
+                        scopus_api_key=api_key,
+                        scopus_insttoken=inst or None,
+                        enable_google_scholar=bool(SERPAPI_API_KEY),
+                        serpapi_api_key=SERPAPI_API_KEY or None,
+                        progress_callback=progress_callback,
+                    )
+                    working_creds = (api_key, inst)
+                    _preferred_scopus_creds = working_creds
+                    break
+                except ValueError as e:
+                    last_err = e
+                    if _is_scopus_auth_error(e):
+                        _rejected_scopus_keys.add(api_key)
+                        continue
+                    raise SDGServiceError(str(e)) from e
+            else:
+                raise SDGServiceError(
+                    str(last_err)
+                    if last_err
+                    else "Scopus API credentials were rejected for all configured keys."
+                )
+
+        assert rows is not None and stats is not None
         if aggregate_stats is None:
             aggregate_stats = stats
         else:
