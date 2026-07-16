@@ -23,6 +23,7 @@ from streamlit_app.config import (
     SCIVAL_HTTP_PROXY,
     SUPABASE_ANON_KEY,
     USE_DIRECT_API,
+    scival_api_key_candidates,
     scival_httpx_verify,
     supabase_proxy_url,
 )
@@ -214,6 +215,8 @@ def is_scival_authentication_error(message: str) -> bool:
     """HTTP 401 / invalid key — same message for every author; show once, skip per-author retries."""
     low = message.lower()
     if "api error (401)" in low:
+        return True
+    if "api authentication failed" in low:
         return True
     if "authentication failed" in low and (
         "scival" in low
@@ -588,25 +591,20 @@ class APIService:
 
         return _retry_with_backoff(op)
 
-    def _fetch_direct_metric(
+    def _fetch_direct_metric_once(
         self,
         author_id: str,
         metric_type: str,
         by_year: bool,
-        custom_api_key: Optional[str],
+        api_key: str,
         year_range: str,
         include_self_citations: str,
         included_docs: str,
+        use_insttoken: bool,
     ) -> Any:
-        api_key = (custom_api_key or SCIVAL_API_KEY or "").strip()
-        if not api_key:
-            raise APIError(
-                "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
-                "or ELSEVIER_API_KEY (or enter a key in Settings)."
-            )
         # Elsevier allows apiKey / insttoken on the query string (same pattern as author XML URLs).
-        # Institutional access often requires both; we also send X-ELS-* headers below.
-        inst = (ELSEVIER_INSTTOKEN or "").strip()
+        # Backup keys (SCIVAL_API_KEY_1/2) never send insttoken; primary/Settings may.
+        inst = (ELSEVIER_INSTTOKEN or "").strip() if use_insttoken else ""
         params: Dict[str, str] = {
             "apiKey": api_key,
             "authors": author_id,
@@ -679,6 +677,45 @@ class APIService:
                 _rate_limiter.release()
 
         return _retry_with_backoff(op)
+
+    def _fetch_direct_metric(
+        self,
+        author_id: str,
+        metric_type: str,
+        by_year: bool,
+        custom_api_key: Optional[str],
+        year_range: str,
+        include_self_citations: str,
+        included_docs: str,
+    ) -> Any:
+        candidates = scival_api_key_candidates(custom_api_key)
+        if not candidates:
+            raise APIError(
+                "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
+                "SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2, or ELSEVIER_API_KEY (or enter a key in Settings)."
+            )
+
+        last_err: Optional[APIError] = None
+        for i, (api_key, use_insttoken, _label) in enumerate(candidates):
+            try:
+                return self._fetch_direct_metric_once(
+                    author_id,
+                    metric_type,
+                    by_year,
+                    api_key,
+                    year_range,
+                    include_self_citations,
+                    included_docs,
+                    use_insttoken,
+                )
+            except APIError as e:
+                last_err = e
+                auth_fail = e.status_code == 401 or is_scival_authentication_error(str(e))
+                if auth_fail and i < len(candidates) - 1:
+                    continue
+                raise
+        assert last_err is not None
+        raise last_err
 
     @staticmethod
     def _process_h_index(data: Any) -> Dict[str, Any]:
@@ -1487,10 +1524,11 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
     When the API returns multiple Scopus profiles for one ORCID, the **first**
     profile in the response is used.
     """
-    key = (api_key or SCIVAL_API_KEY or "").strip()
-    if not key:
+    candidates = scival_api_key_candidates(api_key)
+    if not candidates:
         raise APIError(
-            "SciVal API key required for this lookup (set SCIVAL_API_KEY or ELSEVIER_API_KEY)."
+            "SciVal API key required for this lookup (set SCIVAL_API_KEY, "
+            "SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2, or ELSEVIER_API_KEY)."
         )
 
     extracted = _extract_orcid_from_input(orcid)
@@ -1508,60 +1546,71 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
         )
 
     base = f"https://api.elsevier.com/analytics/scival/author/orcid/{formatted}"
-    params: Dict[str, str] = {"httpAccept": "text/xml"}
-    inst = (ELSEVIER_INSTTOKEN or "").strip()
-    if inst:
-        params["insttoken"] = inst
+    last_err: Optional[APIError] = None
 
-    headers = {
-        "Accept": "application/xml, text/xml, application/json;q=0.9",
-        "X-ELS-APIKey": key,
-        "User-Agent": "SciVal-Research-Dashboard/1.0",
-    }
-    if inst:
-        headers["X-ELS-Insttoken"] = inst
+    for i, (key, use_insttoken, _label) in enumerate(candidates):
+        params: Dict[str, str] = {"httpAccept": "text/xml"}
+        inst = (ELSEVIER_INSTTOKEN or "").strip() if use_insttoken else ""
+        if inst:
+            params["insttoken"] = inst
 
-    client = httpx.Client(
-        timeout=httpx.Timeout(45.0, connect=10.0),
-        proxy=_scival_http_client_proxy(),
-        trust_env=True,
-        verify=scival_httpx_verify(),
-    )
-    try:
+        headers = {
+            "Accept": "application/xml, text/xml, application/json;q=0.9",
+            "X-ELS-APIKey": key,
+            "User-Agent": "SciVal-Research-Dashboard/1.0",
+        }
+        if inst:
+            headers["X-ELS-Insttoken"] = inst
+
+        client = httpx.Client(
+            timeout=httpx.Timeout(45.0, connect=10.0),
+            proxy=_scival_http_client_proxy(),
+            trust_env=True,
+            verify=scival_httpx_verify(),
+        )
         try:
-            r = client.get(base, params=params, headers=headers)
-        except httpx.ConnectError as e:
-            err_s = str(e).lower()
-            if "certificate" in err_s or "ssl" in err_s:
-                raise APIError(
-                    "Secure connection to Elsevier failed (TLS certificate verification). "
-                    "The app uses the certifi CA bundle by default. If you are on a managed network, "
-                    "set SCIVAL_SSL_CA_BUNDLE to your institution's PEM root bundle. "
-                    "Only if you understand the risk: SCIVAL_SSL_VERIFY=false turns off verification."
-                ) from e
-            raise
-        if not r.is_success:
-            if r.status_code == 404:
-                raise APIError("No researcher found for this identifier in the SciVal database.")
-            if r.status_code == 401:
-                raise APIError("API authentication failed. Check API key.")
-            if r.status_code == 403:
-                raise APIError("API access denied. Check API key permissions.")
-            raise APIError(f"API request failed with status {r.status_code}")
-
-        text = (r.text or "").strip()
-        ct = (r.headers.get("content-type") or "").lower()
-
-        if "json" in ct or text.startswith("{"):
             try:
-                data = r.json()
-                return _parse_scival_author_orcid_json(data)
-            except json.JSONDecodeError:
-                pass
+                r = client.get(base, params=params, headers=headers)
+            except httpx.ConnectError as e:
+                err_s = str(e).lower()
+                if "certificate" in err_s or "ssl" in err_s:
+                    raise APIError(
+                        "Secure connection to Elsevier failed (TLS certificate verification). "
+                        "The app uses the certifi CA bundle by default. If you are on a managed network, "
+                        "set SCIVAL_SSL_CA_BUNDLE to your institution's PEM root bundle. "
+                        "Only if you understand the risk: SCIVAL_SSL_VERIFY=false turns off verification."
+                    ) from e
+                raise
+            if not r.is_success:
+                if r.status_code == 404:
+                    raise APIError(
+                        "No researcher found for this identifier in the SciVal database."
+                    )
+                if r.status_code == 401:
+                    last_err = APIError("API authentication failed. Check API key.", 401)
+                    if i < len(candidates) - 1:
+                        continue
+                    raise last_err
+                if r.status_code == 403:
+                    raise APIError("API access denied. Check API key permissions.", 403)
+                raise APIError(f"API request failed with status {r.status_code}")
 
-        return _parse_scival_author_orcid_xml(text)
-    finally:
-        client.close()
+            text = (r.text or "").strip()
+            ct = (r.headers.get("content-type") or "").lower()
+
+            if "json" in ct or text.startswith("{"):
+                try:
+                    data = r.json()
+                    return _parse_scival_author_orcid_json(data)
+                except json.JSONDecodeError:
+                    pass
+
+            return _parse_scival_author_orcid_xml(text)
+        finally:
+            client.close()
+
+    assert last_err is not None
+    raise last_err
 
 
 def resolve_author_ids_for_metrics(

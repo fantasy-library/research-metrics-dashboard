@@ -67,6 +67,51 @@ def _resolve_scival_api_key() -> str:
 SCIVAL_API_KEY: str = _resolve_scival_api_key()
 
 
+def _resolve_named_scival_backup(env_name: str) -> str:
+    """Backup keys (Railway/env): SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 — no insttoken needed."""
+    return _clean_scival_api_key(os.getenv(env_name))
+
+
+# Optional backups tried after primary/Settings key fails auth (HTTP 401).
+# These keys are used without ELSEVIER_INSTTOKEN.
+SCIVAL_API_KEY_1: str = _resolve_named_scival_backup("SCIVAL_API_KEY_1")
+SCIVAL_API_KEY_2: str = _resolve_named_scival_backup("SCIVAL_API_KEY_2")
+
+
+def scival_api_key_candidates(
+    custom_api_key: str | None = None,
+) -> list[tuple[str, bool, str]]:
+    """Ordered (api_key, use_insttoken, label) for direct Elsevier calls.
+
+    Primary / Settings keys may use ELSEVIER_INSTTOKEN when set.
+    SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 never send insttoken.
+    Duplicate (key, use_insttoken) pairs are skipped.
+    """
+    out: list[tuple[str, bool, str]] = []
+    seen: set[tuple[str, bool]] = set()
+
+    def add(key: str | None, use_insttoken: bool, label: str) -> None:
+        k = (key or "").strip()
+        if not k:
+            return
+        sig = (k, use_insttoken)
+        if sig in seen:
+            return
+        seen.add(sig)
+        out.append((k, use_insttoken, label))
+
+    custom = (custom_api_key or "").strip()
+    inst_available = bool(_resolve_insttoken())
+    if custom:
+        add(custom, inst_available, "settings")
+    else:
+        add(SCIVAL_API_KEY, inst_available, "primary")
+
+    add(SCIVAL_API_KEY_1, False, "SCIVAL_API_KEY_1")
+    add(SCIVAL_API_KEY_2, False, "SCIVAL_API_KEY_2")
+    return out
+
+
 def _resolve_scopus_content_api_key() -> str:
     """API key used for Elsevier Scopus Content APIs such as AU-ID publication search."""
     for name in (
