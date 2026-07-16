@@ -48,6 +48,50 @@ ELSEVIER_AUTHOR_BY_ID = "https://api.elsevier.com/content/author/author_id/{auth
 ELSEVIER_SCOPUS_SEARCH = "https://api.elsevier.com/content/search/scopus"
 SERPAPI_GS_API = "https://serpapi.com/search" # New constant for SerpApi Google Scholar API
 
+# Scopus Search: polite pacing + retries on HTTP 429 (Elsevier quota / throttle).
+_SCOPUS_SEARCH_PAGE_PAUSE_SEC = 0.45
+_SCOPUS_SEARCH_429_RETRIES = 5
+_SCOPUS_SEARCH_429_BASE_DELAY_SEC = 8.0
+
+
+def _scopus_retry_after_seconds(resp: requests.Response, attempt: int) -> float:
+    """Honor Retry-After when present; otherwise exponential backoff."""
+    raw = (resp.headers.get("Retry-After") or "").strip()
+    if raw.isdigit():
+        return max(float(raw), 1.0)
+    return min(_SCOPUS_SEARCH_429_BASE_DELAY_SEC * (2 ** (attempt - 1)), 60.0)
+
+
+def scopus_search_get(
+    session: requests.Session,
+    params: Dict[str, Any],
+    headers: Dict[str, str],
+    *,
+    timeout: float = 90,
+    progress: Optional[Callable[[str], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> requests.Response:
+    """GET Scopus Search with backoff on HTTP 429 (does not raise on 4xx/5xx)."""
+    last: Optional[requests.Response] = None
+    for attempt in range(1, _SCOPUS_SEARCH_429_RETRIES + 1):
+        if cancel_check and cancel_check():
+            raise FetchCancelled()
+        last = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=timeout)
+        if last.status_code != 429:
+            return last
+        if attempt >= _SCOPUS_SEARCH_429_RETRIES:
+            break
+        delay = _scopus_retry_after_seconds(last, attempt)
+        if progress:
+            progress(
+                f"Scopus rate limit (HTTP 429) — waiting {delay:.0f}s before retry "
+                f"{attempt}/{_SCOPUS_SEARCH_429_RETRIES - 1}…"
+            )
+        time.sleep(delay)
+    assert last is not None
+    return last
+
+
 # OpenAlex ``type`` values → Scopus search ``DOCTYPE`` codes (subset; unknown types omit the filter).
 OPENALEX_TYPE_TO_SCOPUS_DOCTYPE: Dict[str, str] = {
     "article": "ar",
@@ -849,7 +893,8 @@ def get_abstract_from_scopus(
         try:
             resp = requester.get(url, params=params, headers=headers, timeout=30)
             if resp.status_code == 429:
-                time.sleep(pause * attempt)
+                delay = pause * (2 ** (attempt - 1)) + 2.0
+                time.sleep(min(delay, 45.0))
                 continue
             if resp.status_code == 404:
                 return None
@@ -1420,11 +1465,25 @@ def fetch_author_publications_scopus_with_sdg(
             params["count"] = page_size
             emit_progress(f"Searching Scopus records {start + 1:,}-{start + page_size:,}")
             try:
-                resp = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=90)
+                resp = scopus_search_get(
+                    session,
+                    params,
+                    headers,
+                    timeout=90,
+                    progress=emit_progress,
+                    cancel_check=cancel_check,
+                )
                 if resp.status_code == 400 and page_size > 25:
                     page_size = 25
                     params["count"] = page_size
-                    resp = session.get(ELSEVIER_SCOPUS_SEARCH, params=params, headers=headers, timeout=90)
+                    resp = scopus_search_get(
+                        session,
+                        params,
+                        headers,
+                        timeout=90,
+                        progress=emit_progress,
+                        cancel_check=cancel_check,
+                    )
                 body_low = (resp.text or "").lower()
                 auth_rejected = resp.status_code in (401, 403) or (
                     "apikey_invalid" in body_low or "provided apikey is invalid" in body_low
@@ -1438,8 +1497,9 @@ def fetch_author_publications_scopus_with_sdg(
                     )
                 if resp.status_code == 429:
                     raise ValueError(
-                        "Scopus API rate limit reached. Wait a minute and try again, "
-                        "or reduce the Max publications limit."
+                        "Scopus API rate limit reached after several retries. "
+                        "Wait a minute and try again, reduce the Max publications limit, "
+                        "or wait for the quota to reset."
                     )
                 if resp.status_code >= 500:
                     raise ValueError(
@@ -1447,6 +1507,8 @@ def fetch_author_publications_scopus_with_sdg(
                         "This is an Elsevier-side issue — please try again in a few minutes."
                     )
                 resp.raise_for_status()
+            except FetchCancelled:
+                raise
             except requests.Timeout:
                 raise ValueError(
                     "The Scopus API request timed out. Try reducing the Max publications "
@@ -1539,7 +1601,7 @@ def fetch_author_publications_scopus_with_sdg(
             if total_reported is not None and start + len(entry_els) >= total_reported:
                 break
             start += page_size
-            time.sleep(0.2)
+            time.sleep(_SCOPUS_SEARCH_PAGE_PAUSE_SEC)
 
     emit_progress("Completed")
     return rows, stats

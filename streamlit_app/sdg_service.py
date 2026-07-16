@@ -79,6 +79,11 @@ def _is_scopus_auth_error(exc: BaseException) -> bool:
     )
 
 
+def _is_scopus_rate_limit_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return "rate limit" in msg or "http 429" in msg
+
+
 def _ordered_scopus_credentials(
     custom_api_key: Optional[str] = None,
 ) -> List[Tuple[str, str, str]]:
@@ -243,12 +248,18 @@ def fetch_author_sdg_publications(
                     progress_callback=progress_callback,
                 )
             except ValueError as e:
-                if not _is_scopus_auth_error(e):
+                if _is_scopus_auth_error(e):
+                    _rejected_scopus_keys.add(api_key)
+                    working_creds = None
+                    _preferred_scopus_creds = None
+                    rows = None
+                elif _is_scopus_rate_limit_error(e):
+                    # Try another key (separate quota); do not permanently reject this key.
+                    working_creds = None
+                    _preferred_scopus_creds = None
+                    rows = None
+                else:
                     raise SDGServiceError(str(e)) from e
-                _rejected_scopus_keys.add(api_key)
-                working_creds = None
-                _preferred_scopus_creds = None
-                rows = None
 
         if rows is None:
             last_err: Optional[BaseException] = None
@@ -276,6 +287,9 @@ def fetch_author_sdg_publications(
                     last_err = e
                     if _is_scopus_auth_error(e):
                         _rejected_scopus_keys.add(api_key)
+                        continue
+                    if _is_scopus_rate_limit_error(e):
+                        # Next backup key may have a separate quota.
                         continue
                     raise SDGServiceError(str(e)) from e
             else:
