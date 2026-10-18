@@ -1,4 +1,7 @@
 {
   "$schema": "https://railpack.com/schema.json",
+  "packages": {
+    "python": "3.13.13"
+  },
   "startCommand": "streamlit run streamlit_app/app.py --server.port $PORT --server.address 0.0.0.0"
 }
