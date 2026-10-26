@@ -6975,6 +6975,15 @@ def main() -> None:
             unsafe_allow_html=True,
         )
 
+        _pub_author_ids = list(parsed_author_ids)
+        if not _pub_author_ids:
+            _pub_author_ids = [
+                x.strip()
+                for x in re.split(
+                    r"[,\n;]+", st.session_state.get("scopus_author_ids") or ""
+                )
+                if x.strip()
+            ]
         _pub_authors_for_section: list[dict] = []
         _metric_results = st.session_state.get("results") or []
         if _metric_results:
@@ -6983,9 +6992,10 @@ def main() -> None:
                 for r in _metric_results
                 if not (r.get("data") or {}).get("error")
             ]
-        elif parsed_author_ids:
+        elif _pub_author_ids:
             _pub_authors_for_section = [
-                {"id": aid, "data": {}} for aid in parsed_author_ids[:MAX_AUTHORS_PER_RUN]
+                {"id": aid, "data": {}}
+                for aid in _pub_author_ids[:MAX_AUTHORS_PER_RUN]
             ]
         if _pub_authors_for_section:
             _render_sdg_publications_section(
