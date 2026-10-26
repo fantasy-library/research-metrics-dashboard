@@ -159,6 +159,12 @@ _FILTER_ICON_METRICS_MENU = (
     'aria-hidden="true" focusable="false">'
     '<path d="m6 9 6 6 6-6"/></svg>'
 )
+_FILTER_ICON_PERSON = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
+    'aria-hidden="true" focusable="false">'
+    '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+)
 # Year filter tooltip trigger — same badge family, compact size
 _FILTER_ICON_INFO_SMALL = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
@@ -6574,6 +6580,28 @@ def _render_notice_dialog() -> None:
             st.session_state.pop("_notice_dialog_body", None)
             st.session_state.pop("_notice_dialog_variant", None)
             st.rerun()
+
+
+def _merge_scopus_author_id_into_search_box(new_id: str) -> str:
+    """Merge resolved ID into ``scopus_author_ids``. Returns ``added``, ``duplicate``, or ``noop``."""
+    new_id = (new_id or "").strip()
+    if not new_id:
+        return "noop"
+    existing = (st.session_state.get("scopus_author_ids") or "").strip()
+    if not existing:
+        st.session_state.scopus_author_ids = new_id
+        return "added"
+    parts = [x.strip() for x in re.split(r"[,\n;]+", existing) if x.strip()]
+    if new_id in parts:
+        return "duplicate"
+    if "\n" in existing:
+        sep = "\n"
+    elif "," in existing:
+        sep = ", "
+    else:
+        sep = "\n"
+    st.session_state.scopus_author_ids = existing + sep + new_id
+    return "added"
 
 
 def _render_author_results_metadata(
