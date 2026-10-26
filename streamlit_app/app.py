@@ -36,6 +36,7 @@ from streamlit_app.api_service import (
     get_api_service,
     is_missing_scival_api_key_error,
     is_scival_authentication_error,
+    lookup_scopus_id_from_orcid,
     resolve_author_ids_for_metrics_safe,
 )
 from streamlit_app.config import ELSEVIER_INSTTOKEN, SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, SCOPUS_CONTENT_API_KEY, USE_DIRECT_API
