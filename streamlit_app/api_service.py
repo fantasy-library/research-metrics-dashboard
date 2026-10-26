@@ -427,6 +427,16 @@ def _classify_api_error_plain(message: str, low: str) -> str | None:
             "Verify the author ID or try again later."
         )
 
+    if "orcid" in low and (
+        "not linked" in low or "no scopus author id is linked" in low
+    ):
+        return (
+            "This ORCID is not linked to a Scopus Author ID. "
+            "The researcher may still have a Scopus profile. "
+            "Enter that Scopus Author ID in the search box, or connect the ORCID "
+            "to the Scopus profile and try again."
+        )
+
     if (
         "no researcher found" in low
         or "researcher id not found" in low
@@ -1546,6 +1556,14 @@ def _xml_local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
+_ORCID_NOT_LINKED_MESSAGE = (
+    "This ORCID is not linked to a Scopus Author ID. "
+    "The researcher may still have a Scopus profile. "
+    "Enter that Scopus Author ID in the search box, or connect the ORCID "
+    "to the Scopus profile and try again."
+)
+
+
 def _parse_scival_author_orcid_xml(body: str) -> tuple[str, str]:
     """Parse Elsevier SciVal author-by-ORCID XML (authorResponse / author / id, name).
 
@@ -1559,7 +1577,7 @@ def _parse_scival_author_orcid_xml(body: str) -> tuple[str, str]:
 
     authors = root.findall(".//author")
     if not authors:
-        raise APIError("Researcher ID not found in API response")
+        raise APIError(_ORCID_NOT_LINKED_MESSAGE)
 
     author_el = authors[0]
     aid: Optional[str] = None
@@ -1572,7 +1590,7 @@ def _parse_scival_author_orcid_xml(body: str) -> tuple[str, str]:
             name = child.text.strip()
 
     if not aid:
-        raise APIError("Researcher ID not found in API response")
+        raise APIError(_ORCID_NOT_LINKED_MESSAGE)
     return aid, name
 
 
@@ -1585,7 +1603,7 @@ def _parse_scival_author_orcid_json(data: Any) -> tuple[str, str]:
         raw = data.get("authors")
     if isinstance(raw, list):
         if not raw:
-            raise APIError("Researcher ID not found in API response")
+            raise APIError(_ORCID_NOT_LINKED_MESSAGE)
         author = raw[0] if isinstance(raw[0], dict) else {}
     elif isinstance(raw, dict):
         author = raw
@@ -1593,7 +1611,7 @@ def _parse_scival_author_orcid_json(data: Any) -> tuple[str, str]:
         author = {}
     aid = author.get("id")
     if aid is None:
-        raise APIError("Researcher ID not found in API response")
+        raise APIError(_ORCID_NOT_LINKED_MESSAGE)
     name = author.get("name") or "Unknown"
     return str(aid), str(name)
 
@@ -1684,9 +1702,7 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
                 if _response_looks_like_cloudflare(r.status_code, text):
                     raise APIError(format_error_message_for_user(text), r.status_code)
                 if r.status_code == 404:
-                    raise APIError(
-                        "No researcher found for this identifier in the SciVal database."
-                    )
+                    raise APIError(_ORCID_NOT_LINKED_MESSAGE)
                 if r.status_code == 401:
                     last_err = APIError("API authentication failed. Check API key.", 401)
                     if i < len(candidates) - 1:
