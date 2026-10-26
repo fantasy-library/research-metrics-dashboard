@@ -8,6 +8,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import html
+import io
+import json
 import re
 import sys
 import time
@@ -34,11 +36,16 @@ from streamlit_app.api_service import (
     get_api_service,
     is_missing_scival_api_key_error,
     is_scival_authentication_error,
-    lookup_scopus_id_from_orcid,
     resolve_author_ids_for_metrics_safe,
 )
-from streamlit_app.config import SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, USE_DIRECT_API
+from streamlit_app.config import ELSEVIER_INSTTOKEN, SCIVAL_API_KEY, SCIVAL_HTTP_PROXY, SCOPUS_CONTENT_API_KEY, USE_DIRECT_API
 from streamlit_app.export_utils import export_docx_bytes, export_excel_bytes, export_pdf_bytes
+from streamlit_app.sdg_service import (
+    SDGServiceError,
+    fetch_author_sdg_publications,
+    rows_to_csv_bytes,
+    sdg_credentials_available,
+)
 
 st.set_page_config(
     page_title="Research Metrics Dashboard",
@@ -145,20 +152,6 @@ _FILTER_ICON_FUNNEL = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
     'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
     '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>'
-)
-_FILTER_ICON_PERSON = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
-    'aria-hidden="true" focusable="false">'
-    '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
-)
-_FILTER_ICON_USERS = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
-    'aria-hidden="true" focusable="false">'
-    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
-    '<circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>'
-    '<path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
 )
 _FILTER_ICON_METRICS_MENU = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
@@ -358,7 +351,7 @@ def _inject_export_download_styles() -> None:
   line-height: 1.2 !important;
   color: #ffffff !important;
   box-shadow: 0 2px 12px rgba(59, 130, 246, 0.35) !important;
-  background: linear-gradient(145deg, #dbeafe 0%, #93c5fd 42%, #3b82f6 100%) !important;
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 55%, #2563eb 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.12) !important;
 }}
 [class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stDownloadButton"] button:hover,
@@ -405,7 +398,7 @@ def _inject_export_download_styles() -> None:
   line-height: 1.2 !important;
   color: #ffffff !important;
   box-shadow: 0 2px 12px rgba(34, 197, 94, 0.28) !important;
-  background: linear-gradient(145deg, #d1fae5 0%, #86efac 45%, #22c55e 100%) !important;
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 55%, #16a34a 100%) !important;
   text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
 }}
 [class*="st-key-export_download_row"] [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stDownloadButton"] button:hover,
@@ -435,6 +428,86 @@ def _inject_export_download_styles() -> None:
   display: block !important;
   width: 100% !important;
   clear: both !important;
+}}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _inject_publications_csv_download_styles() -> None:
+    """Green pill download button for Publications tab CSV (matches Export as Excel look)."""
+    from urllib.parse import quote
+
+    svg_doc = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff">'
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 1.4L18.6 9H14V3.4zM8 11h8v1.15H8V11zm0 2.65h8v1.15H8v-1.15zm0 2.65h6v1.15H8v-1.15z"/>'
+        "</svg>"
+    )
+    svg_dl = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
+        'stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M5 21h14"/>'
+        "</svg>"
+    )
+    u_doc, u_dl = quote(svg_doc, safe=""), quote(svg_dl, safe="")
+    scope = '[class*="st-key-download_publications_csv_row"]'
+    st.markdown(
+        f"""
+<style>
+{scope} {{
+  display: block !important;
+  width: 100% !important;
+  margin-top: 0.75rem !important;
+}}
+{scope} [data-testid="stDownloadButton"],
+{scope} .stDownloadButton {{
+  width: 100% !important;
+}}
+{scope} [data-testid="stDownloadButton"] button,
+{scope} .stDownloadButton > button {{
+  width: 100% !important;
+  min-height: 2.75rem !important;
+  height: auto !important;
+  padding: 0.65rem 1.35rem !important;
+  border-radius: 9999px !important;
+  border: none !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  font-weight: 700 !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.25 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 18px rgba(34, 197, 94, 0.35) !important;
+  background: linear-gradient(90deg, #4ade80 0%, #22c55e 50%, #16a34a 100%) !important;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, 0.1) !important;
+  transition: filter 0.15s ease, box-shadow 0.15s ease !important;
+}}
+{scope} [data-testid="stDownloadButton"] button:hover,
+{scope} .stDownloadButton > button:hover {{
+  filter: brightness(1.04) saturate(1.06);
+  box-shadow: 0 6px 22px rgba(22, 163, 74, 0.42) !important;
+}}
+{scope} [data-testid="stDownloadButton"] button::before,
+{scope} .stDownloadButton > button::before {{
+  content: "" !important;
+  display: block !important;
+  width: 1.15rem !important;
+  height: 1.15rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_doc}") center / contain no-repeat !important;
+}}
+{scope} [data-testid="stDownloadButton"] button::after,
+{scope} .stDownloadButton > button::after {{
+  content: "" !important;
+  display: block !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  flex-shrink: 0 !important;
+  background: url("data:image/svg+xml,{u_dl}") center / contain no-repeat !important;
 }}
 </style>
         """,
@@ -1135,27 +1208,6 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   color: #111827 !important;
   line-height: 1.35 !important;
 }
-[class*="st-key-find_scopus_help_panel"] {
-  margin: 0 0 1rem 0 !important;
-  padding: 1rem 1.05rem !important;
-  border-radius: 14px !important;
-  border: 1px solid #bbf7d0 !important;
-  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 55%, #f8fafc 100%) !important;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06) !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-banner {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.45rem !important;
-  margin: 0 0 0.85rem 0 !important;
-  font-size: 1.05rem !important;
-  font-weight: 800 !important;
-  color: #14532d !important;
-  letter-spacing: -0.02em !important;
-}
-[class*="st-key-find_scopus_help_panel"] .find-scopus-banner-badge {
-  flex-shrink: 0 !important;
-}
 .minimal-filter-label {
   display: flex;
   align-items: center;
@@ -1307,127 +1359,66 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
   opacity: 1 !important;
   -webkit-text-fill-color: #9CA3AF !important;
 }
-[class*="st-key-search_shell"] .author-limit-hint {
-  display: flex;
-  align-items: center;
-  gap: 0.52rem;
-  margin: 0.35rem 0 0.1rem 0;
-  padding: 0.5rem 0.65rem;
-  border-radius: 10px;
-  font-size: 0.84rem;
-  line-height: 1.35;
-  overflow: visible;
+[class*="st-key-scopus_id_section"] {
+  margin-bottom: 0.75rem !important;
+  padding: 0.85rem 0.95rem 0.75rem !important;
+  border-color: #dbeafe !important;
+  background: #f8fbff !important;
 }
-[class*="st-key-search_shell"] .author-limit-hint--ok {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e3a8a;
-}
-[class*="st-key-search_shell"] .author-limit-hint--warn {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
-}
-[class*="st-key-search_shell"] .author-limit-icon.minimal-filter-icon-badge {
-  align-self: center !important;
-  margin-top: 0 !important;
-  flex-shrink: 0 !important;
-}
-[class*="st-key-search_shell"] .author-limit-count {
-  font-weight: 700;
-  margin-left: 0.25rem;
-}
-[class*="st-key-search_shell"] .author-input-header-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.45rem 0.85rem;
-  margin: 0 0 0.25rem 0;
-}
-[class*="st-key-search_shell"] .author-input-header-title {
+[class*="st-key-scopus_id_section"] .scopus-id-section-head {
+  margin: 0 0 0.5rem 0;
   font-size: 0.875rem;
-  font-weight: 500;
-  color: #4b5563;
-  flex: 0 0 auto;
+  font-weight: 700;
+  color: #374151;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
+  line-height: 1.45;
 }
-[class*="st-key-search_shell"] .author-limit-hint-inline {
-  margin: 0 !important;
-  flex: 1 1 220px;
-  min-width: min(100%, 14rem);
-  align-items: center !important;
-  padding: 0.52rem 0.65rem !important;
-  font-size: 0.8rem !important;
-  line-height: 1.4 !important;
-  overflow: visible !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-head .scopus-id-count {
+  color: #4f46e5;
+  font-variant-numeric: tabular-nums;
 }
-[class*="st-key-search_shell"]
-  [data-testid="stMarkdownContainer"]:has(.author-limit-hint-inline) {
-  overflow: visible !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-head .scopus-id-count--warn {
+  color: #c2410c;
 }
-/* Find Scopus toggle: light-green pill; icon + label centered (avoid svg clip) */
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"],
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] {
-  gap: 0.55rem !important;
-  column-gap: 0.55rem !important;
-  background: #ecfdf5 !important;
-  background-image: none !important;
-  border: 1px solid #a7f3d0 !important;
-  color: #14532d !important;
-  min-height: 2.65rem !important;
-  padding-top: 0.42rem !important;
-  padding-bottom: 0.42rem !important;
-  padding-left: 0.65rem !important;
-  padding-right: 0.65rem !important;
-  overflow: visible !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-shadow: 0 1px 2px rgba(20, 83, 45, 0.06) !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list,
+[class*="st-key-scopus_id_section"] [data-testid="stMarkdownContainer"] ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"]:hover,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"]:hover {
-  background: #d1fae5 !important;
-  border-color: #6ee7b7 !important;
-  color: #052e16 !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list li,
+[class*="st-key-scopus_id_section"] [data-testid="stMarkdownContainer"] li {
+  margin: 0;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"]:focus-visible,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"]:focus-visible {
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.32) !important;
+[class*="st-key-scopus_id_section"] .scopus-id-section-list li + li,
+[class*="st-key-scopus_id_section"] [data-testid="stMarkdownContainer"] li + li {
+  margin-top: 0.3rem;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] > div,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] > div {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.55rem !important;
-  line-height: 1 !important;
-  overflow: visible !important;
+[class*="st-key-scopus_id_section"] a {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: none;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] p,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] p {
-  color: inherit !important;
-  -webkit-text-fill-color: inherit !important;
-  line-height: 1.28 !important;
-  margin: 0 !important;
-  padding-top: 0.06rem !important;
-  white-space: nowrap !important;
+[class*="st-key-scopus_id_section"] a:hover {
+  text-decoration: underline;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="stBaseButton-secondary"] svg,
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] button[data-testid="baseButton-secondary"] svg {
-  flex-shrink: 0 !important;
-  width: 1.38rem !important;
-  height: 1.38rem !important;
-  min-width: 1.38rem !important;
-  min-height: 1.38rem !important;
-  color: #15803d !important;
-  -webkit-text-fill-color: #15803d !important;
-  overflow: visible !important;
-  display: block !important;
-  vertical-align: middle !important;
+[class*="st-key-scopus_id_section"] [class*="st-key-scopus_author_ids"] textarea {
+  margin-top: 0.65rem;
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
 }
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] [data-testid="element-container"],
-[class*="st-key-search_shell"] [class*="st-key-toggle_find_scopus_panel"] .stButton {
-  overflow: visible !important;
+[class*="st-key-scopus_id_section"] [class*="st-key-scopus_author_ids"] textarea::placeholder {
+  font-size: 0.875rem !important;
+}
+.doc-type-breakdown-wrap {
+  margin: 0.15rem 0 0.65rem 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
 }
 .minimal-section-divider {
   border-top: 1px solid #E5E7EB;
@@ -2102,6 +2093,16 @@ p.metric-subtext {
   line-height: 1.6;
   font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
 }
+.disclaimer-card ul {
+  margin: 0 0 0.8rem;
+  padding-left: 1.35rem;
+  color: #1f2937;
+  font-size: 1rem;
+  line-height: 1.6;
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+}
+.disclaimer-card li { margin-bottom: 0.35rem; }
+.disclaimer-card li:last-child { margin-bottom: 0; }
 .disclaimer-heading {
   margin: 0 0 0.65rem 0;
   color: #0f172a;
@@ -2573,31 +2574,51 @@ footer.site-footer .site-footer-copy {
 }
 
 /* Scopus Author IDs textarea: magnifier middle-left (vertically centered on left strip); copy left-aligned */
-[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea {
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] [data-baseweb="textarea"] {
   border: 2px solid #cbd5e1 !important;
   border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.07),
+    0 1px 3px rgba(103, 58, 183, 0.06) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] [data-baseweb="textarea"]:focus-within {
+  border-color: #7c3aed !important;
+  box-shadow:
+    0 0 0 1px #7c3aed inset,
+    0 3px 10px rgba(15, 23, 42, 0.08) !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] [data-baseweb="textarea"] > div {
+  border: none !important;
+  border-radius: inherit !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+[class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea {
+  border: none !important;
+  border-radius: 10px !important;
   padding: 0.8rem 0.95rem 0.8rem 2.85rem !important;
-  background-color: #ffffff !important;
+  background-color: transparent !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important;
   background-position: 1rem center !important;
   background-size: 1.22rem 1.22rem !important;
-  box-shadow:
-    0 2px 8px rgba(15, 23, 42, 0.07),
-    0 1px 3px rgba(103, 58, 183, 0.06) !important;
+  box-shadow: none !important;
   min-height: 104px !important;
   text-align: left !important;
   box-sizing: border-box !important;
+  outline: none !important;
+  background-clip: padding-box !important;
 }
 /* Empty field: placeholder lines vertically centered as a block; still left-aligned */
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea:placeholder-shown {
   align-content: center !important;
 }
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea:focus {
-  border-color: #7c3aed !important;
-  box-shadow:
-    0 0 0 3px rgba(124, 58, 237, 0.2),
-    0 3px 10px rgba(15, 23, 42, 0.08) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 [class*="st-key-search_shell"] [class*="st-key-scopus_author_ids"] textarea::placeholder {
   color: #64748b !important;
@@ -2869,6 +2890,43 @@ footer.site-footer .site-footer-copy {
   padding: 0.55rem 0.75rem !important;
 }
 
+/* SDG network: institution search — inline help + visible input border */
+[class*="st-key-sdg_network_institution_search_shell"] .sdg-network-search-label {
+  display: flex;
+  align-items: center;
+  margin: 0 0 0.4rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  overflow: visible !important;
+  position: relative;
+  z-index: 2;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] {
+  margin-bottom: 0 !important;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] div[data-baseweb="input"] {
+  border: 1px solid #64748b !important;
+  border-radius: 10px !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  min-height: 2.65rem !important;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+  border-color: #673ab7 !important;
+  box-shadow: 0 0 0 2px rgba(103, 58, 183, 0.2) !important;
+}
+[class*="st-key-sdg_network_institution_search_shell"] [data-testid="stTextInput"] div[data-baseweb="input"] input {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  font-size: 0.95rem !important;
+  padding: 0.55rem 0.75rem !important;
+}
+
 /* Validation toasts — amber styling if ``st.toast`` is used elsewhere */
 [data-testid="stToast"] {
   background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%) !important;
@@ -2896,6 +2954,7 @@ footer.site-footer .site-footer-copy {
         unsafe_allow_html=True,
     )
     _inject_export_download_styles()
+    _inject_publications_csv_download_styles()
 
 
 def _render_footer_html() -> None:
@@ -3096,58 +3155,55 @@ def _metrics_for_panel_ordered(
 # Metric info (i) panels: ``{Topic}: …`` lead line, then detail; collaboration types use bullets.
 METRIC_INFO_TEXT: dict[str, str] = {
     "publication": (
-        "Publications (SciVal scholarly output): number of Scopus-indexed publications for this entity "
-        "in the selected document-type and year window. Values are grouped by publication year."
+        "SciVal scholarly output: number of Scopus-indexed publications of the selected type. "
+        "Values are grouped by publication year."
     ),
     "fwci": (
-        "FWCI: citations on this entity’s papers vs. the average for similar papers worldwide "
-        "(field, document type, age). 1.0 matches that peer-group average; small samples move easily."
+        "Citations on a researcher’s papers vs. the average for similar papers worldwide. "
+        "1.0 means it matches that peer-group average."
     ),
     "topJournal": (
-        "Publications in the top 10% of journals: share of publications in journals that SciVal ranks in the "
-        "top tenth by CiteScore percentile. Publications without CiteScore journal metrics "
-        "(e.g. many books) are out of scope."
+        "This is based on a SciVal ranking of top 10% of journals it indexes. "
+        "Books and chapters are out of scope."
     ),
     "citationCount": (
-        "Citation count: total citations received on the entity’s publications. "
-        "Year axes use publication year of cited papers, not the year a citation occurred."
+        "Total citations of publication(s). "
+        "The year axes are the publication year(s), not the year a citation occurred."
     ),
     "hIndex": (
-        "H-index: greatest h such that at least h publications have been cited at least h times each. "
-        "Combines how many qualifying papers you have with how often they are cited."
+        "The value of h is equal to the number of papers (N) in the list that have N or more citations.\n\n"
+        "Example: H-index of 10, means that of all a researcher’s Scopus-indexed publications, "
+        "at least 10 have been cited 10 or more times.\n\n"
+        "This measure seeks to combine productivity and impact in a single number."
     ),
     "citationsPerPublication": (
-        "Citations per publication: average citations received per publication in the selected "
-        "document-type and year window. The self-citation setting applies where SciVal supports it."
+        "Average citations received per publication. "
+        "This number will change based on whether you include or exclude self-citation."
     ),
     "collaborationInternational": (
-        "International collaboration:\n"
-        "• More than one author\n"
-        "• More than one country/region among publication addresses"
+        "This metric requires that there be more than one author, and that the authors come from "
+        "more than one country or region.\n\n"
+        "In our Hong Kong context, collaborations with researchers in the mainland, Macau, and Taiwan "
+        "are considered by SciVal to “international.”"
     ),
     "collaborationNational": (
-        "National collaboration:\n"
-        "• More than one author\n"
-        "• One country/region on the publication\n"
-        "• Affiliations map to two or more SciVal institutions in that country/region"
+        "This metric requires that there be more than one author and only one country or region. "
+        "In our Hong Kong context, SciVal calls collaborations between the HKSAR institutions "
+        "“national”."
     ),
     "collaborationInstitutional": (
-        "Institutional collaboration:\n"
-        "• More than one author\n"
-        "• One country/region on the publication\n"
-        "• Every affiliation maps to the same SciVal institution"
+        "This metric requires that there be more than one author and that the authors are "
+        "from the same SciVal listed institution."
     ),
     "collaborationSingleAuthorship": (
-        "Single authorship: exactly one author; no co-authors on the publication."
+        "Exactly one author; no co-authors on the publication."
     ),
     "academicCorporateWith": (
-        "Academic–corporate collaboration: share of publications where SciVal maps at least one "
-        "affiliation to an academic organization and at least one affiliation to a corporate "
-        "(industrial) organization."
+        "Proportion of publications where SciVal maps at least one affiliation to an academic "
+        "organization and at least one affiliation to a corporate (industrial) organization."
     ),
     "academicCorporateWithout": (
-        "No academic–corporate collaboration: share of publications not classified by SciVal as "
-        "academic–corporate collaboration."
+        "Proportion of publications not classified by SciVal as academic–corporate collaboration."
     ),
 }
 
@@ -3229,36 +3285,24 @@ def _render_metric_toggle_grid_rows(
 # v14: Default selection is six core metrics on, six collaboration metrics off.
 _METRICS_SESSION_DEFAULT_VERSION = 14
 
-YEAR_OPTIONS = {
-    "3yrs": "Last 3 completed calendar years — compact recent window",
-    "3yrsAndCurrent": (
-        "Last 3 completed calendar years + current year — includes the calendar year still in progress"
-    ),
-    "3yrsAndCurrentAndFuture": (
-        "Last 3 completed calendar years + current + future — adds indexed manuscripts "
-        "whose official publication date is still in the future"
-    ),
-    "5yrs": "Last 5 completed calendar years — balanced default window",
-    "5yrsAndCurrent": (
-        "Last 5 completed calendar years + current year — includes the calendar year still in progress"
-    ),
-    "5yrsAndCurrentAndFuture": (
-        "Last 5 completed calendar years + current + future — widest recent window plus indexed "
-        "manuscripts whose official publication date is still in the future"
-    ),
-    "10yrs": "Last 10 completed calendar years — long-term trend view",
-}
+YEAR_FILTER_KEYS = (
+    "3yrs",
+    "3yrsAndCurrentAndFuture",
+    "5yrs",
+    "5yrsAndCurrent",
+    "5yrsAndCurrentAndFuture",
+    "10yrs",
+)
 MAX_AUTHORS_PER_RUN = 10
 
 # Short labels for dropdowns (matches compact SaaS-style UI)
 YEAR_OPTIONS_DISPLAY = {
-    "3yrs": "Last 3 completed calendar years",
-    "3yrsAndCurrent": "Last 3 completed calendar years + current year",
-    "3yrsAndCurrentAndFuture": "Last 3 completed calendar years + current + future",
-    "5yrs": "Last 5 completed calendar years (default)",
-    "5yrsAndCurrent": "Last 5 completed calendar years + current year",
-    "5yrsAndCurrentAndFuture": "Last 5 completed calendar years + current + future",
-    "10yrs": "Last 10 completed calendar years",
+    "3yrs": "Last 3 years",
+    "3yrsAndCurrentAndFuture": "Last 3 years + current + future/accepted",
+    "5yrs": "Last 5 years (default)",
+    "5yrsAndCurrent": "Last 5 years + current",
+    "5yrsAndCurrentAndFuture": "Last 5 years + current + future/accepted",
+    "10yrs": "Last 10 years",
 }
 
 DOCS_OPTIONS = {
@@ -3279,77 +3323,28 @@ DOCS_OPTIONS_DISPLAY = {
     "BooksAndBookChapters": "Books & book chapters",
 }
 
+DOCUMENT_TYPE_CHART_COLORS = {
+    "Articles": "#2563eb",
+    "Reviews": "#7c3aed",
+    "Conference papers": "#0d9488",
+    "Books & book chapters": "#d97706",
+    "Other": "#64748b",
+    "Other / residual": "#64748b",
+}
+
 SELF_CIT_RADIO_LABELS = {
     "include": "Include",
     "exclude": "Exclude",
 }
 
-YEAR_FOOTNOTES = {
-    "3yrs": "3 completed calendar years",
-    "3yrsAndCurrent": "3 completed calendar years plus current year",
-    "3yrsAndCurrentAndFuture": (
-        "3 completed calendar years, current year, and manuscripts indexed before their official publication date"
-    ),
-    "5yrs": "5 completed calendar years",
-    "5yrsAndCurrent": "5 completed calendar years plus current year",
-    "5yrsAndCurrentAndFuture": (
-        "5 completed calendar years, current year, and manuscripts indexed before their official publication date"
-    ),
-    "10yrs": "10 completed calendar years",
-}
-
-# Streamlit selectbox “?” — precise definition of the selected preset (SciVal yearRange).
-YEAR_SELECT_HELP = {
-    "3yrs": (
-        "For this preset, metrics use publication years in the last 3 completed calendar years only "
-        "(SciVal yearRange 3yrs)."
-    ),
-    "3yrsAndCurrent": (
-        "For this preset, metrics use the last 3 completed calendar years plus the ongoing calendar year "
-        "(SciVal yearRange 3yrsAndCurrent)."
-    ),
-    "3yrsAndCurrentAndFuture": (
-        "For this preset, metrics use the last 3 completed calendar years, the current calendar year, "
-        "and indexed manuscripts whose official publication date is still in the future "
-        "(SciVal 3yrsAndCurrentAndFuture). "
-        "Record inclusion depends on SciVal–Scopus indexing and updates."
-    ),
-    "5yrs": (
-        "For this preset, metrics use publication years in the last 5 completed calendar years only "
-        "(SciVal yearRange 5yrs)."
-    ),
-    "5yrsAndCurrent": (
-        "For this preset, metrics use the last 5 completed calendar years plus the ongoing calendar year "
-        "(SciVal yearRange 5yrsAndCurrent)."
-    ),
-    "5yrsAndCurrentAndFuture": (
-        "For this preset, metrics use the last 5 completed calendar years, the current calendar year, "
-        "and indexed manuscripts whose official publication date is still in the future "
-        "(SciVal 5yrsAndCurrentAndFuture). "
-        "Record inclusion depends on SciVal–Scopus indexing and updates."
-    ),
-    "10yrs": (
-        "For this preset, metrics use publication years in the last 10 completed calendar years only "
-        "(SciVal yearRange 10yrs)."
-    ),
-}
-
-# Year filter info tooltip — short summary of what the year window can include.
-YEAR_FILTER_LABEL_TOOLTIP_HTML = (
-    "<strong>Year range:</strong><br />"
-    "• Completed calendar years<br />"
-    "• The current calendar year<br />"
-    "• Indexed manuscripts with a future official publication date<br />"
-)
-
 SELF_CIT_LABEL_TOOLTIP_HTML = (
-    "Self-citations are citations where an author cites their own previous work. "
-    "Including them may increase citation counts and H-index values."
+    "An author cites their previous work. "
+    "Including self-citations may increase citation counts and H-index values."
 )
 
 SELF_CIT_HELP = (
-    "Self-citations are citations where an author cites their own previous work. "
-    "Including them may increase citation counts and H-index values."
+    "An author cites their previous work. "
+    "Including self-citations may increase citation counts and H-index values."
 )
 
 DOCS_SELECTION_CAPTION = "Include all types matching your selection above."
@@ -3393,10 +3388,1691 @@ def _init_session() -> None:
         st.session_state.scopus_author_ids = ""
     if "find_scopus_panel_open" not in st.session_state:
         st.session_state.find_scopus_panel_open = False
+    if "sdg_publication_result" not in st.session_state:
+        st.session_state.sdg_publication_result = None
+    if "sdg_publication_error" not in st.session_state:
+        st.session_state.sdg_publication_error = ""
     if "self_cit_radio" not in st.session_state:
         st.session_state.self_cit_radio = (
             "include" if st.session_state.get("self_cit_include", True) else "exclude"
         )
+
+
+_SDG_THRESHOLD_PCT = 3.0  # matches Aurora's default SDG_THRESHOLD_PERCENT
+
+
+def _sdg_codes_for_row(row: dict, threshold: float = _SDG_THRESHOLD_PCT) -> list[str]:
+    """Return SDG codes whose score is at or above the threshold percentage.
+
+    Parses lines like '84% SDG 10 (Reduced inequalities)' from sdg_formatted.
+    Falls back to the sdg_response JSON when available.
+    """
+    import json as _json
+
+    valid: list[str] = []
+    seen: set[str] = set()
+
+    # --- primary path: parse scored lines from sdg_formatted ---
+    formatted = str(row.get("sdg_formatted") or "")
+    for line in formatted.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = re.match(r"(\d+(?:\.\d+)?)\s*%\s+SDG\s*0?(\d{1,2})\b", line, flags=re.I)
+        if m:
+            try:
+                score = float(m.group(1))
+                n = int(m.group(2))
+            except ValueError:
+                continue
+            if score >= threshold and 1 <= n <= 17:
+                code = str(n)
+                if code not in seen:
+                    seen.add(code)
+                    valid.append(code)
+
+    if valid:
+        return valid
+
+    # --- fallback: parse sdg_response JSON directly ---
+    raw = row.get("sdg_response") or ""
+    if raw:
+        try:
+            sdg_json = _json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            sdg_json = None
+        if isinstance(sdg_json, dict):
+            preds = sdg_json.get("predictions") or []
+            for entry in preds:
+                sdg = entry.get("sdg") or {}
+                code_raw = str(sdg.get("code") or "").strip()
+                score_raw = entry.get("prediction")
+                if not code_raw or score_raw is None:
+                    continue
+                try:
+                    score = float(score_raw) * 100
+                    n = int(re.sub(r"\D", "", code_raw) or "0")
+                except ValueError:
+                    continue
+                if score >= threshold and 1 <= n <= 17:
+                    code = str(n)
+                    if code not in seen:
+                        seen.add(code)
+                        valid.append(code)
+
+    return valid
+
+
+SDG_NAMES = {
+    "1": "No poverty",
+    "2": "Zero hunger",
+    "3": "Good health and well-being",
+    "4": "Quality education",
+    "5": "Gender equality",
+    "6": "Clean water and sanitation",
+    "7": "Affordable and clean energy",
+    "8": "Decent work and economic growth",
+    "9": "Industry, innovation and infrastructure",
+    "10": "Reduced inequalities",
+    "11": "Sustainable cities and communities",
+    "12": "Responsible consumption and production",
+    "13": "Climate action",
+    "14": "Life below water",
+    "15": "Life on land",
+    "16": "Peace, justice and strong institutions",
+    "17": "Partnerships for the goals",
+}
+
+SDG_COLORS = {
+    "1": "#e5243b",
+    "2": "#dda63a",
+    "3": "#4c9f38",
+    "4": "#c5192d",
+    "5": "#ff3a21",
+    "6": "#26bde2",
+    "7": "#fcc30b",
+    "8": "#a21942",
+    "9": "#fd6925",
+    "10": "#dd1367",
+    "11": "#fd9d24",
+    "12": "#bf8b2e",
+    "13": "#3f7e44",
+    "14": "#0a97d9",
+    "15": "#56c02b",
+    "16": "#00689d",
+    "17": "#19486a",
+}
+
+
+def _render_sdg_distribution(rows: list[dict]) -> None:
+    counts: dict[str, int] = {}
+    for row in rows:
+        for code in _sdg_codes_for_row(row):
+            counts[code] = counts.get(code, 0) + 1
+    if not counts:
+        st.info("No SDG labels were found in the fetched publication rows.")
+        return
+    try:
+        import plotly.graph_objects as go
+    except ImportError as exc:
+        st.warning(f"Install Plotly to render the SDG donut chart: {exc}")
+        return
+
+    ordered = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    labels = [f"SDG {code} ({SDG_NAMES.get(code, 'Unknown')})" for code, _ in ordered]
+    values = [count for _, count in ordered]
+    colors = [SDG_COLORS.get(code, "#64748b") for code, _ in ordered]
+
+    st.markdown("#### SDG distribution")
+    st.caption("SDGs in all publications")
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.45,
+                sort=False,
+                marker=dict(colors=colors, line=dict(color="#ffffff", width=1)),
+                textinfo="none",
+                hovertemplate="%{label}<br>%{value} publications<extra></extra>",
+            )
+        ]
+    )
+    fig.update_layout(
+        height=430,
+        margin=dict(l=10, r=10, t=10, b=10),
+        legend=dict(
+            title="Sustainable Development Goals",
+            orientation="v",
+            y=0.5,
+            yanchor="middle",
+            x=1.02,
+            xanchor="left",
+            font=dict(size=11),
+        ),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _publication_preview_df(rows: list[dict]) -> pd.DataFrame:
+    columns = [
+        "publication_date",
+        "title",
+        "authors",
+        "type",
+        "oa_status",
+        "doi",
+        "citedby_count",
+        "institutions",
+        "sdg_formatted",
+    ]
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    keep = [col for col in columns if col in df.columns]
+    df = df[keep].copy()
+    if "type" in df.columns:
+        df["type"] = df["type"].apply(
+            lambda v: _WORK_TYPE_LABELS.get(str(v or "").lower().strip(), str(v or "").replace("-", " ").title())
+        )
+    return df.rename(
+        columns={
+            "publication_date": "Publication date",
+            "title": "Title",
+            "authors": "Authors",
+            "type": "Type",
+            "oa_status": "OA status",
+            "doi": "DOI",
+            "citedby_count": "Cited by",
+            "institutions": "Institutions",
+            "sdg_formatted": "SDG predictions",
+        }
+    )
+
+
+def _build_coaffiliation_edges(
+    rows: list[dict],
+) -> tuple[dict[tuple[str, str], int], dict[str, str], dict[str, int]] | None:
+    """Build co-affiliation edge weights and institution labels from publication rows."""
+    import itertools
+
+    edge_counts: dict[tuple[str, str], int] = {}
+    node_labels: dict[str, str] = {}
+    pubs_per_node: dict[str, int] = {}
+
+    for row in rows:
+        aff_json = row.get("institution_affiliations_json")
+        affiliations = []
+        if aff_json:
+            try:
+                affiliations = json.loads(aff_json)
+            except Exception:
+                affiliations = []
+        if not affiliations:
+            raw_ids = str(row.get("institution_ids") or "").split(";")
+            raw_names = str(row.get("institution_names_raw") or row.get("institutions") or "").split(";")
+            raw_countries = str(row.get("institution_countries") or "").split(";")
+            for idx, inst_id in enumerate(raw_ids):
+                inst_id = inst_id.strip()
+                if not inst_id:
+                    continue
+                affiliations.append(
+                    {
+                        "id": inst_id,
+                        "name": raw_names[idx].strip() if idx < len(raw_names) else inst_id,
+                        "country": raw_countries[idx].strip().upper() if idx < len(raw_countries) else "",
+                    }
+                )
+
+        unique_nodes: list[str] = []
+        for aff in affiliations:
+            inst_id = str(aff.get("id") or aff.get("name") or "").strip()
+            if not inst_id or inst_id in unique_nodes:
+                continue
+            name = str(aff.get("name") or inst_id.split("/")[-1] or inst_id).strip()
+            country = str(aff.get("country") or "").strip().upper()
+            label = f"{name} ({country})" if country else name
+            node_labels[inst_id] = label
+            unique_nodes.append(inst_id)
+        for inst_id in set(unique_nodes):
+            pubs_per_node[inst_id] = pubs_per_node.get(inst_id, 0) + 1
+        for a, b in itertools.combinations(sorted(unique_nodes), 2):
+            edge_counts[(a, b)] = edge_counts.get((a, b), 0) + 1
+
+    if not pubs_per_node:
+        return None
+    return edge_counts, node_labels, pubs_per_node
+
+
+def _render_top_coaffiliation_histogram(
+    label_by_node: dict[str, str],
+    pubs_per_node: dict[str, int],
+    *,
+    top_n: int = 10,
+) -> None:
+    """Horizontal bar chart of the most-published institutions in the co-affiliation set."""
+    import plotly.graph_objects as go
+
+    ranked = sorted(pubs_per_node.items(), key=lambda item: item[1], reverse=True)[:top_n]
+    if not ranked:
+        return
+
+    labels = [label_by_node.get(node, node) for node, _ in ranked]
+    values = [count for _, count in ranked]
+
+    # Ascending y order so the highest publication count appears at the top.
+    ordered = sorted(zip(labels, values), key=lambda item: item[1])
+    labels = [label for label, _ in ordered]
+    values = [value for _, value in ordered]
+
+    st.markdown("#### Top co-affiliation pairs")
+    st.caption(
+        f"Top {len(ranked)} most-published institutions in this result set "
+        "(sorted highest to lowest)."
+    )
+
+    fig = go.Figure(
+        go.Bar(
+            y=labels,
+            x=values,
+            orientation="h",
+            marker_color="#4f46e5",
+            text=values,
+            textposition="outside",
+            hovertemplate="%{y}<br>Publications: %{x}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        height=max(280, 32 * len(labels) + 80),
+        margin=dict(l=0, r=40, t=10, b=30),
+        xaxis_title="Publications",
+        yaxis=dict(automargin=True),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_sdg_coaffiliation_network(rows: list[dict], max_nodes: int = 35) -> None:
+    if not rows:
+        st.info("No publications available to build the co-affiliation network.")
+        return
+    try:
+        import networkx as nx
+        import plotly.graph_objects as go
+    except ImportError as exc:
+        st.warning(f"Install network dependencies to render the SDG network: {exc}")
+        return
+
+    built = _build_coaffiliation_edges(rows)
+    if not built:
+        st.info("No institution affiliations found among the fetched publications.")
+        return
+    edge_counts, node_labels, pubs_per_node = built
+
+    label_by_node = {node: node_labels.get(node, node) for node in node_labels}
+    for edge in edge_counts:
+        for node in edge:
+            label_by_node.setdefault(node, node_labels.get(node, node))
+
+    _render_top_coaffiliation_histogram(label_by_node, pubs_per_node, top_n=10)
+    st.divider()
+
+    if not edge_counts:
+        st.info("No co-affiliations found among the fetched publications.")
+        return
+
+    degree: dict[str, int] = {}
+    for (a, b), weight in edge_counts.items():
+        degree[a] = degree.get(a, 0) + weight
+        degree[b] = degree.get(b, 0) + weight
+
+    with st.container(border=True, key="sdg_network_institution_search_shell"):
+        st.markdown(
+            '<div class="sdg-network-search-label">'
+            '<span class="year-filter-label-with-tip">'
+            "<span>Search institution to center the network (optional)</span>"
+            '<span class="year-filter-tip" tabindex="0" role="button" '
+            'aria-label="Institution search information, details in tooltip">'
+            '<span class="minimal-filter-icon-badge minimal-filter-icon-badge--compact '
+            'minimal-filter-icon-badge--info year-filter-tip-marker" aria-hidden="true">'
+            f"{_FILTER_ICON_INFO_SMALL}</span>"
+            '<span class="year-filter-tip-popup" role="tooltip">'
+            "Type part of an institution name from the fetched publication set."
+            "</span></span></span></div>",
+            unsafe_allow_html=True,
+        )
+        focus_query = st.text_input(
+            "Search institution to center the network (optional)",
+            value="",
+            key="sdg_network_institution_search",
+            label_visibility="collapsed",
+        ).strip()
+    selected_focus: str | None = None
+    if focus_query:
+        q = focus_query.lower()
+        matches = [
+            node
+            for node, label in label_by_node.items()
+            if q in label.lower() or q in node.lower()
+        ]
+        matches.sort(key=lambda node: (-degree.get(node, 0), label_by_node.get(node, node)))
+        if not matches:
+            st.warning("No institution in this SDG publication set matches that search.")
+        elif len(matches) == 1:
+            selected_focus = matches[0]
+            st.caption(f"Centered on: {label_by_node[selected_focus]}")
+        else:
+            selected_label = st.selectbox(
+                "Multiple institution matches - pick one",
+                options=[label_by_node[node] for node in matches],
+                index=0,
+                key="sdg_network_institution_match",
+            )
+            selected_focus = next(
+                node for node in matches if label_by_node[node] == selected_label
+            )
+
+    if selected_focus:
+        primary_edges = {
+            edge: weight
+            for edge, weight in edge_counts.items()
+            if selected_focus in edge
+        }
+        neighbors: set[str] = set()
+        for a, b in primary_edges:
+            neighbors.update((a, b))
+        neighbors.discard(selected_focus)
+        secondary_edges = {
+            edge: weight
+            for edge, weight in edge_counts.items()
+            if edge[0] in neighbors and edge[1] in neighbors and weight >= 2
+        }
+        focused_edges = {**primary_edges, **secondary_edges}
+        if focused_edges:
+            edge_counts = focused_edges
+            degree = {}
+            for (a, b), weight in edge_counts.items():
+                degree[a] = degree.get(a, 0) + weight
+                degree[b] = degree.get(b, 0) + weight
+        else:
+            st.info("The selected institution has no co-affiliation edges in this result set.")
+            return
+
+    top_nodes = set(sorted(degree, key=degree.get, reverse=True)[:max_nodes])
+    if selected_focus:
+        top_nodes.add(selected_focus)
+    filtered_edges = {(a, b): w for (a, b), w in edge_counts.items() if a in top_nodes and b in top_nodes}
+    if not filtered_edges:
+        st.info("Co-affiliations exist but were filtered out by the top-node limit.")
+        return
+
+    graph = nx.Graph()
+    for node in top_nodes:
+        graph.add_node(node)
+    for (a, b), weight in filtered_edges.items():
+        graph.add_edge(a, b, weight=weight)
+    pos = nx.spring_layout(graph, weight="weight", dim=3, seed=42)
+    if selected_focus and selected_focus in pos:
+        pos[selected_focus] = [0.0, 0.0, 0.0]
+
+    edge_traces = []
+    for (a, b), weight in filtered_edges.items():
+        x0, y0, z0 = pos[a]
+        x1, y1, z1 = pos[b]
+        edge_traces.append(
+            go.Scatter3d(
+                x=[x0, x1, None],
+                y=[y0, y1, None],
+                z=[z0, z1, None],
+                mode="lines",
+                line=dict(width=max(1.0, min(8.0, weight * 1.5)), color="rgba(93,93,93,0.55)"),
+                hoverinfo="text",
+                text=[f"Co-authored works: {weight}", f"Co-authored works: {weight}", ""],
+            )
+        )
+
+    node_x: list[float] = []
+    node_y: list[float] = []
+    node_z: list[float] = []
+    node_sizes: list[float] = []
+    node_text: list[str] = []
+    max_degree = max(degree.get(node, 1) for node in top_nodes)
+    for node in top_nodes:
+        x, y, z = pos[node]
+        deg = degree.get(node, 1)
+        node_x.append(float(x))
+        node_y.append(float(y))
+        node_z.append(float(z))
+        node_sizes.append(10 + (deg / max_degree) * 25)
+        node_text.append(
+            f"{label_by_node.get(node, node)} · {pubs_per_node.get(node, 0)} publications · link-strength {deg}"
+        )
+
+    node_trace = go.Scatter3d(
+        x=node_x,
+        y=node_y,
+        z=node_z,
+        mode="markers+text",
+        marker=dict(size=node_sizes, color=node_sizes, colorscale="Viridis", showscale=True, opacity=0.95),
+        text=[txt.split(" · ", 1)[0] for txt in node_text],
+        textposition="top center",
+        hovertext=node_text,
+        hoverinfo="text",
+    )
+    fig = go.Figure(data=edge_traces + [node_trace])
+    fig.update_layout(
+        height=650,
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False)),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+_OA_STATUS_COLORS = {
+    "diamond": "#7dd3fc",
+    "gold": "#facc15",
+    "hybrid": "#efa046",
+    "green": "#22c55e",
+    "bronze": "#cd7f32",
+    "closed": "#6b7280",
+}
+_OA_STATUS_ORDER = ["diamond", "gold", "hybrid", "green", "bronze", "closed"]
+
+# Human-readable publication type labels (OpenAlex values -> display)
+_WORK_TYPE_LABELS: dict[str, str] = {
+    "article": "Article",
+    "review": "Review",
+    "book": "Book",
+    "book-chapter": "Book chapter",
+    "proceedings-article": "Conference paper",
+    "proceedings": "Conference proceedings",
+    "dissertation": "Dissertation",
+    "dataset": "Dataset",
+    "report": "Report",
+    "editorial": "Editorial",
+    "letter": "Letter",
+    "reference-entry": "Reference entry",
+    "standard": "Standard",
+    "other": "Other",
+}
+
+
+def _oa_label(row: dict) -> str:
+    status = str(row.get("oa_status") or "").lower().strip()
+    if status in _OA_STATUS_COLORS:
+        return status
+    is_oa = str(row.get("is_oa") or "").strip().lower()
+    return "gold" if is_oa in ("true", "1", "yes") else "closed"
+
+
+def _render_oa_by_author(rows: list[dict], max_authors: int = 20) -> None:
+    """Horizontal stacked bar: Open Access vs Closed per author (top N by publication count)."""
+    import plotly.graph_objects as go
+
+    author_open: dict[str, int] = {}
+    author_closed: dict[str, int] = {}
+    for row in rows:
+        for name in str(row.get("authors") or "").split(";"):
+            name = name.strip()
+            if not name:
+                continue
+            label = _oa_label(row)
+            if label == "closed":
+                author_closed[name] = author_closed.get(name, 0) + 1
+            else:
+                author_open[name] = author_open.get(name, 0) + 1
+
+    all_authors = set(author_open) | set(author_closed)
+    if not all_authors:
+        st.info("No author data available for OA distribution.")
+        return
+
+    totals = {a: author_open.get(a, 0) + author_closed.get(a, 0) for a in all_authors}
+    top = sorted(totals, key=totals.get, reverse=True)[:max_authors]
+    top_sorted = sorted(top, key=lambda a: totals[a])  # ascending for horizontal bar
+
+    st.markdown("#### OA distribution by Co-authors")
+    st.caption(f"OA status distribution for top {len(top_sorted)} authors")
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=top_sorted,
+        x=[author_open.get(a, 0) for a in top_sorted],
+        name="Open access",
+        orientation="h",
+        marker_color="#0c6b2f",
+    ))
+    fig.add_trace(go.Bar(
+        y=top_sorted,
+        x=[author_closed.get(a, 0) for a in top_sorted],
+        name="Closed",
+        orientation="h",
+        marker_color="#6b7280",
+    ))
+    fig.update_layout(
+        barmode="stack",
+        height=max(350, 28 * len(top_sorted) + 80),
+        margin=dict(l=0, r=10, t=10, b=30),
+        legend=dict(title="Open-Access status", orientation="v", x=1.01, xanchor="left", y=1),
+        xaxis_title="Publications",
+        yaxis_title="Author",
+        yaxis=dict(automargin=True),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_oa_ratio(rows: list[dict]) -> None:
+    """Donut chart: Open access vs Closed ratio."""
+    import plotly.graph_objects as go
+
+    open_count = sum(1 for row in rows if _oa_label(row) != "closed")
+    closed_count = sum(1 for row in rows if _oa_label(row) == "closed")
+    if open_count + closed_count == 0:
+        st.info("No OA status data found.")
+        return
+
+    st.markdown("#### Open Access — closed access ratio")
+    st.caption("Open access vs closed")
+
+    fig = go.Figure(data=[go.Pie(
+        labels=["Open access", "Closed"],
+        values=[open_count, closed_count],
+        hole=0.42,
+        sort=False,
+        marker=dict(colors=["#0c6b2f", "#6b7280"], line=dict(color="#ffffff", width=1)),
+        textinfo="none",
+        hovertemplate="%{label}<br>%{value} publications (%{percent})<extra></extra>",
+    )])
+    fig.update_layout(
+        height=370,
+        margin=dict(l=10, r=10, t=10, b=10),
+        legend=dict(title="Access status", orientation="v", x=1.01, xanchor="left", y=0.5, yanchor="middle"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_oa_volume_by_month(rows: list[dict]) -> None:
+    """Stacked bar: publication count by month, coloured by OA status."""
+    import plotly.graph_objects as go
+
+    month_status: dict[str, dict[str, int]] = {}
+    for row in rows:
+        raw_date = str(row.get("publication_date") or "").strip()
+        if not raw_date or len(raw_date) < 7:
+            continue
+        month = raw_date[:7]  # YYYY-MM
+        status = _oa_label(row)
+        month_status.setdefault(month, {})
+        month_status[month][status] = month_status[month].get(status, 0) + 1
+
+    if not month_status:
+        st.info("No publication date data found for the OA volume chart.")
+        return
+
+    months = sorted(month_status.keys())
+    present_statuses = [s for s in _OA_STATUS_ORDER if any(month_status[m].get(s, 0) for m in months)]
+
+    if not present_statuses:
+        st.info("No OA status data found for volume chart.")
+        return
+
+    earliest = pd.to_datetime(months[0] + "-01").strftime("%b %Y")
+    latest = pd.to_datetime(months[-1] + "-01").strftime("%b %Y")
+    st.markdown("#### Publication volume by OA status")
+    st.caption(f"Publications from {earliest} to {latest}")
+
+    fig = go.Figure()
+    for status in present_statuses:
+        fig.add_trace(go.Bar(
+            x=months,
+            y=[month_status[m].get(status, 0) for m in months],
+            name=status,
+            marker_color=_OA_STATUS_COLORS.get(status, "#64748b"),
+        ))
+    fig.update_layout(
+        barmode="stack",
+        height=380,
+        margin=dict(l=10, r=10, t=10, b=40),
+        legend=dict(title="Open-Access status", orientation="v", x=1.01, xanchor="left", y=1),
+        xaxis_title="Publication month",
+        yaxis_title="Publications",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_pub_type_breakdown(rows: list[dict]) -> None:
+    """Horizontal bar: specific publication type counts."""
+    import plotly.graph_objects as go
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        raw = str(row.get("type") or "other").strip().lower()
+        label = _WORK_TYPE_LABELS.get(raw, raw.replace("-", " ").title())
+        counts[label] = counts.get(label, 0) + 1
+
+    if not counts:
+        return
+
+    sorted_types = sorted(counts.items(), key=lambda item: item[1])
+    labels = [t for t, _ in sorted_types]
+    values = [v for _, v in sorted_types]
+
+    fig = go.Figure(go.Bar(
+        y=labels,
+        x=values,
+        orientation="h",
+        marker_color="#4f46e5",
+        text=values,
+        textposition="outside",
+    ))
+    fig.update_layout(
+        height=max(200, 30 * len(labels) + 60),
+        margin=dict(l=0, r=40, t=10, b=30),
+        xaxis_title="Publications",
+        yaxis=dict(automargin=True),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_fetch_transparency(stats: object, row_count: int) -> None:
+    """Render a compact one-line metadata summary matching the pipeline's counters."""
+    if not stats:
+        return
+
+    total_expected       = getattr(stats, "total_expected", None)
+    abstracts_available  = int(getattr(stats, "total_abstracts_available", 0) or 0)
+    openalex_missing     = int(getattr(stats, "openalex_abstract_missing", 0) or 0)
+    via_cache            = int(getattr(stats, "cached_abstract_retrieved", 0) or 0)
+    via_elsevier         = int(getattr(stats, "scopus_abstract_retrieved", 0) or 0)
+    via_gs               = int(getattr(stats, "gs_abstract_retrieved", 0) or 0)
+    skipped_no_doi       = int(getattr(stats, "scopus_skipped_no_doi", 0) or 0)
+    skipped_duplicate    = int(getattr(stats, "scopus_skipped_duplicate_doi", 0) or 0)
+    skipped_no_openalex  = int(getattr(stats, "scopus_doi_not_in_openalex", 0) or 0)
+    skipped_type         = int(getattr(stats, "scopus_skipped_type_mismatch", 0) or 0)
+    skipped_date         = int(getattr(stats, "scopus_skipped_date_mismatch", 0) or 0)
+
+    # ── Main stats sentence ────────────────────────────────────────────────
+    candidates = int(total_expected) if total_expected is not None else None
+    parts: list[str] = []
+    if candidates is not None:
+        parts.append(
+            f"Scopus: **{candidates:,}** candidates → **{row_count:,}** rows written (via OpenAlex by DOI)"
+        )
+    else:
+        parts.append(f"Wrote **{row_count:,}** rows")
+
+    # Abstract sourcing breakdown — show fallback chain: OpenAlex → cache → Elsevier → GS
+    still_missing = max(0, openalex_missing - via_cache - via_elsevier - via_gs)
+    abstract_parts: list[str] = [f"Abstracts available: **{abstracts_available:,}**"]
+    if openalex_missing:
+        fallback_bits: list[str] = []
+        if via_cache:
+            fallback_bits.append(f"**{via_cache:,}** from local cache")
+        if via_elsevier:
+            fallback_bits.append(f"**{via_elsevier:,}** via Elsevier (DOI)")
+        if via_gs:
+            fallback_bits.append(f"**{via_gs:,}** via Google Scholar")
+        recovered_str = (
+            ("; ".join(fallback_bits) + " recovered") if fallback_bits else "none recovered"
+        )
+        abstract_parts.append(
+            f"OpenAlex missing: **{openalex_missing:,}** ({recovered_str}"
+            + (f"; **{still_missing:,}** without abstract" if still_missing else "")
+            + ")"
+        )
+    parts.append("  ".join(abstract_parts))
+
+    # ── Skipped breakdown ─────────────────────────────────────────────────
+    skipped_parts: list[str] = []
+    if skipped_no_doi:
+        skipped_parts.append(f"no DOI: {skipped_no_doi:,}")
+    if skipped_duplicate:
+        skipped_parts.append(f"duplicate DOI: {skipped_duplicate:,}")
+    if skipped_no_openalex:
+        skipped_parts.append(f"DOI not in OpenAlex: {skipped_no_openalex:,}")
+    if skipped_type:
+        skipped_parts.append(f"document type filter: {skipped_type:,}")
+    if skipped_date:
+        skipped_parts.append(f"publication date window: {skipped_date:,}")
+    if skipped_parts:
+        parts.append("skipped (" + "; ".join(skipped_parts) + ")")
+
+    st.caption("  ·  ".join(parts))
+
+
+@st.cache_data(show_spinner=False)
+def _analysis_gif_data_url() -> str:
+    gif_path = Path(__file__).resolve().parent / "static" / "analysis.gif"
+    if not gif_path.is_file():
+        return ""
+    try:
+        encoded = base64.b64encode(gif_path.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+    return f"data:image/gif;base64,{encoded}"
+
+
+def _inject_button_gif_icon_styles(
+    streamlit_key: str, gif_data_url: str, *, icon_size: str = "1.75rem"
+) -> None:
+    """Render a GIF inside a native ``st.button`` (left of label) via ``::before``."""
+    if not gif_data_url.startswith("data:image/gif;base64,"):
+        return
+    safe_url = gif_data_url.replace("\\", "\\\\").replace('"', '\\"')
+    key_sel = f'[class*="st-key-{streamlit_key}"]'
+    st.markdown(
+        f"""
+<style>
+{key_sel} button {{
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}}
+{key_sel} button > div {{
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}}
+{key_sel} button::before {{
+  content: "" !important;
+  display: block !important;
+  width: {icon_size} !important;
+  height: {icon_size} !important;
+  flex-shrink: 0 !important;
+  background: url("{safe_url}") center / contain no-repeat !important;
+}}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+_SDG_MODEL_OPTIONS: dict[str, str] = {
+    "Elsevier SDG Multi-label (Recommended)": "elsevier-sdg-multi",
+    "Aurora SDG Multi-label (Fast)": "aurora-sdg-multi",
+    "Aurora SDG (High Accuracy)": "aurora-sdg",
+}
+_SDG_DISCLAIMER = (
+    "This SDG classification tool has been generated using data provided by the Aurora SDG Classifier API. "
+    "Please be aware that classification results presented in this tool are subject to change over time as "
+    "the underlying data is updated and refined."
+)
+
+
+# ── ASJC Subject Area helpers (aligned with Scopus_Wos Serial Title API usage) ──
+
+def _normalize_doi_for_elsevier(doi: str) -> str:
+    """Bare DOI (10.x/…) for Elsevier Scopus queries — rows often store https://doi.org/…"""
+    if not doi:
+        return ""
+    cleaned = doi.strip()
+    for prefix in (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi:",
+    ):
+        if cleaned.lower().startswith(prefix.lower()):
+            cleaned = cleaned[len(prefix) :].strip()
+    return cleaned.strip()
+
+
+def _clean_issn_for_scopus(issn: str | None) -> str | None:
+    """8-character ISSN without hyphen (Scopus_Wos ``clean_issn``)."""
+    if not issn or not isinstance(issn, str):
+        return None
+    cleaned = re.sub(r"[-\s]", "", issn.strip().upper())
+    return cleaned if len(cleaned) == 8 else None
+
+
+def _elsevier_scopus_params(api_key: str, inst_token: str) -> dict[str, str]:
+    """Query params for Elsevier Scopus / Serial Title APIs (apiKey + insttoken)."""
+    params: dict[str, str] = {"apiKey": api_key.strip(), "httpAccept": "application/json"}
+    inst = (inst_token or "").strip()
+    if inst:
+        params["insttoken"] = inst
+    return params
+
+
+def _scopus_search_entries(payload: dict) -> list[dict]:
+    """Normalize Scopus Search ``entry`` (single dict when count=1, else list)."""
+    raw = payload.get("search-results", {}).get("entry", [])
+    if isinstance(raw, dict):
+        return [raw]
+    if isinstance(raw, list):
+        return [e for e in raw if isinstance(e, dict)]
+    return []
+
+
+def _serial_title_entries(payload: dict) -> list[dict]:
+    raw = payload.get("serial-metadata-response", {}).get("entry", [])
+    if isinstance(raw, dict):
+        return [raw]
+    if isinstance(raw, list):
+        return [e for e in raw if isinstance(e, dict)]
+    return []
+
+
+def _get_issn_from_doi(doi: str, api_key: str, inst_token: str) -> str | None:
+    """Return journal ISSN (or EISSN) for a DOI via Scopus Search API."""
+    import requests as _req
+
+    cleaned = _normalize_doi_for_elsevier(doi)
+    if not cleaned or not cleaned.startswith("10.") or "/" not in cleaned:
+        return None
+    if not (api_key or "").strip():
+        return None
+
+    params = _elsevier_scopus_params(api_key, inst_token)
+    params["query"] = f'DOI("{cleaned}")'
+    params["count"] = "1"
+
+    try:
+        resp = _req.get(
+            "https://api.elsevier.com/content/search/scopus",
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=20,
+        )
+        if resp.status_code != 200:
+            return None
+        for entry in _scopus_search_entries(resp.json()):
+            issn = entry.get("prism:issn") or entry.get("prism:eissn")
+            normalized = _clean_issn_for_scopus(issn)
+            if normalized:
+                return normalized
+    except Exception:
+        pass
+    return None
+
+
+def _get_asjc_subjects_by_issn(issn: str, api_key: str, inst_token: str) -> list[tuple[str, str]]:
+    """ASJC subject areas for a journal ISSN via Elsevier Serial Title API."""
+    import requests as _req
+
+    issn_clean = _clean_issn_for_scopus(issn)
+    if not issn_clean or not (api_key or "").strip():
+        return []
+
+    params = _elsevier_scopus_params(api_key, inst_token)
+    try:
+        resp = _req.get(
+            f"https://api.elsevier.com/content/serial/title/issn/{issn_clean}",
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=20,
+        )
+        if resp.status_code != 200:
+            return []
+        for entry in _serial_title_entries(resp.json()):
+            areas = entry.get("subject-area") or []
+            if isinstance(areas, dict):
+                areas = [areas]
+            return [
+                (str(a.get("@code", "")), str(a.get("$", "Unknown")))
+                for a in areas
+                if isinstance(a, dict) and a.get("$")
+            ]
+    except Exception:
+        pass
+    return []
+
+
+def _extract_publication_dois(rows: list[dict]) -> list[str]:
+    dois: list[str] = []
+    for row in rows:
+        norm = _normalize_doi_for_elsevier(str(row.get("doi") or ""))
+        if norm.startswith("10.") and "/" in norm:
+            dois.append(norm)
+    return list(dict.fromkeys(dois))
+
+
+def _ensure_asjc_subject_cache(rows: list[dict], *, show_progress: bool = False) -> dict:
+    """Resolve DOI → ISSN → ASJC subjects and store in session state."""
+    import streamlit_app.sdg_service as _sdg
+
+    creds = _sdg._ordered_scopus_credentials()
+    if not creds:
+        return {}
+
+    preferred = _sdg._preferred_scopus_creds
+    if preferred:
+        api_key, inst_token = preferred
+    else:
+        api_key, inst_token, _label = creds[0]
+
+    dois = _extract_publication_dois(rows)
+    if not dois:
+        return {}
+
+    cache_key = "asjc_subject_cache_v2"
+    if cache_key not in st.session_state:
+        st.session_state[cache_key] = {}
+
+    cached: dict = st.session_state[cache_key]
+    uncached_dois = [d for d in dois if d not in cached]
+
+    if uncached_dois:
+        prog = st.progress(0, text="Fetching journal subjects from Scopus…") if show_progress else None
+        total = len(uncached_dois)
+        for i, doi in enumerate(uncached_dois):
+            issn = _get_issn_from_doi(doi, api_key, inst_token)
+            # On first miss, try remaining credential candidates once (invalid primary key).
+            if issn is None and i == 0 and not preferred:
+                for try_key, try_inst, _ in creds[1:]:
+                    issn = _get_issn_from_doi(doi, try_key, try_inst)
+                    if issn:
+                        api_key, inst_token = try_key, try_inst
+                        _sdg._preferred_scopus_creds = (try_key, try_inst)
+                        preferred = (try_key, try_inst)
+                        break
+            subjects: list[tuple[str, str]] = []
+            if issn:
+                if "asjc_issn_cache" not in st.session_state:
+                    st.session_state["asjc_issn_cache"] = {}
+                issn_cache = st.session_state["asjc_issn_cache"]
+                if issn not in issn_cache:
+                    issn_cache[issn] = _get_asjc_subjects_by_issn(issn, api_key, inst_token)
+                subjects = issn_cache[issn]
+            cached[doi] = {"issn": issn, "subjects": subjects}
+            if prog is not None:
+                prog.progress((i + 1) / total, text=f"Fetching journal subjects… {i + 1}/{total}")
+        if prog is not None:
+            prog.empty()
+        st.session_state[cache_key] = cached
+
+    return cached
+
+
+def _enrich_publication_rows_with_asjc(rows: list[dict]) -> list[dict]:
+    """Attach cached ASJC ISSN and subject fields for CSV export."""
+    if not rows:
+        return []
+    _ensure_asjc_subject_cache(rows, show_progress=False)
+    cached = st.session_state.get("asjc_subject_cache_v2", {})
+    enriched: list[dict] = []
+    for row in rows:
+        export_row = dict(row)
+        doi = _normalize_doi_for_elsevier(str(row.get("doi") or ""))
+        entry = cached.get(doi, {})
+        subjects: list[tuple[str, str]] = entry.get("subjects") or []
+        export_row["asjc_issn"] = entry.get("issn") or ""
+        export_row["asjc_subject_codes"] = "; ".join(code for code, _ in subjects if code)
+        export_row["asjc_subjects"] = "; ".join(name for _, name in subjects if name)
+        enriched.append(export_row)
+    return enriched
+
+
+def _render_asjc_subjects(rows: list[dict]) -> None:
+    """Fetch ASJC subject areas via DOI → ISSN → Serial Title API and render charts."""
+    import plotly.graph_objects as go
+
+    if not sdg_credentials_available():
+        st.warning(
+            "An Elsevier API key (`SCOPUS_API_KEY`, `SCIVAL_API_KEY`, or "
+            "`SCIVAL_API_KEY_1` / `SCIVAL_API_KEY_2`) is required to fetch ASJC subjects.",
+            icon=":material/key:",
+        )
+        return
+
+    dois = _extract_publication_dois(rows)
+
+    if not dois:
+        st.info("No DOIs were found in the fetched publications — cannot look up ASJC subjects.")
+        return
+
+    uncached_dois = [d for d in dois if d not in st.session_state.get("asjc_subject_cache_v2", {})]
+    cached = _ensure_asjc_subject_cache(rows, show_progress=bool(uncached_dois))
+
+    # Aggregate subject area counts across all publications
+    subject_counts: dict[str, int] = {}
+    issn_hits = 0
+    for doi in dois:
+        entry = cached.get(doi) or {}
+        if entry.get("issn"):
+            issn_hits += 1
+        for _code, name in entry.get("subjects", []):
+            subject_counts[name] = subject_counts.get(name, 0) + 1
+
+    if not subject_counts:
+        st.info(
+            "No ASJC subject areas were retrieved. "
+            f"Resolved ISSN for **{issn_hits}** of **{len(dois)}** DOIs. "
+            "Common causes: invalid API key, missing `ELSEVIER_INSTTOKEN` (when required), "
+            "DOIs not indexed in Scopus, or journals without subject-area metadata."
+        )
+        with st.expander("Troubleshooting"):
+            st.markdown(
+                "- Confirm **`SCOPUS_API_KEY` / `SCIVAL_API_KEY`** or backup **`SCIVAL_API_KEY_1` / `SCIVAL_API_KEY_2`** "
+                "(same as Publications Analysis).\n"
+                "- Institutional keys may also need **`ELSEVIER_INSTTOKEN`**; backup keys usually do not.\n"
+                "- DOIs are normalized from `https://doi.org/…` before lookup.\n"
+                "- Re-run **Run Publications Analysis** after changing credentials, then open this tab again."
+            )
+        return
+
+    sorted_subjects = sorted(subject_counts.items(), key=lambda x: x[1], reverse=True)
+    top_subjects = sorted_subjects[:30]  # cap at 30 for readability
+
+    labels = [s for s, _ in reversed(top_subjects)]
+    values = [v for _, v in reversed(top_subjects)]
+
+    total_pubs = len(dois)
+    st.markdown("#### ASJC Subject Area distribution")
+    st.caption(
+        f"ASJC (All Science Journal Classification) codes resolved for **{total_pubs}** publications "
+        f"via Scopus Serial Title API. A publication may span multiple subject areas."
+    )
+
+    palette = [
+        "#4f46e5", "#7c3aed", "#db2777", "#ea580c", "#d97706",
+        "#16a34a", "#0891b2", "#2563eb", "#9333ea", "#c026d3",
+    ]
+    bar_colors = [palette[i % len(palette)] for i in range(len(labels))]
+
+    fig = go.Figure(go.Bar(
+        y=labels,
+        x=values,
+        orientation="h",
+        marker_color=list(reversed(bar_colors)),
+        text=values,
+        textposition="outside",
+        hovertemplate="%{y}<br>%{x} publications<extra></extra>",
+    ))
+    fig.update_layout(
+        height=max(300, 26 * len(labels) + 80),
+        margin=dict(l=0, r=60, t=10, b=30),
+        xaxis_title="Number of publications",
+        yaxis=dict(automargin=True, tickfont=dict(size=11)),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ── Donut chart of top-10 for a quick overview ─────────────────────────
+    top10 = sorted_subjects[:10]
+    st.markdown("#### Top 10 subject areas (share)")
+    pie_colors = [
+        "#4f46e5", "#7c3aed", "#db2777", "#ea580c", "#d97706",
+        "#16a34a", "#0891b2", "#2563eb", "#9333ea", "#c026d3",
+    ]
+    fig2 = go.Figure(go.Pie(
+        labels=[s for s, _ in top10],
+        values=[v for _, v in top10],
+        hole=0.42,
+        marker=dict(colors=pie_colors[:len(top10)], line=dict(color="#ffffff", width=1.5)),
+        textinfo="none",
+        hovertemplate="%{label}<br>%{value} publications<extra></extra>",
+    ))
+    fig2.update_layout(
+        height=400,
+        margin=dict(l=10, r=10, t=10, b=10),
+        legend=dict(
+            orientation="v",
+            y=0.5,
+            yanchor="middle",
+            x=1.02,
+            xanchor="left",
+            font=dict(size=11),
+        ),
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
+
+def _render_abstract_wordcloud(rows: list[dict]) -> None:
+    """Generate and display a word cloud from publication abstracts."""
+    abstracts = [str(r.get("abstract") or "").strip() for r in rows]
+    combined = " ".join(a for a in abstracts if a)
+
+    if not combined:
+        st.info("No abstracts were found in the fetched publications — cannot generate a word cloud.")
+        return
+
+    try:
+        from wordcloud import WordCloud, STOPWORDS
+    except ImportError:
+        st.warning("Install `wordcloud` (`pip install wordcloud`) to generate the abstract word cloud.")
+        return
+
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        st.warning("Install `matplotlib` to display the word cloud.")
+        return
+
+    st.markdown("#### Abstract word cloud")
+    st.caption("Most frequent terms across all available abstracts (common English stop-words removed).")
+
+    extra_stops = {
+        "study", "research", "results", "result", "findings", "finding",
+        "paper", "using", "used", "use", "based", "analysis", "data",
+        "also", "however", "show", "shows", "shown", "two", "three",
+        "proposed", "present", "presented", "method", "methods",
+        "approach", "approaches", "model", "models",
+    }
+    stopwords = STOPWORDS | extra_stops
+
+    wc = WordCloud(
+        width=1200,
+        height=540,
+        background_color="white",
+        colormap="RdYlBu",
+        stopwords=stopwords,
+        max_words=120,
+        collocations=False,
+        prefer_horizontal=0.85,
+        min_font_size=10,
+    ).generate(combined)
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
+    fig.tight_layout(pad=0)
+
+    png_buf = io.BytesIO()
+    fig.savefig(png_buf, format="png", bbox_inches="tight", pad_inches=0, dpi=150)
+    png_bytes = png_buf.getvalue()
+
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+    st.download_button(
+        "Download PNG",
+        data=png_bytes,
+        file_name="abstract-wordcloud.png",
+        mime="image/png",
+        key="download_abstract_wordcloud_png",
+    )
+
+
+def _render_sdg_publications_section(valid_results: list[dict], year_key: str, docs_key: str) -> None:
+    st.markdown(
+        '<hr class="charts-export-divider" aria-hidden="true" />',
+        unsafe_allow_html=True,
+    )
+
+    if "sdg_publications_expanded" not in st.session_state:
+        st.session_state.sdg_publications_expanded = True
+
+    _title_gif_url = _analysis_gif_data_url()
+    if _title_gif_url:
+        _inject_button_gif_icon_styles(
+            "sdg_publications_title_toggle", _title_gif_url, icon_size="2.35rem"
+        )
+    _title_radius = "18px 18px 0 0" if st.session_state.sdg_publications_expanded else "18px"
+    _title_border_bottom = "none" if st.session_state.sdg_publications_expanded else "1px solid #e5e7eb"
+    st.markdown(
+        f"""
+<style>
+[class*="st-key-sdg_publications_title_toggle"] button {{
+  width: 100% !important;
+  justify-content: flex-start !important;
+  min-height: 4.4rem !important;
+  padding: 0.85rem 1.15rem !important;
+  border-radius: {_title_radius} !important;
+  border: 1px solid #e5e7eb !important;
+  border-bottom: {_title_border_bottom} !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07) !important;
+}}
+[class*="st-key-sdg_publications_title_toggle"] button:hover {{
+  background: #ffffff !important;
+  border-color: #c7d2fe !important;
+  box-shadow: 0 5px 22px rgba(79, 70, 229, 0.13) !important;
+}}
+[class*="st-key-sdg_publications_title_toggle"] button p {{
+  font-size: 1.55rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+}}
+[class*="st-key-sdg_publications_body"] {{
+  margin-top: -0.85rem !important;
+}}
+[class*="st-key-sdg_publications_body"],
+[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlockBorderWrapper"] {{
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  border-radius: 0 0 18px 18px !important;
+  border-top: none !important;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07) !important;
+}}
+[class*="st-key-sdg_publications_body"] div[data-testid="stVerticalBlock"] {{
+  gap: 1rem !important;
+}}
+.sdg-pipeline-note {{
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: #6b7280;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}}
+.sdg-pipeline-note-icon {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 1.5px solid #a5b4fc;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  user-select: none;
+}}
+.sdg-pipeline-note-text strong {{
+  color: #475569;
+  font-weight: 600;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "Publications Analysis: Subjects, Networks, SDGs, & OA Status",
+        key="sdg_publications_title_toggle",
+        type="secondary",
+        use_container_width=True,
+    ):
+        st.session_state.sdg_publications_expanded = not st.session_state.sdg_publications_expanded
+
+    if not st.session_state.sdg_publications_expanded:
+        return
+
+    with st.container(border=True, key="sdg_publications_body"):
+        st.caption(
+            "Fetch publication records for the selected author to unlock five analysis views: "
+            "Publications · Subject (ASJC) · Co-affiliation Network · SDG Summary · OA Analysis"
+        )
+        st.markdown(
+            """
+<div class="sdg-pipeline-note">
+  <span class="sdg-pipeline-note-icon" aria-hidden="true">i</span>
+  <span class="sdg-pipeline-note-text"><strong>Note:</strong> Scopus identifies candidate publications
+  (AU-ID search), but only records with DOIs matched in OpenAlex are included; metadata is sourced from
+  OpenAlex. SDGs use the Aurora classifier, and ASJC subjects are assigned via Elsevier's Serial Title
+  API (DOI → ISSN). Document type and date filters may apply. Number of Publications may differ from
+  Scopus/SciVal. For reference only.</span>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+        if not sdg_credentials_available():
+            st.info(
+                "To enable this section set an Elsevier API key (`SCOPUS_API_KEY`, `SCIVAL_API_KEY`, "
+                "or backup `SCIVAL_API_KEY_1` / `SCIVAL_API_KEY_2`). "
+                "`ELSEVIER_INSTTOKEN` is optional when using the backup keys. "
+                "Scopus publication search uses the Scopus Content API, which may require a separate "
+                "entitlement from SciVal."
+            )
+            return
+
+        author_options: dict[str, str] = {}
+        for item in valid_results:
+            aid = str(item.get("id") or "").strip()
+            if not aid:
+                continue
+            data = item.get("data") or {}
+            name = str(data.get("authorName") or f"Author {aid}")
+            author_options[f"{name} ({aid})"] = aid
+        if not author_options:
+            st.info("Analyse at least one valid Scopus Author ID above before fetching SDG publications.")
+            return
+
+        _disclaimer_tooltip = (
+            "This SDG classification tool is generated using data provided by the Aurora SDG Classifier API "
+            "(https://aurora-universities.eu/sdg-research/sdg-api/). "
+            "The results displayed may differ from SDG classifications shown in Scopus or other platforms. "
+            "Please note that classifications are subject to change over time as the underlying data and "
+            "methodologies are updated and refined."
+        )
+        _disclaimer_tooltip_body = _disclaimer_tooltip.replace(
+            "(https://aurora-universities.eu/sdg-research/sdg-api/)",
+            '(<a href="https://aurora-universities.eu/sdg-research/sdg-api/" target="_blank">aurora-universities.eu</a>)',
+        )
+        st.markdown(
+            f"""
+<style>
+.sdg-model-label-row {{
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #31333f;
+  margin-bottom: 0.35rem;
+}}
+.sdg-model-label-with-tip {{
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}}
+.sdg-disclaimer-tooltip {{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+}}
+.sdg-disclaimer-tooltip .sdg-tooltip-icon {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 1.5px solid #a5b4fc;
+  flex-shrink: 0;
+  user-select: none;
+}}
+.sdg-disclaimer-tooltip .sdg-tooltip-box {{
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.18s;
+  position: absolute;
+  bottom: 130%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  width: 22rem;
+  max-width: 90vw;
+  z-index: 9999;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+  pointer-events: none;
+  white-space: normal;
+}}
+.sdg-disclaimer-tooltip .sdg-tooltip-box a {{
+  color: #93c5fd;
+}}
+.sdg-disclaimer-tooltip:hover .sdg-tooltip-box {{
+  visibility: visible;
+  opacity: 1;
+}}
+[class*="st-key-sdg_author_select"] div[data-baseweb="select"] > div,
+[class*="st-key-sdg_model_select"] div[data-baseweb="select"] > div {{
+  border: 1.6px solid #a5b4fc !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.08) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}}
+[class*="st-key-sdg_author_select"] div[data-baseweb="select"] > div:hover,
+[class*="st-key-sdg_model_select"] div[data-baseweb="select"] > div:hover {{
+  border-color: #7c3aed !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.14) !important;
+}}
+[class*="st-key-sdg_limit_rows"] [data-testid="stNumberInput"] input,
+[class*="st-key-sdg_limit_rows"] input {{
+  border: 1.6px solid #86efac !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(22, 163, 74, 0.08) !important;
+}}
+[class*="st-key-sdg_limit_rows"] [data-testid="stNumberInput"] input:focus,
+[class*="st-key-sdg_limit_rows"] input:focus {{
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16) !important;
+}}
+[class*="st-key-fetch_sdg_publications_button"] button {{
+  min-height: 2.75rem !important;
+  padding: 0.68rem 1.15rem !important;
+  border-radius: 999px !important;
+  border: none !important;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #db2777 100%) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.3) !important;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease !important;
+}}
+[class*="st-key-fetch_sdg_publications_button"] button:hover {{
+  filter: brightness(1.04) saturate(1.08) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 12px 28px rgba(124, 58, 237, 0.38) !important;
+}}
+[class*="st-key-fetch_sdg_publications_button"] button p,
+[class*="st-key-fetch_sdg_publications_button"] button span {{
+  color: #ffffff !important;
+}}
+</style>
+""",
+            unsafe_allow_html=True,
+        )
+
+        c_author, c_model, c_limit = st.columns([2, 1, 1])
+        with c_author:
+            selected_label = st.selectbox(
+                "Author",
+                options=list(author_options.keys()),
+                key="sdg_author_select",
+            )
+        with c_model:
+            st.markdown(
+                f"""
+<div class="sdg-model-label-row">
+  <span class="sdg-model-label-with-tip">
+    <span>Select Classification Model</span>
+    <span class="sdg-disclaimer-tooltip">
+      <span class="sdg-tooltip-icon">?</span>
+      <span class="sdg-tooltip-box">{_disclaimer_tooltip_body}</span>
+    </span>
+  </span>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+            model_label = st.selectbox(
+                "Select Classification Model",
+                options=list(_SDG_MODEL_OPTIONS.keys()),
+                index=0,
+                key="sdg_model_select",
+                label_visibility="collapsed",
+            )
+            sdg_model = _SDG_MODEL_OPTIONS[model_label]
+        with c_limit:
+            limit_rows = st.number_input(
+                "Max publications",
+                min_value=1,
+                max_value=500,
+                value=50,
+                step=25,
+                key="sdg_limit_rows",
+            )
+
+        selected_author_id = author_options[selected_label]
+        # Keep this as a native Streamlit button: custom components keep their
+        # last value across reruns and can re-trigger analysis when another widget changes.
+        _fetch_btn_kwargs: dict = {
+            "type": "secondary",
+            "key": "fetch_sdg_publications_button",
+            "icon": ":material/analytics:",
+        }
+        fetch_clicked = st.button("Run Publications Analysis", **_fetch_btn_kwargs)
+        if fetch_clicked:
+            st.session_state.sdg_publication_error = ""
+            # Clear previous result so stale data is never shown after a failed re-fetch
+            st.session_state.sdg_publication_result = None
+            st.session_state.pop("asjc_subject_cache_v2", None)
+            st.session_state.pop("asjc_issn_cache", None)
+            progress_bar = st.progress(0)
+            progress_text = st.empty()
+
+            def progress_callback(done: int, expected: int | None, message: str) -> None:
+                # Use candidates_scanned (from stats via closure) when available so the
+                # bar moves steadily even for skipped entries, not only accepted rows.
+                scanned = getattr(
+                    getattr(st.session_state, "_sdg_fetch_stats_live", None),
+                    "scopus_candidates_scanned", None,
+                )
+                denominator = scanned or expected or int(limit_rows) or 1
+                progress_bar.progress(min(done / denominator, 0.99))
+                detail = f" — {message}" if message else ""
+                if expected:
+                    progress_text.text(
+                        f"Accepted {done:,} of up to {min(int(limit_rows), expected):,} publications{detail}"
+                    )
+                else:
+                    progress_text.text(f"Accepted {done:,} publications{detail}")
+
+            fetch_error: str = ""
+            try:
+                with st.spinner(
+                    "Fetching Scopus publications, OpenAlex metadata, Aurora SDG labels, and ASJC subjects..."
+                ):
+                    result = fetch_author_sdg_publications(
+                        selected_author_id,
+                        year_key=year_key,
+                        docs_key=docs_key,
+                        model=sdg_model,
+                        limit_rows=int(limit_rows),
+                        progress_callback=progress_callback,
+                    )
+                    st.session_state.sdg_publication_result = {
+                        "author_id": selected_author_id,
+                        "author_label": selected_label,
+                        "year_key": year_key,
+                        "docs_key": docs_key,
+                        "model": sdg_model,
+                        "limit": int(limit_rows),
+                        "result": result,
+                    }
+                    if result.rows:
+                        progress_text.text(
+                            f"Fetched {len(result.rows):,} publication rows. Resolving ASJC subjects…"
+                        )
+                        _ensure_asjc_subject_cache(result.rows, show_progress=True)
+                progress_bar.progress(1.0)
+                progress_text.text(f"Fetched {len(result.rows):,} publication rows.")
+            except (SDGServiceError, ValueError) as exc:
+                fetch_error = str(exc)
+            except Exception as exc:
+                fetch_error = (
+                    "An unexpected error occurred while fetching publications. "
+                    f"Details: {type(exc).__name__}: {exc}"
+                )
+            if fetch_error:
+                st.session_state.sdg_publication_error = fetch_error
+                progress_bar.empty()
+                progress_text.empty()
+
+        if st.session_state.get("sdg_publication_error"):
+            st.error(st.session_state.sdg_publication_error)
+
+        payload = st.session_state.get("sdg_publication_result")
+        if not payload:
+            return
+        result = payload.get("result")
+        rows = list(getattr(result, "rows", []) or [])
+
+        # Warn if the user has changed filters since the last fetch without re-running
+        _payload_year = payload.get("year_key")
+        _payload_docs = payload.get("docs_key")
+        _payload_author = payload.get("author_id")
+        if (
+            _payload_author != selected_author_id
+            or _payload_year != year_key
+            or _payload_docs != docs_key
+        ):
+            st.warning(
+                "The filters or author selection have changed since the last fetch. "
+                "Click **Run Publications Analysis** again to refresh the results.",
+                icon=":material/refresh:",
+            )
+
+        st.success(
+            f"Loaded **{len(rows):,}** publication rows for **{payload.get('author_label')}** "
+            f"({getattr(result, 'from_date', '')} – {getattr(result, 'to_date', '')}). "
+            "Use the tabs below to explore publications, the co-affiliation network, SDG classifications, and OA status."
+        )
+        _render_fetch_transparency(getattr(result, "stats", None), len(rows))
+        if not rows:
+            st.info("No publication rows were returned for the selected filters.")
+            return
+
+        st.markdown(
+            """
+<style>
+/* Make the analysis-result tabs larger and more prominent */
+div[data-testid="stTabs"] button[data-baseweb="tab"] {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    padding: 10px 22px !important;
+    color: #475569 !important;
+    border-bottom: 3px solid transparent !important;
+    transition: color 0.15s, border-color 0.15s !important;
+    gap: 6px !important;
+}
+div[data-testid="stTabs"] button[data-baseweb="tab"]:hover {
+    color: #4f46e5 !important;
+    background: #f1f0fe !important;
+    border-radius: 8px 8px 0 0 !important;
+}
+div[data-testid="stTabs"] button[aria-selected="true"][data-baseweb="tab"] {
+    color: #4f46e5 !important;
+    border-bottom: 3px solid #4f46e5 !important;
+    background: transparent !important;
+}
+</style>
+""",
+            unsafe_allow_html=True,
+        )
+        tab_publications, tab_asjc, tab_network, tab_summary, tab_oa = st.tabs(
+            ["📄  Publications", "🏷️  Subject (ASJC)", "🔗  Network", "🌱  SDG Summary", "🔓  OA Analysis"]
+        )
+        with tab_publications:
+            st.markdown("#### Publication type breakdown")
+            _render_pub_type_breakdown(rows)
+            st.divider()
+            preview_df = _publication_preview_df(rows)
+            st.dataframe(preview_df, use_container_width=True, hide_index=True)
+            with st.container(border=False, key="download_publications_csv_row"):
+                st.download_button(
+                    "Download Publications CSV",
+                    rows_to_csv_bytes(_enrich_publication_rows_with_asjc(rows)),
+                    file_name=f"sdg-publications-{payload.get('author_id')}.csv",
+                    mime="text/csv",
+                    key="download_sdg_publications_csv",
+                    use_container_width=True,
+                )
+        with tab_asjc:
+            _render_asjc_subjects(rows)
+        with tab_network:
+            st.markdown("#### Co-affiliation network")
+            st.caption(
+                "Each node is an institution (from OpenAlex authorship affiliations on each row). "
+                "An edge means two institutions appeared together on at least one publication. "
+                "When works were discovered via Scopus AU-ID, rows are still filled from OpenAlex by DOI, "
+                "so this view matches a direct OpenAlex fetch. "
+                "Link-strength on a node sums edge weights to partners (not the same as publication count — "
+                "see hover publications in this view)."
+            )
+            _render_sdg_coaffiliation_network(rows)
+        with tab_summary:
+            _render_sdg_distribution(rows)
+            st.divider()
+            _render_abstract_wordcloud(rows)
+        with tab_oa:
+            _render_oa_ratio(rows)
+            st.divider()
+            _render_oa_by_author(rows)
+            st.divider()
+            _render_oa_volume_by_month(rows)
 
 
 def _enabled_metric_ids(metrics: list) -> list:
@@ -4817,26 +6493,45 @@ def _render_compare_authors_charts(valid: list, label_map: dict) -> None:
                     )
 
 
-def _merge_scopus_author_id_into_search_box(new_id: str) -> str:
-    """Merge resolved ID into ``scopus_author_ids``. Returns ``added``, ``duplicate``, or ``noop``."""
-    new_id = (new_id or "").strip()
-    if not new_id:
-        return "noop"
-    existing = (st.session_state.get("scopus_author_ids") or "").strip()
-    if not existing:
-        st.session_state.scopus_author_ids = new_id
-        return "added"
-    parts = [x.strip() for x in re.split(r"[,\n;]+", existing) if x.strip()]
-    if new_id in parts:
-        return "duplicate"
-    if "\n" in existing:
-        sep = "\n"
-    elif "," in existing:
-        sep = ", "
-    else:
-        sep = "\n"
-    st.session_state.scopus_author_ids = existing + sep + new_id
-    return "added"
+def _document_type_series_for_chart(
+    breakdown: dict | None, years: list[int], chart_type: str
+) -> list[dict]:
+    """Build stacked ECharts series for publication counts by document type."""
+    if not breakdown:
+        return []
+    by_year = breakdown.get("byYear") or {}
+    if not by_year:
+        return []
+
+    labels = [it.get("label") for it in (breakdown.get("items") or []) if it.get("label")]
+    if not labels:
+        labels = list(by_year.keys())
+
+    series: list[dict] = []
+    for label in labels:
+        year_map = by_year.get(label) or {}
+        display_label = "Other / residual" if label == "Other" else label
+        data: list[int | float] = []
+        for y in years:
+            val = year_map.get(str(y))
+            if val is None:
+                val = year_map.get(y)
+            data.append(val if val is not None else 0)
+        if not any(data):
+            continue
+        entry: dict = {
+            "name": display_label,
+            "type": chart_type.lower(),
+            "stack": "publications",
+            "data": data,
+            "itemStyle": {"color": DOCUMENT_TYPE_CHART_COLORS.get(display_label, "#64748b")},
+            "emphasis": {"focus": "series"},
+        }
+        if chart_type == "Line":
+            entry["smooth"] = True
+            entry["areaStyle"] = {"opacity": 0.2}
+        series.append(entry)
+    return series
 
 
 def _invoke_notice_dialog(body: str, *, variant: str = "warning") -> None:
@@ -4867,6 +6562,21 @@ def _render_notice_dialog() -> None:
             st.session_state.pop("_notice_dialog_body", None)
             st.session_state.pop("_notice_dialog_variant", None)
             st.rerun()
+
+
+def _render_author_results_metadata(
+    data_source: dict | None,
+    docs_key: str,
+) -> None:
+    """Source/year metadata and selected document-type filter."""
+    doc_filter_label = DOCS_OPTIONS_DISPLAY.get(docs_key, docs_key)
+    if data_source:
+        st.caption(
+            f"Source: {data_source.get('sourceName', '')} · "
+            f"Updated: {data_source.get('lastUpdated', '')} · "
+            f"Years: {data_source.get('metricStartYear', '')}–{data_source.get('metricEndYear', '')} · "
+            f"Document Type filter: {doc_filter_label}"
+        )
 
 
 def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
@@ -4995,20 +6705,19 @@ def main() -> None:
             """
 <div class="disclaimer-card-wrap">
   <div class="disclaimer-card">
-    <p class="disclaimer-heading"><span aria-hidden="true">⚠️</span> Research Impact Dashboard — Disclaimer</p>
+    <p class="disclaimer-heading"><span aria-hidden="true">⚠️</span> Disclaimer</p>
     <p>
-      This dashboard provides a high-level summary of research-impact indicators using Elsevier&rsquo;s SciVal APIs.
-      It is intended as a starting point for exploration, not a substitute for the full SciVal platform.
-      For granular benchmarking and comprehensive longitudinal data, please consult the
-      <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a> via HKUST Library.
+      This tool provides a basic summary of SciVal&rsquo;s research-impact indicators. It is meant to be
+      a starting point for exploration, not a substitute for the full
+      <a href="https://lbdiscover.hkust.edu.hk/bib/991012525864503412" target="_blank" rel="noopener noreferrer">SciVal platform</a>.
     </p>
+    <ul>
+      <li>Accuracy depends on a correct Scopus Author ID and profile.</li>
+      <li>Regularly check &amp; verify your profile so citations &amp; publications are correct.</li>
+    </ul>
     <p>
-      <strong>Important: Metric accuracy depends on a correct Scopus Author ID and profile. We strongly recommend
-      verifying your profile so that citations and publications are attributed correctly.</strong>
-    </p>
-    <p>
-      Where institutional policy governs hiring, reappointment, tenure, or promotion, do not rely on this dashboard
-      alone; follow unit- and university-approved evidence and procedures.
+      Do <strong>NOT</strong> rely on this tool as the sole source of evidence for decisions relating to recruitment, reappointment, tenure, promotion, or other personnel matters.
+      Instead, follow unit and university-approved evidence &amp; procedures.
     </p>
     <div class="disclaimer-links">
       Resources:
@@ -5032,7 +6741,6 @@ def main() -> None:
     analyze_metrics_inline = False
     with st.container():
         with st.container(border=True, key="search_shell"):
-            # Extra width on the right so “Find Scopus Author ID” fits on one line
             _hdr_l, _hdr_r = st.columns([11, 5])
             with _hdr_l:
                 st.markdown(
@@ -5063,36 +6771,38 @@ def main() -> None:
             _parsed_header_ids = [
                 x.strip() for x in re.split(r"[,\n;]+", _raw_header_ids) if x.strip()
             ]
-            _limit_cls_header = (
-                "author-limit-hint--warn"
+            _count_cls = (
+                " scopus-id-count--warn"
                 if len(_parsed_header_ids) > MAX_AUTHORS_PER_RUN
-                else "author-limit-hint--ok"
+                else ""
             )
-            st.markdown(
-                '<div class="author-input-header-row">'
-                '<span class="author-input-header-title">Scopus Author ID</span>'
-                '<div class="author-limit-hint author-limit-hint-inline '
-                f'{_limit_cls_header}"><span class="minimal-filter-icon-badge '
-                'minimal-filter-icon-badge--compact minimal-filter-icon-badge--users '
-                f'author-limit-icon" aria-hidden="true">{_FILTER_ICON_USERS}</span>'
-                "<span><strong>Search up to "
-                f"{MAX_AUTHORS_PER_RUN} author IDs in one run.</strong> "
-                "Use commas, semicolons, or line breaks to separate entries. "
-                '<span class="author-limit-count">'
-                f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} entered"
-                "</span></span></div></div>",
-                unsafe_allow_html=True,
-            )
-            author_ids = st.text_area(
-                "Scopus Author ID",
-                placeholder=(
-                    "Enter Scopus Author ID(s). Don't know your ID? "
-                    "Use Find Scopus Author ID above."
-                ),
-                label_visibility="collapsed",
-                key="scopus_author_ids",
-                height=96,
-            )
+            with st.container(border=True, key="scopus_id_section"):
+                st.markdown(
+                    '<div class="scopus-id-section">'
+                    '<div class="scopus-id-section-head">Scopus Author ID: '
+                    f'<span class="scopus-id-count{_count_cls}" aria-live="polite" '
+                    f'title="Updates as you enter IDs in the field below">'
+                    f"{len(_parsed_header_ids)}/{MAX_AUTHORS_PER_RUN} IDs entered"
+                    "</span></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "- **HKUST researchers** &ndash; Look for your Scopus ID in your "
+                    "[Research Portal profile](https://researchportal.hkust.edu.hk/en/persons/)\n"
+                    "- Not there, or not an HKUST researcher? Try searching "
+                    "[Scopus](https://lbdiscover.hkust.edu.hk/bib/991000319279703412) itself "
+                    "[(guide)](https://elsevier.libguides.com/Scopus/author-profile)."
+                )
+                author_ids = st.text_area(
+                    "Scopus Author ID",
+                    placeholder=(
+                        "Enter up to 10 Scopus IDs per search. Use commas, semicolons "
+                        "or line breaks to separate ID numbers."
+                    ),
+                    label_visibility="collapsed",
+                    key="scopus_author_ids",
+                    height=96,
+                )
             parsed_author_ids = [
                 x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
             ]
@@ -5102,29 +6812,19 @@ def main() -> None:
                 st.markdown(
                     '<div class="minimal-filter-label">'
                     f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--calendar" '
-                    f'aria-hidden="true">{_FILTER_ICON_CALENDAR}</span>'
-                    '<span class="year-filter-label-with-tip">'
-                    "<span>Year</span>"
-                    '<span class="year-filter-tip" tabindex="0" role="button" '
-                    'aria-label="Year range information, details in tooltip">'
-                    f'<span class="minimal-filter-icon-badge minimal-filter-icon-badge--compact minimal-filter-icon-badge--info year-filter-tip-marker" aria-hidden="true">{_FILTER_ICON_INFO_SMALL}</span>'
-                    '<span class="year-filter-tip-popup" role="tooltip" '
-                    'id="year-range-options-tooltip">'
-                    f"{YEAR_FILTER_LABEL_TOOLTIP_HTML}"
-                    "</span></span></span></div>",
+                    f'aria-hidden="true">{_FILTER_ICON_CALENDAR}</span><span>Year</span></div>',
                     unsafe_allow_html=True,
                 )
-                _year_help_key = st.session_state.get("year_filter_select", "5yrs")
+                _year_default = st.session_state.get("year_filter_select", "5yrs")
+                if _year_default not in YEAR_FILTER_KEYS:
+                    _year_default = "5yrs"
                 year_key = st.selectbox(
                     "Year",
-                    options=list(YEAR_OPTIONS.keys()),
+                    options=YEAR_FILTER_KEYS,
                     format_func=lambda k: YEAR_OPTIONS_DISPLAY[k],
-                    index=list(YEAR_OPTIONS.keys()).index("5yrs"),
+                    index=YEAR_FILTER_KEYS.index(_year_default),
                     label_visibility="collapsed",
                     key="year_filter_select",
-                    help=YEAR_SELECT_HELP.get(
-                        _year_help_key, YEAR_SELECT_HELP["5yrs"]
-                    ),
                 )
             with fd:
                 st.markdown(
@@ -5420,6 +7120,7 @@ def main() -> None:
 
     results = st.session_state.results
     valid = [r for r in results if not (r.get("data") or {}).get("error")]
+    _results_docs_key = st.session_state.get("docs_filter_select", "AllPublicationTypes")
 
     if valid:
         with st.container(border=True):
@@ -5520,12 +7221,7 @@ def main() -> None:
                         unsafe_allow_html=True,
                     )
                     ds = d.get("dataSource")
-                    if ds:
-                        st.caption(
-                            f"Source: {ds.get('sourceName', '')} · "
-                            f"Updated: {ds.get('lastUpdated', '')} · "
-                            f"Years: {ds.get('metricStartYear', '')}–{ds.get('metricEndYear', '')}"
-                        )
+                    _render_author_results_metadata(ds, _results_docs_key)
 
                     order_opts = [
                         "publication",
@@ -5600,10 +7296,74 @@ def main() -> None:
                                 or plot_metric in ACADEMIC_CORPORATE_SUBMETRIC_IDS
                             )
                             metrics_payload = d.get("metrics") or {}
+                            doc_type_breakdown = d.get("documentTypeBreakdown") or {}
+                            doctype_series = (
+                                _document_type_series_for_chart(
+                                    doc_type_breakdown, years, chart_type
+                                )
+                                if plot_metric == "publication"
+                                else []
+                            )
                             by_year = _extract_metric_by_year(metrics_payload, plot_metric)
-                            if not by_year:
+                            if not by_year and not doctype_series:
                                 st.caption(
                                     "Chart is not available for this metric row (for example, H-Index)."
+                                )
+                            elif doctype_series:
+                                x_years = [str(y) for y in years]
+                                _yaxis_single = {
+                                    "type": "value",
+                                    "name": "Publications",
+                                    "nameLocation": "middle",
+                                    "nameGap": 50,
+                                    "nameRotate": 90,
+                                    "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                }
+                                echarts_options = {
+                                    "animation": True,
+                                    "title": {
+                                        "text": "Publications by document type",
+                                        "left": "center",
+                                        "top": 8,
+                                        "textStyle": {"fontSize": 15},
+                                    },
+                                    "tooltip": {"trigger": "axis"},
+                                    "legend": {
+                                        "show": True,
+                                        "bottom": 0,
+                                        "type": "scroll",
+                                    },
+                                    "toolbox": {
+                                        **_compare_toolbox(),
+                                        "top": 8,
+                                        "right": 40,
+                                    },
+                                    "grid": {
+                                        "left": "10%",
+                                        "right": "5%",
+                                        "top": 84,
+                                        "bottom": 96,
+                                        "containLabel": True,
+                                    },
+                                    "xAxis": {
+                                        "type": "category",
+                                        "name": "Year",
+                                        "nameLocation": "middle",
+                                        "nameGap": 28,
+                                        "nameTextStyle": {"fontSize": 11, "color": "#475569"},
+                                        "data": x_years,
+                                    },
+                                    "yAxis": _yaxis_single,
+                                    "series": doctype_series,
+                                    "dataZoom": [
+                                        {"type": "inside"},
+                                        {"type": "slider", "height": 18, "bottom": 36},
+                                    ],
+                                }
+                                st_echarts(
+                                    options=echarts_options,
+                                    height="500px",
+                                    key=f"echarts_{aid}_{plot_metric}_doctype",
                                 )
                             else:
                                 values = [by_year.get(str(y)) for y in years]
@@ -5751,6 +7511,8 @@ def main() -> None:
                             metrics=d.get("metrics"),
                             data_source=d.get("dataSource"),
                         )
+
+        _render_sdg_publications_section(valid, year_key, docs_key)
 
     elif results:
         for r in results:

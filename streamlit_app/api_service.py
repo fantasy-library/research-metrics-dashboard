@@ -23,6 +23,7 @@ from streamlit_app.config import (
     SCIVAL_USER_AGENT,
     SUPABASE_ANON_KEY,
     USE_DIRECT_API,
+    scival_api_key_candidates,
     scival_httpx_verify,
     supabase_proxy_url,
 )
@@ -157,7 +158,7 @@ _rate_limiter = _RateLimiter()
 
 
 def _retry_with_backoff(operation):
-    """Retry rate-limited SciVal calls. Do not retry read/connect timeouts (avoids long silent spinners)."""
+    """Retry rate-limited SciVal calls only. Auth / other API errors fail immediately (no sleep)."""
     last_err: Optional[Exception] = None
     max_attempts = RATE_LIMIT_CONFIG["retry_attempts"]
     base_delay = RATE_LIMIT_CONFIG["retry_delay"]
@@ -167,7 +168,8 @@ def _retry_with_backoff(operation):
             return operation()
         except APIError as e:
             last_err = e
-            if not e.is_rate_limit_error and attempt > 1:
+            # Never backoff on invalid keys — caller may switch to SCIVAL_API_KEY_1/2 immediately.
+            if not e.is_rate_limit_error:
                 raise
         except httpx.TimeoutException as e:
             last_err = e
@@ -180,6 +182,7 @@ def _retry_with_backoff(operation):
             break
         except Exception as e:
             last_err = e
+            raise APIError(str(e)) from e
         if attempt >= max_attempts:
             break
         delay = base_delay * (mult ** (attempt - 1)) + random.random()
@@ -213,7 +216,11 @@ def is_missing_scival_api_key_error(message: str) -> bool:
 def is_scival_authentication_error(message: str) -> bool:
     """HTTP 401 / invalid key — same message for every author; show once, skip per-author retries."""
     low = message.lower()
+    if "apikey_invalid" in low or "provided apikey is invalid" in low:
+        return True
     if "api error (401)" in low:
+        return True
+    if "api authentication failed" in low:
         return True
     if "authentication failed" in low and (
         "scival" in low
@@ -277,6 +284,14 @@ def _metric_query_params(
         if inst:
             params["insttoken"] = inst
     return params
+
+
+def _is_apikey_invalid_response(status_code: int, body: str) -> bool:
+    """Elsevier often returns APIKEY_INVALID with 401 (sometimes other 4xx)."""
+    if status_code == 401:
+        return True
+    low = (body or "").lower()
+    return "apikey_invalid" in low or "provided apikey is invalid" in low
 
 
 def _extract_scival_error_detail(body: str) -> str:
@@ -597,9 +612,44 @@ class APIService:
             trust_env=True,
             verify=scival_httpx_verify(),
         )
+        # After the first successful key, reuse it for later metric calls in this session.
+        self._preferred_key: Optional[tuple[str, bool]] = None  # (api_key, use_insttoken)
+        self._rejected_keys: set[str] = set()
 
     def close(self) -> None:
         self._client.close()
+
+    def _ordered_key_candidates(
+        self, custom_api_key: Optional[str]
+    ) -> list[tuple[str, bool, str]]:
+        """Prefer a known-good key; skip keys that already returned APIKEY_INVALID this session."""
+        candidates = scival_api_key_candidates(custom_api_key)
+        if self._rejected_keys:
+            candidates = [
+                (k, use_inst, label)
+                for k, use_inst, label in candidates
+                if k not in self._rejected_keys
+            ]
+        if not candidates:
+            # All tried keys failed auth — allow a fresh pass (e.g. user updated Settings).
+            self._rejected_keys.clear()
+            self._preferred_key = None
+            candidates = scival_api_key_candidates(custom_api_key)
+        if self._preferred_key:
+            pk, pu = self._preferred_key
+            preferred = [
+                (k, use_inst, label)
+                for k, use_inst, label in candidates
+                if k == pk and use_inst == pu
+            ]
+            rest = [
+                (k, use_inst, label)
+                for k, use_inst, label in candidates
+                if not (k == pk and use_inst == pu)
+            ]
+            if preferred:
+                return preferred + rest
+        return candidates
 
     def _make_supabase_request(
         self,
@@ -641,25 +691,19 @@ class APIService:
 
         return _retry_with_backoff(op)
 
-    def _fetch_direct_metric(
+    def _fetch_direct_metric_once(
         self,
         author_id: str,
         metric_type: str,
         by_year: bool,
-        custom_api_key: Optional[str],
+        api_key: str,
         year_range: str,
         include_self_citations: str,
         included_docs: str,
+        use_insttoken: bool,
     ) -> Any:
-        api_key = (custom_api_key or SCIVAL_API_KEY or "").strip()
-        if not api_key:
-            raise APIError(
-                "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
-                "or ELSEVIER_API_KEY (or enter a key in Settings)."
-            )
-        # Auth via X-ELS-* headers (default). Keys in the URL trigger Cloudflare when opened in Chrome
-        # and are optional on the query string (SCIVAL_AUTH_IN_QUERY=true).
-        inst = (ELSEVIER_INSTTOKEN or "").strip()
+        # Auth via X-ELS-* headers (default). Backup keys never send insttoken; primary/Settings may.
+        inst = (ELSEVIER_INSTTOKEN or "").strip() if use_insttoken else ""
         params = _metric_query_params(
             author_id,
             metric_type,
@@ -689,6 +733,12 @@ class APIService:
                             "Rate limit exceeded. The system will automatically retry. "
                             "Please wait..."
                         )
+                    elif _is_apikey_invalid_response(r.status_code, text):
+                        detail = _extract_scival_error_detail(text)
+                        msg = format_error_message_for_user(
+                            f"API Error (401): {detail or text[:900]}"
+                        )
+                        raise APIError(msg, 401, is_ent, is_rl)
                     elif (
                         "ENTITLEMENTS_ERROR" in text
                         or "Not entitled to the resource" in text
@@ -721,6 +771,49 @@ class APIService:
                 _rate_limiter.release()
 
         return _retry_with_backoff(op)
+
+    def _fetch_direct_metric(
+        self,
+        author_id: str,
+        metric_type: str,
+        by_year: bool,
+        custom_api_key: Optional[str],
+        year_range: str,
+        include_self_citations: str,
+        included_docs: str,
+    ) -> Any:
+        candidates = self._ordered_key_candidates(custom_api_key)
+        if not candidates:
+            raise APIError(
+                "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
+                "SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2, or ELSEVIER_API_KEY (or enter a key in Settings)."
+            )
+
+        last_err: Optional[APIError] = None
+        for i, (api_key, use_insttoken, _label) in enumerate(candidates):
+            try:
+                result = self._fetch_direct_metric_once(
+                    author_id,
+                    metric_type,
+                    by_year,
+                    api_key,
+                    year_range,
+                    include_self_citations,
+                    included_docs,
+                    use_insttoken,
+                )
+                self._preferred_key = (api_key, use_insttoken)
+                return result
+            except APIError as e:
+                last_err = e
+                auth_fail = e.status_code == 401 or is_scival_authentication_error(str(e))
+                if auth_fail:
+                    self._rejected_keys.add(api_key)
+                    if i < len(candidates) - 1:
+                        continue
+                raise
+        assert last_err is not None
+        raise last_err
 
     @staticmethod
     def _process_h_index(data: Any) -> Dict[str, Any]:
@@ -774,6 +867,172 @@ class APIService:
         except (KeyError, IndexError, TypeError):
             total = "N/A"
         return {"byYear": self._normalize_year_data(by_year), "total": total}
+
+    @staticmethod
+    def _extract_scholarly_output_total(total_data: Any) -> Optional[float]:
+        try:
+            val = total_data["results"][0]["metrics"][0].get("value")
+        except (KeyError, IndexError, TypeError):
+            return None
+        if isinstance(val, (int, float)):
+            return float(val)
+        if isinstance(val, str):
+            try:
+                return float(val.strip())
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _extract_scholarly_output_by_year(year_data: Any) -> Dict[str, float]:
+        try:
+            by_year = year_data["results"][0]["metrics"][0].get("valueByYear") or {}
+        except (KeyError, IndexError, TypeError):
+            by_year = {}
+        out: Dict[str, float] = {}
+        if not isinstance(by_year, dict):
+            return out
+        for year_str, value in by_year.items():
+            try:
+                int(year_str)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(value, dict) and value is not None and "value" in value:
+                out[str(year_str)] = round(float(value["value"]), 2)
+            elif isinstance(value, (int, float)):
+                out[str(year_str)] = round(float(value), 2)
+            else:
+                out[str(year_str)] = 0.0
+        return out
+
+    @staticmethod
+    def _year_map_value(data: Dict[str, float], year: str | int) -> float:
+        ys = str(year)
+        if ys in data:
+            return float(data[ys])
+        try:
+            return float(data.get(int(ys), 0.0))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return 0.0
+
+    @staticmethod
+    def _format_document_type_count(count: float) -> int | float:
+        if count == int(count):
+            return int(count)
+        return round(count, 2)
+
+    @classmethod
+    def _build_document_type_breakdown_from_year_series(
+        cls,
+        *,
+        articles_only: Dict[str, float],
+        articles_reviews: Dict[str, float],
+        articles_conf: Dict[str, float],
+        books: Dict[str, float],
+        all_types: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
+        years: set[str] = set()
+        for bucket in (articles_only, articles_reviews, articles_conf, books):
+            years.update(str(y) for y in bucket.keys())
+        if all_types:
+            years.update(str(y) for y in all_types.keys())
+
+        by_year: Dict[str, Dict[str, int | float]] = {
+            "Articles": {},
+            "Reviews": {},
+            "Conference papers": {},
+            "Books & book chapters": {},
+            "Other": {},
+        }
+
+        for year in sorted(years, key=lambda y: int(y)):
+            articles = cls._year_map_value(articles_only, year)
+            reviews = max(0.0, cls._year_map_value(articles_reviews, year) - articles)
+            conference = max(0.0, cls._year_map_value(articles_conf, year) - articles)
+            books_count = cls._year_map_value(books, year)
+            if all_types is not None:
+                total_y = cls._year_map_value(all_types, year)
+                other = max(0.0, total_y - articles - reviews - conference - books_count)
+            else:
+                other = 0.0
+
+            for label, count in (
+                ("Articles", articles),
+                ("Reviews", reviews),
+                ("Conference papers", conference),
+                ("Books & book chapters", books_count),
+                ("Other", other),
+            ):
+                if count > 0:
+                    by_year[label][year] = cls._format_document_type_count(count)
+
+        items: List[Dict[str, Any]] = []
+        by_year_clean: Dict[str, Dict[str, int | float]] = {}
+        for label, year_map in by_year.items():
+            if not year_map:
+                continue
+            by_year_clean[label] = year_map
+            total_count = sum(float(v) for v in year_map.values())
+            items.append(
+                {"label": label, "count": cls._format_document_type_count(total_count)}
+            )
+
+        grand_total = sum(float(it["count"]) for it in items)
+        return {
+            "total": cls._format_document_type_count(grand_total) if items else 0,
+            "items": items,
+            "byYear": by_year_clean,
+        }
+
+    def _fetch_document_type_breakdown(
+        self,
+        author_id: str,
+        custom_api_key: Optional[str],
+        year_range: str,
+        *,
+        all_by_year: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
+        """Derive publication counts by document type via SciVal ``includedDocs`` buckets."""
+        bucket_docs = {
+            "articlesOnly": "ArticlesOnly",
+            "articlesReviews": "ArticlesReviews",
+            "articlesConference": "ArticlesConferencePapers",
+            "books": "BooksAndBookChapters",
+        }
+        fetched: Dict[str, Dict[str, float]] = {}
+        for key, included_docs in bucket_docs.items():
+            time.sleep(0.2)
+            data = self._fetch_direct_metric(
+                author_id,
+                "ScholarlyOutput",
+                True,
+                custom_api_key,
+                year_range,
+                "false",
+                included_docs,
+            )
+            fetched[key] = self._extract_scholarly_output_by_year(data)
+
+        if all_by_year is None:
+            time.sleep(0.2)
+            all_data = self._fetch_direct_metric(
+                author_id,
+                "ScholarlyOutput",
+                True,
+                custom_api_key,
+                year_range,
+                "false",
+                "AllPublicationTypes",
+            )
+            all_by_year = self._extract_scholarly_output_by_year(all_data)
+
+        return self._build_document_type_breakdown_from_year_series(
+            articles_only=fetched["articlesOnly"],
+            articles_reviews=fetched["articlesReviews"],
+            articles_conf=fetched["articlesConference"],
+            books=fetched["books"],
+            all_types=all_by_year,
+        )
 
     def _process_fwci(self, year_data: Any, total_data: Any) -> Dict[str, Any]:
         try:
@@ -1148,6 +1407,20 @@ class APIService:
         else:
             _apply_academic_corporate_submetrics(metrics, None)
 
+        document_type_breakdown: Dict[str, Any] = {"total": None, "items": [], "byYear": {}}
+        try:
+            all_by_year: Optional[Dict[str, float]] = None
+            if included_docs == "AllPublicationTypes" and so_year is not None:
+                all_by_year = self._extract_scholarly_output_by_year(so_year)
+            document_type_breakdown = self._fetch_document_type_breakdown(
+                author_id,
+                custom_api_key,
+                year_range,
+                all_by_year=all_by_year,
+            )
+        except Exception:
+            document_type_breakdown = {"total": None, "items": [], "byYear": {}}
+
         return {
             "authorName": author_name,
             "dataSource": {
@@ -1160,6 +1433,7 @@ class APIService:
                 or datetime.utcnow().year,
             },
             "metrics": metrics,
+            "documentTypeBreakdown": document_type_breakdown,
         }
 
     def get_author_metrics(
@@ -1348,10 +1622,11 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
     When the API returns multiple Scopus profiles for one ORCID, the **first**
     profile in the response is used.
     """
-    key = (api_key or SCIVAL_API_KEY or "").strip()
-    if not key:
+    candidates = scival_api_key_candidates(api_key)
+    if not candidates:
         raise APIError(
-            "SciVal API key required for this lookup (set SCIVAL_API_KEY or ELSEVIER_API_KEY)."
+            "SciVal API key required for this lookup (set SCIVAL_API_KEY, "
+            "SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2, or ELSEVIER_API_KEY)."
         )
 
     extracted = _extract_orcid_from_input(orcid)
@@ -1369,63 +1644,74 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
         )
 
     base = f"https://api.elsevier.com/analytics/scival/author/orcid/{formatted}"
-    inst = (ELSEVIER_INSTTOKEN or "").strip()
-    params: Dict[str, str] = {"httpAccept": "text/xml"}
-    if SCIVAL_AUTH_IN_QUERY and inst:
-        params["insttoken"] = inst
+    last_err: Optional[APIError] = None
 
-    headers = {
-        "Accept": "application/xml, text/xml, application/json;q=0.9",
-        "X-ELS-APIKey": key,
-        "User-Agent": SCIVAL_USER_AGENT,
-    }
-    if inst:
-        headers["X-ELS-Insttoken"] = inst
+    for i, (key, use_insttoken, _label) in enumerate(candidates):
+        params: Dict[str, str] = {"httpAccept": "text/xml"}
+        inst = (ELSEVIER_INSTTOKEN or "").strip() if use_insttoken else ""
+        if SCIVAL_AUTH_IN_QUERY and inst:
+            params["insttoken"] = inst
 
-    client = httpx.Client(
-        timeout=httpx.Timeout(45.0, connect=10.0),
-        proxy=_scival_http_client_proxy(),
-        trust_env=True,
-        verify=scival_httpx_verify(),
-    )
-    try:
+        headers = {
+            "Accept": "application/xml, text/xml, application/json;q=0.9",
+            "X-ELS-APIKey": key,
+            "User-Agent": SCIVAL_USER_AGENT,
+        }
+        if inst:
+            headers["X-ELS-Insttoken"] = inst
+
+        client = httpx.Client(
+            timeout=httpx.Timeout(45.0, connect=10.0),
+            proxy=_scival_http_client_proxy(),
+            trust_env=True,
+            verify=scival_httpx_verify(),
+        )
         try:
-            r = client.get(base, params=params, headers=headers)
-        except httpx.ConnectError as e:
-            err_s = str(e).lower()
-            if "certificate" in err_s or "ssl" in err_s:
-                raise APIError(
-                    "Secure connection to Elsevier failed (TLS certificate verification). "
-                    "The app uses the certifi CA bundle by default. If you are on a managed network, "
-                    "set SCIVAL_SSL_CA_BUNDLE to your institution's PEM root bundle. "
-                    "Only if you understand the risk: SCIVAL_SSL_VERIFY=false turns off verification."
-                ) from e
-            raise
-        if not r.is_success:
-            text = (r.text or "").strip()
-            if _response_looks_like_cloudflare(r.status_code, text):
-                raise APIError(format_error_message_for_user(text), r.status_code)
-            if r.status_code == 404:
-                raise APIError("No researcher found for this identifier in the SciVal database.")
-            if r.status_code == 401:
-                raise APIError("API authentication failed. Check API key.")
-            if r.status_code == 403:
-                raise APIError("API access denied. Check API key permissions.")
-            raise APIError(f"API request failed with status {r.status_code}")
-
-        text = (r.text or "").strip()
-        ct = (r.headers.get("content-type") or "").lower()
-
-        if "json" in ct or text.startswith("{"):
             try:
-                data = r.json()
-                return _parse_scival_author_orcid_json(data)
-            except json.JSONDecodeError:
-                pass
+                r = client.get(base, params=params, headers=headers)
+            except httpx.ConnectError as e:
+                err_s = str(e).lower()
+                if "certificate" in err_s or "ssl" in err_s:
+                    raise APIError(
+                        "Secure connection to Elsevier failed (TLS certificate verification). "
+                        "The app uses the certifi CA bundle by default. If you are on a managed network, "
+                        "set SCIVAL_SSL_CA_BUNDLE to your institution's PEM root bundle. "
+                        "Only if you understand the risk: SCIVAL_SSL_VERIFY=false turns off verification."
+                    ) from e
+                raise
+            if not r.is_success:
+                text = (r.text or "").strip()
+                if _response_looks_like_cloudflare(r.status_code, text):
+                    raise APIError(format_error_message_for_user(text), r.status_code)
+                if r.status_code == 404:
+                    raise APIError(
+                        "No researcher found for this identifier in the SciVal database."
+                    )
+                if r.status_code == 401:
+                    last_err = APIError("API authentication failed. Check API key.", 401)
+                    if i < len(candidates) - 1:
+                        continue
+                    raise last_err
+                if r.status_code == 403:
+                    raise APIError("API access denied. Check API key permissions.", 403)
+                raise APIError(f"API request failed with status {r.status_code}")
 
-        return _parse_scival_author_orcid_xml(text)
-    finally:
-        client.close()
+            text = (r.text or "").strip()
+            ct = (r.headers.get("content-type") or "").lower()
+
+            if "json" in ct or text.startswith("{"):
+                try:
+                    data = r.json()
+                    return _parse_scival_author_orcid_json(data)
+                except json.JSONDecodeError:
+                    pass
+
+            return _parse_scival_author_orcid_xml(text)
+        finally:
+            client.close()
+
+    assert last_err is not None
+    raise last_err
 
 
 def resolve_author_ids_for_metrics(

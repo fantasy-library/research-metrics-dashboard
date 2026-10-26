@@ -53,6 +53,7 @@ def _resolve_scival_api_key() -> str:
     for name in (
         "VITE_SCIVAL_API_KEY",
         "SCIVAL_API_KEY",
+        "SCOPUS_API_KEY",
         "ELSEVIER_API_KEY",
         "ELS_API_KEY",
     ):
@@ -64,6 +65,69 @@ def _resolve_scival_api_key() -> str:
 
 # Prefer explicit SciVal key; do not hardcode keys in source.
 SCIVAL_API_KEY: str = _resolve_scival_api_key()
+
+
+def _resolve_named_scival_backup(env_name: str) -> str:
+    """Backup keys (Railway/env): SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 — no insttoken needed."""
+    return _clean_scival_api_key(os.getenv(env_name))
+
+
+# Optional backups tried after primary/Settings key fails auth (HTTP 401).
+# These keys are used without ELSEVIER_INSTTOKEN.
+SCIVAL_API_KEY_1: str = _resolve_named_scival_backup("SCIVAL_API_KEY_1")
+SCIVAL_API_KEY_2: str = _resolve_named_scival_backup("SCIVAL_API_KEY_2")
+
+
+def scival_api_key_candidates(
+    custom_api_key: str | None = None,
+) -> list[tuple[str, bool, str]]:
+    """Ordered (api_key, use_insttoken, label) for direct Elsevier calls.
+
+    Primary / Settings keys may use ELSEVIER_INSTTOKEN when set.
+    SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 never send insttoken.
+    Duplicate (key, use_insttoken) pairs are skipped.
+    """
+    out: list[tuple[str, bool, str]] = []
+    seen: set[tuple[str, bool]] = set()
+
+    def add(key: str | None, use_insttoken: bool, label: str) -> None:
+        k = (key or "").strip()
+        if not k:
+            return
+        sig = (k, use_insttoken)
+        if sig in seen:
+            return
+        seen.add(sig)
+        out.append((k, use_insttoken, label))
+
+    custom = (custom_api_key or "").strip()
+    inst_available = bool(_resolve_insttoken())
+    if custom:
+        add(custom, inst_available, "settings")
+    else:
+        add(SCIVAL_API_KEY, inst_available, "primary")
+
+    add(SCIVAL_API_KEY_1, False, "SCIVAL_API_KEY_1")
+    add(SCIVAL_API_KEY_2, False, "SCIVAL_API_KEY_2")
+    return out
+
+
+def _resolve_scopus_content_api_key() -> str:
+    """API key used for Elsevier Scopus Content APIs such as AU-ID publication search."""
+    for name in (
+        "SCOPUS_API_KEY",
+        "ELSEVIER_API_KEY",
+        "ELS_API_KEY",
+        "VITE_SCIVAL_API_KEY",
+        "SCIVAL_API_KEY",
+    ):
+        v = _clean_scival_api_key(os.getenv(name))
+        if v:
+            return v
+    return ""
+
+
+SCOPUS_CONTENT_API_KEY: str = _resolve_scopus_content_api_key()
 
 
 def _resolve_insttoken() -> str:
@@ -81,6 +145,52 @@ def _resolve_insttoken() -> str:
 
 # Optional institutional token (Elsevier query param insttoken and/or header X-ELS-Insttoken)
 ELSEVIER_INSTTOKEN: str = _resolve_insttoken()
+
+
+def elsevier_credential_candidates(
+    custom_api_key: str | None = None,
+) -> list[tuple[str, str, str]]:
+    """Ordered (api_key, insttoken_or_empty, label) for Scopus Content / Publication Analysis.
+
+    Primary / Settings may include ELSEVIER_INSTTOKEN when set.
+    SCIVAL_API_KEY_1 / SCIVAL_API_KEY_2 never include insttoken.
+    """
+    out: list[tuple[str, str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    inst = (ELSEVIER_INSTTOKEN or "").strip()
+
+    def add(key: str | None, use_insttoken: bool, label: str) -> None:
+        k = (key or "").strip()
+        if not k:
+            return
+        tok = inst if use_insttoken else ""
+        sig = (k, tok)
+        if sig in seen:
+            return
+        seen.add(sig)
+        out.append((k, tok, label))
+
+    custom = (custom_api_key or "").strip()
+    if custom:
+        add(custom, bool(inst), "settings")
+    else:
+        add(SCOPUS_CONTENT_API_KEY, bool(inst), "scopus_primary")
+        add(SCIVAL_API_KEY, bool(inst), "primary")
+
+    add(SCIVAL_API_KEY_1, False, "SCIVAL_API_KEY_1")
+    add(SCIVAL_API_KEY_2, False, "SCIVAL_API_KEY_2")
+    return out
+
+
+# OpenAlex asks callers to identify themselves. Override in deployment with a contact email.
+OPENALEX_USER_AGENT: str = (
+    os.getenv("OPENALEX_USER_AGENT")
+    or os.getenv("HTTP_USER_AGENT")
+    or "HKUST Research Metrics Dashboard (mailto:library@ust.hk)"
+).strip()
+
+# Optional; currently reserved for future abstract backfill when Google Scholar is enabled.
+SERPAPI_API_KEY: str = (os.getenv("SERPAPI_API_KEY") or "").strip()
 
 # Optional HTTP(S) proxy for SciVal HTTP client only (Elsevier direct API + ORCID lookup).
 # Use when Cloudflare blocks your server's datacenter IP: point this at a library/campus proxy
