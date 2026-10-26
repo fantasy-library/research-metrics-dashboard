@@ -3323,6 +3323,8 @@ YEAR_FILTER_KEYS = (
     "10yrs",
 )
 MAX_AUTHORS_PER_RUN = 10
+# ORCID lookup can miss researchers whose Scopus profile is not linked. Hide until that copy is clearer.
+_SHOW_FIND_SCOPUS_AUTHOR_ID = False
 
 # Short labels for dropdowns (matches compact SaaS-style UI)
 YEAR_OPTIONS_DISPLAY = {
@@ -6798,30 +6800,39 @@ def main() -> None:
     analyze_metrics_inline = False
     with st.container():
         with st.container(border=True, key="search_shell"):
-            _hdr_l, _hdr_r = st.columns([11, 5])
-            with _hdr_l:
+            if _SHOW_FIND_SCOPUS_AUTHOR_ID:
+                _hdr_l, _hdr_r = st.columns([11, 5])
+                with _hdr_l:
+                    st.markdown(
+                        '<p class="search-config-title">Enter Scopus Author ID, select '
+                        "Search Scope and Metrics</p>",
+                        unsafe_allow_html=True,
+                    )
+                with _hdr_r:
+                    _panel_open = bool(st.session_state.get("find_scopus_panel_open"))
+                    _find_scopus_icon = (
+                        ":material/chevron_right:"
+                        if _panel_open
+                        else ":material/expand_more:"
+                    )
+                    if st.button(
+                        "Find Scopus Author ID",
+                        key="toggle_find_scopus_panel",
+                        use_container_width=True,
+                        type="secondary",
+                        icon=_find_scopus_icon,
+                    ):
+                        st.session_state.find_scopus_panel_open = not _panel_open
+            else:
                 st.markdown(
                     '<p class="search-config-title">Enter Scopus Author ID, select '
                     "Search Scope and Metrics</p>",
                     unsafe_allow_html=True,
                 )
-            with _hdr_r:
-                _panel_open = bool(st.session_state.get("find_scopus_panel_open"))
-                _find_scopus_icon = (
-                    ":material/chevron_right:"
-                    if _panel_open
-                    else ":material/expand_more:"
-                )
-                if st.button(
-                    "Find Scopus Author ID",
-                    key="toggle_find_scopus_panel",
-                    use_container_width=True,
-                    type="secondary",
-                    icon=_find_scopus_icon,
-                ):
-                    st.session_state.find_scopus_panel_open = not _panel_open
 
-            if st.session_state.get("find_scopus_panel_open"):
+            if _SHOW_FIND_SCOPUS_AUTHOR_ID and st.session_state.get(
+                "find_scopus_panel_open"
+            ):
                 _render_find_scopus_author_id_help(api_key_effective)
 
             _raw_header_ids = st.session_state.get("scopus_author_ids") or ""
