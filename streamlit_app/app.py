@@ -6975,33 +6975,6 @@ def main() -> None:
             unsafe_allow_html=True,
         )
 
-        _pub_author_ids = list(parsed_author_ids)
-        if not _pub_author_ids:
-            _pub_author_ids = [
-                x.strip()
-                for x in re.split(
-                    r"[,\n;]+", st.session_state.get("scopus_author_ids") or ""
-                )
-                if x.strip()
-            ]
-        _pub_authors_for_section: list[dict] = []
-        _metric_results = st.session_state.get("results") or []
-        if _metric_results:
-            _pub_authors_for_section = [
-                r
-                for r in _metric_results
-                if not (r.get("data") or {}).get("error")
-            ]
-        elif _pub_author_ids:
-            _pub_authors_for_section = [
-                {"id": aid, "data": {}}
-                for aid in _pub_author_ids[:MAX_AUTHORS_PER_RUN]
-            ]
-        if _pub_authors_for_section:
-            _render_sdg_publications_section(
-                _pub_authors_for_section, year_key, docs_key
-            )
-
         if not st.session_state.get("_deep_link_analyze_injected"):
             st.session_state._deep_link_analyze_injected = True
             components.html(_DEEP_LINK_ANALYZE_HTML, height=0, width=0)
@@ -7559,6 +7532,8 @@ def main() -> None:
                             metrics=d.get("metrics"),
                             data_source=d.get("dataSource"),
                         )
+
+        _render_sdg_publications_section(valid, year_key, docs_key)
 
     elif results:
         for r in results:
