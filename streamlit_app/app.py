@@ -1340,6 +1340,19 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 .minimal-filter-icon-badge--person svg {
   color: #15803d !important;
 }
+[class*="st-key-find_scopus_help_panel"] .find-scopus-banner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 1rem !important;
+  margin: 0 0 0.85rem 0 !important;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: #14532d !important;
+  letter-spacing: -0.02em !important;
+}
+[class*="st-key-find_scopus_help_panel"] .find-scopus-banner-badge {
+  flex-shrink: 0 !important;
+}
 .minimal-filter-icon-badge--users svg {
   color: #2563eb !important;
 }
