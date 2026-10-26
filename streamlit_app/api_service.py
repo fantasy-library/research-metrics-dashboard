@@ -12,15 +12,15 @@ import xml.etree.ElementTree as ET
 from collections import deque
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlencode
-
 import httpx
 
 from streamlit_app.config import (
     DIRECT_API_BASE,
     ELSEVIER_INSTTOKEN,
     SCIVAL_API_KEY,
+    SCIVAL_AUTH_IN_QUERY,
     SCIVAL_HTTP_PROXY,
+    SCIVAL_USER_AGENT,
     SUPABASE_ANON_KEY,
     USE_DIRECT_API,
     scival_httpx_verify,
@@ -224,6 +224,59 @@ def is_scival_authentication_error(message: str) -> bool:
     ):
         return True
     return False
+
+
+def _response_looks_like_cloudflare(status_code: int, body: str) -> bool:
+    """True when Elsevier/Cloudflare returned an HTML block page instead of SciVal JSON."""
+    low = (body or "").lower()
+    if "sorry, you have been blocked" in low or "unable to access elsevier" in low:
+        return True
+    if "cloudflare" in low and ("ray id" in low or "cf-ray" in low or "cf-error" in low):
+        return True
+    if status_code in (403, 429) and "cloudflare" in low:
+        return True
+    return False
+
+
+def _elsevier_scival_headers(api_key: str, inst: str) -> Dict[str, str]:
+    headers = {
+        "Accept": "application/json",
+        "X-ELS-APIKey": api_key,
+        "User-Agent": SCIVAL_USER_AGENT,
+    }
+    if inst:
+        headers["X-ELS-Insttoken"] = inst
+    return headers
+
+
+def _metric_query_params(
+    author_id: str,
+    metric_type: str,
+    by_year: bool,
+    year_range: str,
+    include_self_citations: str,
+    included_docs: str,
+    *,
+    api_key: str = "",
+    inst: str = "",
+) -> Dict[str, str]:
+    params: Dict[str, str] = {
+        "authors": author_id,
+        "metricTypes": metric_type,
+        "includedDocs": included_docs,
+        "yearRange": year_range,
+        "includeSelfCitations": include_self_citations,
+        "byYear": str(by_year).lower(),
+        "journalImpactType": "CiteScore",
+        "showAsFieldWeighted": "false",
+        "indexType": "hIndex",
+    }
+    if SCIVAL_AUTH_IN_QUERY:
+        if api_key:
+            params["apiKey"] = api_key
+        if inst:
+            params["insttoken"] = inst
+    return params
 
 
 def _extract_scival_error_detail(body: str) -> str:
@@ -604,42 +657,31 @@ class APIService:
                 "SciVal API key is not configured. Set SCIVAL_API_KEY, VITE_SCIVAL_API_KEY, "
                 "or ELSEVIER_API_KEY (or enter a key in Settings)."
             )
-        # Elsevier allows apiKey / insttoken on the query string (same pattern as author XML URLs).
-        # Institutional access often requires both; we also send X-ELS-* headers below.
+        # Auth via X-ELS-* headers (default). Keys in the URL trigger Cloudflare when opened in Chrome
+        # and are optional on the query string (SCIVAL_AUTH_IN_QUERY=true).
         inst = (ELSEVIER_INSTTOKEN or "").strip()
-        params: Dict[str, str] = {
-            "apiKey": api_key,
-            "authors": author_id,
-            "metricTypes": metric_type,
-            "includedDocs": included_docs,
-            "yearRange": year_range,
-            "includeSelfCitations": include_self_citations,
-            "byYear": str(by_year).lower(),
-            # Match Elsevier SciVal browser / Data Fetcher examples (see dev.elsevier.com SciVal payloads).
-            # Requests without these sometimes differ in behaviour across metric types or tenants.
-            "journalImpactType": "CiteScore",
-            "showAsFieldWeighted": "false",
-            "indexType": "hIndex",
-        }
-        if inst:
-            params["insttoken"] = inst
-        url = f"{DIRECT_API_BASE}?{urlencode(params)}"
-        headers = {
-            "Accept": "application/json",
-            "X-ELS-APIKey": api_key,
-            "User-Agent": "SciVal-Research-Dashboard/1.0",
-        }
-        if inst:
-            headers["X-ELS-Insttoken"] = inst
+        params = _metric_query_params(
+            author_id,
+            metric_type,
+            by_year,
+            year_range,
+            include_self_citations,
+            included_docs,
+            api_key=api_key,
+            inst=inst,
+        )
+        headers = _elsevier_scival_headers(api_key, inst)
 
         def op():
             _rate_limiter.acquire()
             try:
-                r = self._client.get(url, headers=headers)
+                r = self._client.get(DIRECT_API_BASE, params=params, headers=headers)
                 text = r.text
                 if not r.is_success:
                     is_ent = False
                     is_rl = False
+                    if _response_looks_like_cloudflare(r.status_code, text):
+                        raise APIError(format_error_message_for_user(text), r.status_code)
                     msg = f"API Error ({r.status_code}): {text}"
                     if r.status_code == 429 or "RATE_LIMIT_EXCEEDED" in text:
                         is_rl = True
@@ -1327,15 +1369,15 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
         )
 
     base = f"https://api.elsevier.com/analytics/scival/author/orcid/{formatted}"
-    params: Dict[str, str] = {"httpAccept": "text/xml"}
     inst = (ELSEVIER_INSTTOKEN or "").strip()
-    if inst:
+    params: Dict[str, str] = {"httpAccept": "text/xml"}
+    if SCIVAL_AUTH_IN_QUERY and inst:
         params["insttoken"] = inst
 
     headers = {
         "Accept": "application/xml, text/xml, application/json;q=0.9",
         "X-ELS-APIKey": key,
-        "User-Agent": "SciVal-Research-Dashboard/1.0",
+        "User-Agent": SCIVAL_USER_AGENT,
     }
     if inst:
         headers["X-ELS-Insttoken"] = inst
@@ -1360,6 +1402,9 @@ def lookup_scopus_id_from_orcid(orcid: str, api_key: Optional[str] = None) -> tu
                 ) from e
             raise
         if not r.is_success:
+            text = (r.text or "").strip()
+            if _response_looks_like_cloudflare(r.status_code, text):
+                raise APIError(format_error_message_for_user(text), r.status_code)
             if r.status_code == 404:
                 raise APIError("No researcher found for this identifier in the SciVal database.")
             if r.status_code == 401:

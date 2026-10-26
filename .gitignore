@@ -1,5 +1,9 @@
 # Leftover from old Node frontend (safe to delete locally)
 node_modules/
+frontend/
+
+# Local copy of Aurora SDG classifier (not part of this Streamlit app)
+Aurora-SDG-Publication-Classifier-Copy--main/
 
 # Python
 __pycache__/

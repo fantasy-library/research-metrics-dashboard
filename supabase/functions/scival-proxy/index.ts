@@ -26,6 +26,17 @@ interface FetchParams {
   yearRange: string;
   includeSelfCitations: string;
   byYear: string;
+  journalImpactType: string;
+  showAsFieldWeighted: string;
+  indexType: string;
+}
+
+function resolveInsttoken(): string {
+  return (
+    Deno.env.get('ELSEVIER_INSTTOKEN')?.trim() ||
+    Deno.env.get('VITE_ELSEVIER_INSTTOKEN')?.trim() ||
+    ''
+  );
 }
 
 function formatParams(params: FetchParams): string {
@@ -50,25 +61,33 @@ async function fetchMetric(authorId: string, metricType: string, byYear: boolean
     );
   }
 
+  const insttoken = resolveInsttoken();
   const params: FetchParams = {
     authors: authorId,
     metricTypes: metricType,
     includedDocs: includedDocs,
     yearRange: yearRange,
     includeSelfCitations: includeSelfCitations,
-    byYear: byYear.toString()
+    byYear: byYear.toString(),
+    journalImpactType: 'CiteScore',
+    showAsFieldWeighted: 'false',
+    indexType: 'hIndex',
   };
-  
+
   const url = `${BASE_URL}?${formatParams(params)}`;
-  
-  // Use headers similar to Google Apps Script
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'X-ELS-APIKey': apiKey,
+    'User-Agent': 'SciVal-Research-Dashboard/1.0',
+  };
+  if (insttoken) {
+    headers['X-ELS-Insttoken'] = insttoken;
+  }
+
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Accept': 'application/json',
-      'X-ELS-APIKey': apiKey,
-      'User-Agent': 'SciVal-Research-Dashboard/1.0'
-    }
+    headers,
   });
   
   if (!response.ok) {

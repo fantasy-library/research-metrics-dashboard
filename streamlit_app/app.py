@@ -4885,10 +4885,6 @@ def _render_find_scopus_author_id_help(api_key_effective: str | None) -> None:
             st.caption(
                 "Browse HKUST researcher profiles to find Scopus Author IDs."
             )
-            st.image(
-                str(_ROOT / "Scholar_Profiles.png"),
-                use_container_width=True,
-            )
             st.link_button(
                 "Open HKUST Research Portal",
                 "https://researchportal.hkust.edu.hk/en/persons/",
@@ -4973,6 +4969,18 @@ def main() -> None:
         if (SCIVAL_HTTP_PROXY or "").strip():
             _mode_caption += " SciVal traffic uses SCIVAL_HTTP_PROXY (Elsevier via institutional proxy)."
         st.caption(_mode_caption)
+        with st.expander("Elsevier / Cloudflare access"):
+            st.markdown(
+                "This dashboard calls SciVal **from the server** (Python + API headers), not from your "
+                "browser address bar. Pasting a full SciVal URL into Chrome often shows "
+                "**Sorry, you have been blocked** — that is Cloudflare protecting Elsevier and is "
+                "**not** a reliable test of whether Analyze will work here."
+            )
+            st.markdown(
+                "If Analyze fails with a Cloudflare message, ask HKUST Library / IT for an "
+                "institutional **HTTP(S) proxy** and set **`SCIVAL_HTTP_PROXY`** (or `HTTPS_PROXY`) "
+                "so requests leave from the campus network."
+            )
         custom_key = st.text_input(
             "Optional SciVal API key",
             type="password",

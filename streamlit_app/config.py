@@ -87,6 +87,16 @@ ELSEVIER_INSTTOKEN: str = _resolve_insttoken()
 # so traffic exits from an allowlisted university address. Example: http://proxy.ust.hk:8080
 SCIVAL_HTTP_PROXY: str = (os.getenv("SCIVAL_HTTP_PROXY") or "").strip()
 
+# Elsevier API auth: default header-only (X-ELS-APIKey / X-ELS-Insttoken). Putting keys in the
+# query string matches Data Fetcher examples but often triggers Cloudflare when pasted in a browser
+# and can increase WAF scrutiny on server traffic — set SCIVAL_AUTH_IN_QUERY=true only if required.
+SCIVAL_AUTH_IN_QUERY: bool = _truthy(os.getenv("SCIVAL_AUTH_IN_QUERY"))
+
+# Identifiable client string for Elsevier (optional override).
+SCIVAL_USER_AGENT: str = (
+    (os.getenv("SCIVAL_USER_AGENT") or "").strip() or "SciVal-Research-Dashboard/1.0"
+)
+
 
 def scival_httpx_verify() -> bool | str:
     """TLS ``verify`` argument for httpx clients talking to Elsevier/SciVal.
