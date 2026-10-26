@@ -1199,6 +1199,15 @@ div[data-testid="stVerticalBlock"]:has(span.skin-unified-form-shell) {
 }
 
 /* —— Search configuration (shell + widgets: final shell tokens live in “Stable key-based” block) —— */
+.search-scope-kicker {
+  margin: 0.35rem 0 0.15rem 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
+}
 .search-config-title {
   margin: 0 0 0.65rem 0 !important;
   font-family: 'Inter', 'Segoe UI', sans-serif !important;
@@ -4727,7 +4736,10 @@ def _render_sdg_publications_section(valid_results: list[dict], year_key: str, d
             name = str(data.get("authorName") or f"Author {aid}")
             author_options[f"{name} ({aid})"] = aid
         if not author_options:
-            st.info("Analyse at least one valid Scopus Author ID above before fetching SDG publications.")
+            st.info(
+                "Enter at least one Scopus Author ID in the search box above, then open this section "
+                "or run **Analyze Metrics** first."
+            )
             return
 
         _disclaimer_tooltip = (
@@ -6679,6 +6691,9 @@ def main() -> None:
         if (SCIVAL_HTTP_PROXY or "").strip():
             _mode_caption += " SciVal traffic uses SCIVAL_HTTP_PROXY (Elsevier via institutional proxy)."
         st.caption(_mode_caption)
+        st.caption(
+            "Build: **revised5** (doc-type filter, Publications Analysis, SciVal header auth)."
+        )
         with st.expander("Elsevier / Cloudflare access"):
             st.markdown(
                 "This dashboard calls SciVal **from the server** (Python + API headers), not from your "
@@ -6807,6 +6822,11 @@ def main() -> None:
                 x.strip() for x in re.split(r"[,\n;]+", author_ids) if x.strip()
             ]
 
+            st.markdown(
+                '<p class="search-scope-kicker">Search scope '
+                "(SciVal metrics &amp; Publications Analysis)</p>",
+                unsafe_allow_html=True,
+            )
             fy, fd, fs = st.columns(3, gap="small")
             with fy:
                 st.markdown(
@@ -6954,6 +6974,24 @@ def main() -> None:
             '<div id="analyze-metrics-anchor" class="analyze-anchor-tight"></div>',
             unsafe_allow_html=True,
         )
+
+        _pub_authors_for_section: list[dict] = []
+        _metric_results = st.session_state.get("results") or []
+        if _metric_results:
+            _pub_authors_for_section = [
+                r
+                for r in _metric_results
+                if not (r.get("data") or {}).get("error")
+            ]
+        elif parsed_author_ids:
+            _pub_authors_for_section = [
+                {"id": aid, "data": {}} for aid in parsed_author_ids[:MAX_AUTHORS_PER_RUN]
+            ]
+        if _pub_authors_for_section:
+            _render_sdg_publications_section(
+                _pub_authors_for_section, year_key, docs_key
+            )
+
         if not st.session_state.get("_deep_link_analyze_injected"):
             st.session_state._deep_link_analyze_injected = True
             components.html(_DEEP_LINK_ANALYZE_HTML, height=0, width=0)
@@ -7511,8 +7549,6 @@ def main() -> None:
                             metrics=d.get("metrics"),
                             data_source=d.get("dataSource"),
                         )
-
-        _render_sdg_publications_section(valid, year_key, docs_key)
 
     elif results:
         for r in results:
